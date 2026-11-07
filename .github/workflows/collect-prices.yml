@@ -1,0 +1,29 @@
+name: Collect flight prices
+
+# Supabase Edge Function `collect` 를 6시간마다 호출한다. (KST 약 02/08/14/20시)
+# 정각은 GitHub 쪽이 몹시 붐벼 지연되므로 17분으로 둔다.
+on:
+  schedule:
+    - cron: "17 5,11,17,23 * * *"
+  workflow_dispatch: {}   # Actions 탭에서 수동 실행 가능
+
+permissions: {}
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call collect function
+        env:
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          COLLECT_SECRET: ${{ secrets.COLLECT_SECRET }}
+        run: |
+          if [ -z "$PROJECT_REF" ] || [ -z "$COLLECT_SECRET" ]; then
+            echo "Missing repository secrets: SUPABASE_PROJECT_REF / COLLECT_SECRET" >&2
+            exit 1
+          fi
+          curl -sS --fail-with-body --max-time 170 -X POST \
+            "https://${PROJECT_REF}.supabase.co/functions/v1/collect" \
+            -H "x-collect-secret: ${COLLECT_SECRET}"
+          echo
