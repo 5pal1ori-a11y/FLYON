@@ -43,8 +43,14 @@ jobs:
         env:
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "$SUPABASE_PROJECT_REF" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing secrets: SUPABASE_PROJECT_REF / SUPABASE_ANON_KEY (샘플 데이터 빌드가 올라가는 것을 막기 위해 중단)" >&2
+            exit 1
+          fi
           xcodebuild archive \
             -project FLYON.xcodeproj \
             -scheme FLYON \
@@ -56,7 +62,9 @@ jobs:
             -authenticationKeyIssuerID "$ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" \
+            SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
       - name: Export and upload to App Store Connect
         env:
