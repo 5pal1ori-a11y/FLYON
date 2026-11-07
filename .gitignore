@@ -1,0 +1,17 @@
+# Xcode / XcodeGen
+*.xcodeproj
+xcuserdata/
+DerivedData/
+build/
+.DS_Store
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Secrets - never commit
+.env
+.env.*
+*.p8
+*.p12
+*.mobileprovision
