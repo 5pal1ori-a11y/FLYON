@@ -23,6 +23,7 @@ targets:
       path: FLYON/Info.plist
       properties:
         CFBundleDisplayName: FLYON
+        ITSAppUsesNonExemptEncryption: false   # HTTPS 표준 암호화만 사용
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:

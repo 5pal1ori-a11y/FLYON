@@ -1,0 +1,40 @@
+name: iOS build check
+
+# 서명 없이 시뮬레이터용으로 컴파일만 해 본다. (비밀값 불필요)
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "FLYON/**"
+      - "project.yml"
+      - ".github/workflows/ios-build-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (simulator, no signing)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project FLYON.xcodeproj \
+            -scheme FLYON \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
