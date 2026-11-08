@@ -1,0 +1,154 @@
+name: 구독온 TestFlight
+
+# 구독온(SubscriptionOn) 앱 전용. 수동 실행: Actions 탭 > 구독온 TestFlight > Run workflow
+# 기기(UDID) 등록 없이 서명하기 위해, 실행마다 임시 배포 인증서/프로파일을 API로 만들고
+# 업로드 후 삭제한다. (ci/apple_signing.py, FLYON과 같은 팀·시크릿 사용)
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  TEAM_ID: F5XL8B63NU
+  BUNDLE_ID: com.subon.app
+  CAPABILITIES: ""
+
+jobs:
+  testflight:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet cryptography
+
+      - name: Generate Xcode project
+        run: cd SubscriptionOn && xcodegen generate
+
+      - name: Write App Store Connect API key
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEY_ID" ] || [ -z "$PRIVATE_KEY" ]; then
+            echo "Missing App Store Connect secrets" >&2; exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
+          chmod 600 "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
+
+      - name: Create temporary signing assets
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          export ASC_KEY_PATH="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+          "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/ci/apple_signing.py" setup "$RUNNER_TEMP/signing"
+
+      - name: Install signing assets into a temporary keychain
+        run: |
+          set -euo pipefail
+          SIGN="$RUNNER_TEMP/signing"
+          KC="$RUNNER_TEMP/flyon-build.keychain-db"
+          KC_PASS="$(openssl rand -hex 16)"
+          echo "::add-mask::$KC_PASS"
+
+          security create-keychain -p "$KC_PASS" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KC_PASS" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KC"
+
+          # Apple 중간 인증서 (체인 검증용)
+          for name in AppleWWDRCAG3 AppleWWDRCAG6; do
+            curl -fsSL -o "$RUNNER_TEMP/$name.cer" "https://www.apple.com/certificateauthority/$name.cer" \
+              && security import "$RUNNER_TEMP/$name.cer" -k "$KC" -T /usr/bin/codesign || true
+          done
+
+          security import "$SIGN/key.pem" -k "$KC" -t priv -f openssl -T /usr/bin/codesign
+          security import "$SIGN/distribution.cer" -k "$KC" -t cert -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" "$KC" >/dev/null
+
+          security find-identity -v -p codesigning "$KC"
+          IDENTITY="$(security find-identity -v -p codesigning "$KC" | awk '/[0-9A-F]{40}/ {print $2; exit}')"
+          if [ -z "$IDENTITY" ]; then echo "No valid signing identity found" >&2; exit 1; fi
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_UUID="$(python3 -c "import json;print(json.load(open('$SIGN/signing.json'))['profile_uuid'])")"
+          PROFILE_NAME="$(python3 -c "import json;print(json.load(open('$SIGN/signing.json'))['profile_name'])")"
+          cp "$SIGN/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          {
+            echo "KC=$KC"
+            echo "IDENTITY=$IDENTITY"
+            echo "PROFILE_NAME=$PROFILE_NAME"
+          } >> "$GITHUB_ENV"
+
+      - name: Archive
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project SubscriptionOn/SubscriptionOn.xcodeproj \
+            -scheme SubscriptionOn \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SubscriptionOn.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KC" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+
+      - name: Export and upload to App Store Connect
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>${IDENTITY}</string>
+            <key>provisioningProfiles</key>
+            <dict><key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string></dict>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/SubscriptionOn.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
+
+      - name: Cleanup (delete temporary certificate/profile, keychain, API key)
+        if: always()
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+          if [ -f "$ASC_KEY_PATH" ] && [ -x "$RUNNER_TEMP/venv/bin/python" ]; then
+            "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/ci/apple_signing.py" cleanup "$RUNNER_TEMP/signing" || echo "::warning::Cleanup failed; delete 'FLYON CI' certificates/profiles in the developer portal"
+          fi
+          [ -n "${KC:-}" ] && security delete-keychain "$KC" || true
+          rm -rf "$RUNNER_TEMP/keys" "$RUNNER_TEMP/signing"

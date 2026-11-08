@@ -114,7 +114,7 @@ def setup(outdir: str) -> None:
     bundle_resource_id = exact[0]["id"]
     caps = call("GET", f"/bundleIds/{bundle_resource_id}/bundleIdCapabilities", soft=True) or {"data": []}
     enabled = {c["attributes"].get("capabilityType") for c in caps.get("data", [])}
-    for cap in ("PUSH_NOTIFICATIONS", "APPLE_ID_AUTH"):
+    for cap in [c for c in os.environ.get("CAPABILITIES", "PUSH_NOTIFICATIONS,APPLE_ID_AUTH").split(",") if c]:
         if cap not in enabled:
             body = {"data": {"type": "bundleIdCapabilities",
                              "attributes": {"capabilityType": cap},
