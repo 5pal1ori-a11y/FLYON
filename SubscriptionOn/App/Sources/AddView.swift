@@ -142,20 +142,19 @@ struct AddView: View {
                 quick("text.bubble", "문자·메일로") { method = .text; stage = .form }
             }
 
-            Card {
-                VStack(spacing: 0) {
-                    ForEach(results, id: \.name) { s in
-                        Button { choose(s) } label: {
-                            HStack(spacing: 14) {
-                                LogoView(name: s.name, category: s.category, size: 40)
-                                Text(s.name).font(.system(size: 16)).foregroundStyle(T.text)
-                                Spacer()
-                                Image(systemName: "plus").foregroundStyle(T.blue)
-                            }.padding(.vertical, 10).contentShape(Rectangle())
-                        }
+            let q = query.trimmingCharacters(in: .whitespaces)
+            if q.isEmpty {
+                ForEach(Category.allCases) { cat in
+                    let items = Catalog.all.filter { $0.category == cat }
+                    if !items.isEmpty {
+                        Text(cat.rawValue).font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub).padding(.top, 6)
+                        Card { VStack(spacing: 0) { ForEach(items, id: \.name) { serviceRow($0) } } }
                     }
-                    let q = query.trimmingCharacters(in: .whitespaces)
-                    if !q.isEmpty {
+                }
+            } else {
+                Card {
+                    VStack(spacing: 0) {
+                        ForEach(results, id: \.name) { serviceRow($0) }
                         Button { name = q; catTouched = false; autofill(q, force: true); stage = .form } label: {
                             HStack(spacing: 14) {
                                 LogoView(name: q, category: Catalog.classify(q), size: 40)
@@ -163,11 +162,22 @@ struct AddView: View {
                                 Spacer(); Image(systemName: "plus").foregroundStyle(T.blue)
                             }.padding(.vertical, 10).contentShape(Rectangle())
                         }
-                    } else if results.isEmpty { Text("검색 결과가 없어요").foregroundStyle(T.sub) }
+                    }
                 }
             }
             Button("직접 입력") { stage = .form }.font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
         }.padding(20)
+    }
+
+    func serviceRow(_ s: Service) -> some View {
+        Button { choose(s) } label: {
+            HStack(spacing: 14) {
+                LogoView(name: s.name, category: s.category, size: 40)
+                Text(s.name).font(.system(size: 16)).foregroundStyle(T.text)
+                Spacer()
+                Image(systemName: "plus").foregroundStyle(T.blue)
+            }.padding(.vertical, 10).contentShape(Rectangle())
+        }
     }
 
     func quick(_ icon: String, _ title: String, _ a: @escaping () -> Void) -> some View {
@@ -254,7 +264,7 @@ struct AddView: View {
     func autofill(_ v: String, force: Bool = false) {
         if editing != nil && !force { return }
         if !catTouched || force { category = Catalog.classify(v) }
-        if let s = Catalog.find(v), priceText.isEmpty || force { priceText = String(s.defaultPrice) }
+        if let s = Catalog.find(v), s.defaultPrice > 0, priceText.isEmpty || force { priceText = String(s.defaultPrice) }
     }
 
     func load() {

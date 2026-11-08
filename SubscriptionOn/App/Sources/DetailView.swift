@@ -94,7 +94,8 @@ struct DetailView: View {
     func cancel() {
         // 앱스토어로 결제한 구독은 애플 구독 관리 화면, 그 외에는 서비스 공식 해지 페이지
         let apple = s.payMethod.contains("애플") || s.payMethod.lowercased().contains("apple") || s.payMethod.contains("앱스토어")
-        let link = apple ? "https://apps.apple.com/account/subscriptions" : (s.service?.cancelURL ?? "")
+        var link = apple ? "https://apps.apple.com/account/subscriptions" : (s.service?.cancelURL ?? "")
+        if link.isEmpty, let q = "\(s.name) 해지 방법".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) { link = "https://www.google.com/search?q=" + q }
         if let u = URL(string: link), !link.isEmpty { openURL(u) }
         askDone = true
     }

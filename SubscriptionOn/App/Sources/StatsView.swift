@@ -21,6 +21,7 @@ struct StatsView: View {
                         }
                     }
                 }
+                NoticeCard()
                 if store.active.isEmpty {
                     Text("구독을 추가하면 보여드려요").foregroundStyle(T.sub).frame(maxWidth: .infinity).padding(.top, 60)
                 } else {

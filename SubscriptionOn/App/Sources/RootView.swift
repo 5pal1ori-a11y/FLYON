@@ -104,34 +104,14 @@ struct HomeView: View {
                             }
                         }
 
-                        // 다음 결제일 카드 2개
-                        let nexts = nextDays()
-                        if !nexts.isEmpty {
-                            HStack(spacing: 12) {
-                                ForEach(nexts, id: \.0) { d, subs in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(d.formatted(.dateTime.month().day())).font(.system(size: 13)).foregroundStyle(T.sub)
-                                        Text(subs.reduce(0) { $0 + $1.price }.won).font(.system(size: 20, weight: .bold))
-                                        HStack(spacing: -8) {
-                                            ForEach(subs.prefix(4)) { s in LogoView(name: s.name, category: s.category, size: 26) }
-                                        }.padding(.top, 4)
-                                    }
-                                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                                }
-                            }
-                        }
-
                         // 구독 서비스
                         HStack {
                             Text("구독 서비스").font(.system(size: 15)).foregroundStyle(T.sub)
                             Spacer()
                             Text("총 \(store.monthlyTotal.won)").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.text)
                         }.padding(.top, 8)
-                        TextField("서비스 검색", text: $q)
-                            .padding(12).background(.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        let list = q.isEmpty ? store.upcoming : store.search(q)
-                        ForEach(showAllList || !q.isEmpty ? list : Array(list.prefix(6))) { s in
+                        let list = store.upcoming
+                        ForEach(showAllList ? list : Array(list.prefix(5))) { s in
                             HStack(spacing: 14) {
                                 LogoView(name: s.name, category: s.category, size: 48)
                                 VStack(alignment: .leading, spacing: 3) {
@@ -144,28 +124,18 @@ struct HomeView: View {
                             .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                             .onTapGesture { selected = s }
                         }
-                        if q.isEmpty && list.count > 6 {
+                        if list.count > 5 {
                             Button { withAnimation { showAllList.toggle() } } label: {
-                                Text(showAllList ? "접기" : "\(list.count - 6)개 더 보기").font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
+                                Text(showAllList ? "접기" : "\(list.count - 5)개 더 보기").font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
                             }
                         }
 
-                        if q.isEmpty {
-                            NoticeCard()
-                            UpcomingList { selected = $0 }
-                            if !store.insights.isEmpty {
-                                Card {
-                                    VStack(alignment: .leading, spacing: 14) {
-                                        SectionTitle(t: store.potentialSave > 0 ? "\(store.potentialSave.won) 아낄 수 있어요" : "확인해보세요")
-                                        ForEach(store.insights) { i in
-                                            HStack(spacing: 12) {
-                                                Image(systemName: i.icon).foregroundStyle(T.blue).frame(width: 32, height: 32).background(T.blueSoft, in: Circle())
-                                                Text(i.text).font(.system(size: 15)).foregroundStyle(T.text)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        if store.potentialSave > 0 {
+                            HStack(spacing: 12) {
+                                Image(systemName: "sparkles").foregroundStyle(T.blue)
+                                Text("\(store.potentialSave.won) 아낄 수 있어요").font(.system(size: 15, weight: .semibold))
+                                Spacer()
+                            }.padding(16).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
                     }
                     Spacer(minLength: 160)
@@ -236,6 +206,7 @@ struct CalendarView: View {
                         ForEach(todays) { s in SubRow(s: s).onTapGesture { selected = s } }
                     }
                 }
+                UpcomingList { selected = $0 }
                 Spacer(minLength: 100)
             }.padding(.horizontal, 20)
         }.sheet(item: $selected) { DetailView(sub: $0).environmentObject(store) }
