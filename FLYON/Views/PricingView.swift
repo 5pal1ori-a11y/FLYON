@@ -38,7 +38,6 @@ struct PricingView: View {
                         searchCard
                         searchButton
                         popularRoutes
-                        footer
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, -34)
@@ -69,23 +68,18 @@ struct PricingView: View {
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("어디로 갈까요?")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text("출발지와 도착지를 고르면 가격 흐름을 분석해 드려요")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.75))
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 64)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Theme.headerGradient
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 28, bottomTrailingRadius: 28))
-                .ignoresSafeArea(edges: .top)
-        )
+        Text("어디로 갈까요?")
+            .font(.system(size: 30, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 60)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Theme.headerGradient
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 28, bottomTrailingRadius: 28))
+                    .ignoresSafeArea(edges: .top)
+            )
     }
 
     // MARK: Search card
@@ -170,31 +164,27 @@ struct PricingView: View {
     private var popularRoutes: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "인기 노선")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(Array(Catalog.popularRoutes.enumerated()), id: \.offset) { index, pair in
-                    if let o = Catalog.airport(pair.0), let d = Catalog.airport(pair.1) {
-                        Button {
-                            origin = o
-                            destination = d
-                            appState.addRecent(origin: o, destination: d)
-                            result = RouteSearch(origin: o, destination: d, month: month, airlines: airlines)
-                        } label: {
-                            RouteTile(origin: o, destination: d, index: index)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(Catalog.popularRoutes.enumerated()), id: \.offset) { _, pair in
+                        if let o = Catalog.airport(pair.0), let d = Catalog.airport(pair.1) {
+                            Button {
+                                origin = o
+                                destination = d
+                            } label: {
+                                Text("\(o.city) → \(d.city)")
+                                    .font(.subheadline.weight(.medium))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(Theme.cardBackground, in: Capsule())
+                                    .foregroundStyle(.primary)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, 16)
             }
-        }
-    }
-
-    private var footer: some View {
-        Label {
-            Text("전 세계 \(Catalog.airports.count.formatted())개 공항, \(Catalog.airlines.count)개 항공사를 고를 수 있어요. 노선에 따라 가격 데이터가 없을 수 있고, 처음 조회하는 노선은 불러오는 데 몇 초 걸려요.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        } icon: {
-            Image(systemName: "globe.asia.australia").foregroundStyle(.secondary)
+            .padding(.horizontal, -16)
         }
     }
 
@@ -233,10 +223,6 @@ private struct AirportRow: View {
                                 .lineLimit(1)
                             IATABadge(code: airport.code)
                         }
-                        Text("\(airport.name) · \(airport.country)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
                     } else {
                         Text(placeholder)
                             .font(.title3.weight(.semibold))

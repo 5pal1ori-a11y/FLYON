@@ -13,21 +13,16 @@ struct ResultView: View {
     }
 
     private enum Phase { case loading, loaded, failed }
-    private enum RangeOption: Int, CaseIterable, Identifiable {
-        case week = 7, month = 30, quarter = 90
-        var id: Int { rawValue }
-        var title: String {
-            switch self {
-            case .week: return "7일"
-            case .month: return "30일"
-            case .quarter: return "90일"
-            }
-        }
+    private enum Tab: String, CaseIterable, Identifiable {
+        case trend = "추이"
+        case calendar = "달력"
+        case airlines = "항공사"
+        var id: String { rawValue }
     }
 
     @State private var phase: Phase = .loading
     @State private var data = Loaded(history: [], calendar: [], quotes: [])
-    @State private var range: RangeOption = .month
+    @State private var tab: Tab = .trend
     @State private var month: Date
     @State private var monthLoading = false
     @State private var showAllQuotes = false
@@ -44,12 +39,13 @@ struct ResultView: View {
         FavoriteRoute(originCode: search.origin.code, destinationCode: search.destination.code)
     }
 
-    private var rangeHistory: [PricePoint] {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -(range.rawValue - 1), to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
+    /// 최근 30일 이력
+    private var recentHistory: [PricePoint] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -29, to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
         return data.history.filter { $0.date >= cutoff }
     }
 
-    private var analysis: PriceAnalysis? { PriceAnalysis(history: rangeHistory) }
+    private var analysis: PriceAnalysis? { PriceAnalysis(history: recentHistory) }
 
     private var hasAnyData: Bool {
         !(data.history.isEmpty && data.calendar.isEmpty && data.quotes.isEmpty)
@@ -59,34 +55,45 @@ struct ResultView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                hero
+
                 switch phase {
                 case .loading:
-                    hero(placeholder: true)
-                    ProgressView("가격을 불러오는 중이에요")
-                        .frame(maxWidth: .infinity, minHeight: 200)
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 160)
                 case .failed:
-                    hero(placeholder: true)
                     ContentUnavailableView {
-                        Label("가격을 불러오지 못했어요", systemImage: "wifi.exclamationmark")
+                        Label("불러오지 못했어요", systemImage: "wifi.exclamationmark")
                     } description: {
-                        Text("네트워크 상태를 확인하고 다시 시도해 주세요." + (errorDetail.map { "\n(\($0))" } ?? ""))
+                        Text("네트워크를 확인하고 다시 시도해 주세요." + (errorDetail.map { "\n(\($0))" } ?? ""))
                     } actions: {
                         Button("다시 시도") { Task { await load() } }
                             .buttonStyle(.borderedProminent)
                     }
                 case .loaded:
                     if hasAnyData {
-                        hero(placeholder: false)
-                        rangePicker
-                        chartCard
-                        calendarCard
-                        quotesCard
+                        Picker("보기", selection: $tab) {
+                            ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+
+                        switch tab {
+                        case .trend: trendCard
+                        case .calendar: calendarCard
+                        case .airlines: quotesCard
+                        }
                     } else {
-                        hero(placeholder: true)
-                        emptyState
+                        ContentUnavailableView {
+                            Label("가격 데이터가 아직 없어요", systemImage: "tray")
+                        } description: {
+                            Text("검색 기록이 적은 노선일 수 있어요. 다른 노선이나 달을 선택해 보세요.")
+                        }
                     }
                 }
-                disclaimer
+
+                Text("참고용 가격이며 실제 예약 가격과 다를 수 있어요. FLYON은 항공권을 판매하거나 예약을 중개하지 않아요.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
@@ -110,37 +117,34 @@ struct ResultView: View {
 
     // MARK: Hero
 
-    private func hero(placeholder: Bool) -> some View {
+    private var hero: some View {
         let price = analysis?.current ?? data.quotes.first?.price ?? data.calendar.map(\.price).min()
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                IATABadge(code: search.origin.code, onDark: true)
-                Image(systemName: "airplane").font(.caption).foregroundStyle(.white.opacity(0.8))
-                IATABadge(code: search.destination.code, onDark: true)
-                Spacer()
-                if appState.provider.isSample {
-                    Pill(text: "샘플 데이터", systemImage: "testtube.2", color: .orange)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(analysis.map { "\($0.lastDate.dayTitle) 기준 최저가" } ?? "현재 참고 최저가")
+        let ready = phase == .loaded
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("현재 최저가")
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.7))
-                if let price, !placeholder {
-                    Text(price.won)
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                } else {
-                    Text("––––")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.3))
+                Spacer()
+                if appState.provider.isSample {
+                    Pill(text: "샘플 데이터", color: .orange)
                 }
             }
 
-            if let a = analysis, !placeholder {
+            if let price, ready {
+                Text(price.won)
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            } else {
+                Text("––––")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+
+            if let a = analysis, ready, a.verdict != .collecting {
                 HStack(spacing: 10) {
-                    Pill(text: a.verdict.title, systemImage: a.verdict.symbol, color: a.verdict.color == Theme.mid ? .yellow : a.verdict.color)
+                    Pill(text: a.verdict.title, systemImage: a.verdict.symbol,
+                         color: a.verdict.color == Theme.mid ? .yellow : a.verdict.color)
                     Text(a.deviationText)
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.75))
@@ -152,47 +156,22 @@ struct ResultView: View {
         .background(Theme.headerGradient, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    private var rangePicker: some View {
-        Picker("기간", selection: $range) {
-            ForEach(RangeOption.allCases) { Text($0.title).tag($0) }
-        }
-        .pickerStyle(.segmented)
-    }
+    // MARK: 추이
 
-    // MARK: Chart
-
-    private var chartCard: some View {
+    private var trendCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "가격 흐름", subtitle: "수집일별 최저가")
-
-            if let a = analysis, rangeHistory.count >= 2 {
+            if let a = analysis, recentHistory.count >= 2 {
                 Chart {
-                    ForEach(rangeHistory) { p in
+                    ForEach(recentHistory) { p in
                         AreaMark(x: .value("날짜", p.date), y: .value("가격", p.price))
                             .interpolationMethod(.catmullRom)
                             .foregroundStyle(LinearGradient(
-                                colors: [Theme.accent.opacity(0.28), Theme.accent.opacity(0)],
+                                colors: [Theme.accent.opacity(0.25), Theme.accent.opacity(0)],
                                 startPoint: .top, endPoint: .bottom))
                         LineMark(x: .value("날짜", p.date), y: .value("가격", p.price))
                             .interpolationMethod(.catmullRom)
                             .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                             .foregroundStyle(Theme.accent)
-                    }
-                    RuleMark(y: .value("평균", a.average))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                        .foregroundStyle(.secondary)
-                        .annotation(position: .top, alignment: .trailing) {
-                            Text("평균 \(a.average.shortWon)").font(.caption2).foregroundStyle(.secondary)
-                        }
-                    if let low = rangeHistory.min(by: { $0.price < $1.price }) {
-                        PointMark(x: .value("날짜", low.date), y: .value("가격", low.price))
-                            .foregroundStyle(Theme.cheap)
-                            .symbolSize(70)
-                    }
-                    if let last = rangeHistory.max(by: { $0.date < $1.date }) {
-                        PointMark(x: .value("날짜", last.date), y: .value("가격", last.price))
-                            .foregroundStyle(Theme.accent)
-                            .symbolSize(90)
                     }
                 }
                 .chartYScale(domain: .automatic(includesZero: false))
@@ -211,37 +190,25 @@ struct ResultView: View {
                 }
                 .frame(height: 200)
 
-                HStack {
-                    stat("최저", a.lowest.won, Theme.cheap)
-                    Divider().frame(height: 30)
-                    stat("평균", a.average.won, .primary)
-                    Divider().frame(height: 30)
-                    stat("최고", a.highest.won, Theme.expensive)
-                }
+                Text("최근 30일  최저 \(a.lowest.won) · 평균 \(a.average.won) · 최고 \(a.highest.won)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "hourglass")
                         .font(.title2)
                         .foregroundStyle(Theme.accent)
-                    Text("이 노선의 가격 이력을 모으기 시작했어요. 며칠 지나면 가격 흐름 그래프가 나타나요.")
+                    Text("가격 이력을 모으는 중이에요. 며칠 지나면 그래프가 나타나요.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 8)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }
 
-    private func stat(_ title: String, _ value: String, _ color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.subheadline.weight(.bold)).foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: Calendar
+    // MARK: 달력
 
     private var canGoBack: Bool { month > (PricingView.months.first ?? month) }
     private var canGoForward: Bool { month < (PricingView.months.last ?? month) }
@@ -249,53 +216,33 @@ struct ResultView: View {
     private var calendarCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                SectionHeader(title: "출발일별 최저가", subtitle: "싼 날을 한눈에 확인해요")
+                Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
+                    .disabled(!canGoBack || monthLoading)
                 Spacer()
-                HStack(spacing: 4) {
-                    Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
-                        .disabled(!canGoBack || monthLoading)
-                    Text(month.monthTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(minWidth: 84)
-                    Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
-                        .disabled(!canGoForward || monthLoading)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.accent)
+                Text(month.monthTitle).font(.headline)
+                Spacer()
+                Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
+                    .disabled(!canGoForward || monthLoading)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.accent)
 
             if data.calendar.isEmpty {
-                Text(monthLoading ? "불러오는 중..." : (calendarError.map { "불러오지 못했어요 (\($0))" } ?? "이 달의 출발일별 가격 데이터가 아직 없어요."))
+                Text(monthLoading ? "불러오는 중..." : (calendarError.map { "불러오지 못했어요 (\($0))" } ?? "이 달의 가격 데이터가 아직 없어요."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
             } else {
-                if let cheapest = data.calendar.min(by: { $0.price < $1.price }) {
-                    HStack(spacing: 8) {
-                        Pill(text: "가장 싼 날", systemImage: "arrow.down.right", color: Theme.cheap)
-                        Text("\(cheapest.date.dayTitle)  \(cheapest.price.won)")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                }
                 CalendarGrid(month: month, days: data.calendar)
-                HStack(spacing: 14) {
-                    legendDot(Theme.cheap, "저렴")
-                    legendDot(Theme.mid, "보통")
-                    legendDot(Theme.expensive, "비쌈")
+                if let cheapest = data.calendar.min(by: { $0.price < $1.price }) {
+                    Text("가장 싼 날  \(cheapest.date.dayTitle) · \(cheapest.price.won)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.cheap)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .card()
         .opacity(monthLoading ? 0.6 : 1)
-    }
-
-    private func legendDot(_ color: Color, _ text: String) -> some View {
-        HStack(spacing: 5) {
-            RoundedRectangle(cornerRadius: 3).fill(color.opacity(0.4)).frame(width: 12, height: 12)
-            Text(text)
-        }
     }
 
     private func shiftMonth(_ delta: Int) {
@@ -304,48 +251,41 @@ struct ResultView: View {
         Task { await loadMonth() }
     }
 
-    // MARK: Quotes
+    // MARK: 항공사
 
     private var quotesCard: some View {
         let quotes = data.quotes
-        let shown = showAllQuotes ? quotes : Array(quotes.prefix(6))
-        return VStack(alignment: .leading, spacing: 6) {
-            SectionHeader(title: "항공사별 최저가", subtitle: "\(month.monthTitle) 출발 기준")
-                .padding(.bottom, 8)
-
+        let shown = showAllQuotes ? quotes : Array(quotes.prefix(5))
+        return VStack(alignment: .leading, spacing: 4) {
             if quotes.isEmpty {
-                Text(monthLoading ? "불러오는 중..." : (quotesError.map { "불러오지 못했어요 (\($0))" } ?? "선택한 조건에 맞는 항공사 가격이 없어요."))
+                Text(monthLoading ? "불러오는 중..." : (quotesError.map { "불러오지 못했어요 (\($0))" } ?? "이 조건의 항공사 가격이 없어요."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
+                Text("\(month.monthTitle) 출발 기준")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 6)
+
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, q in
                     HStack(spacing: 12) {
-                        AirlineBadge(code: q.airline.code)
-                        VStack(alignment: .leading, spacing: 3) {
+                        AirlineBadge(code: q.airline.code, size: 36)
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(q.airline.name).font(.subheadline.weight(.semibold))
-                            HStack(spacing: 6) {
-                                Text(q.departureDate.dayTitle)
-                                Text(q.transfers == 0 ? "직항" : "경유 \(q.transfers)회")
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 1)
-                                    .background(Color(.tertiarySystemFill), in: Capsule())
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            Text("\(q.departureDate.dayTitle) · \(q.transfers == 0 ? "직항" : "경유 \(q.transfers)회")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(q.price.won)
-                                .font(.system(.subheadline, design: .rounded).weight(.bold))
-                                .foregroundStyle(index == 0 ? Theme.accent : .primary)
-                            if index == 0 { Pill(text: "최저", color: Theme.cheap) }
-                        }
+                        Text(q.price.won)
+                            .font(.system(.subheadline, design: .rounded).weight(.bold))
+                            .foregroundStyle(index == 0 ? Theme.accent : .primary)
                     }
                     .padding(.vertical, 8)
                     if index < shown.count - 1 { Divider() }
                 }
-                if quotes.count > 6 {
-                    Button(showAllQuotes ? "접기" : "항공사 \(quotes.count)곳 모두 보기") {
+                if quotes.count > 5 {
+                    Button(showAllQuotes ? "접기" : "\(quotes.count - 5)곳 더 보기") {
                         withAnimation { showAllQuotes.toggle() }
                     }
                     .font(.subheadline.weight(.semibold))
@@ -354,30 +294,8 @@ struct ResultView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .card()
-    }
-
-    // MARK: Empty / disclaimer
-
-    private var emptyState: some View {
-        ContentUnavailableView {
-            Label("이 노선의 가격 데이터가 아직 없어요", systemImage: "tray")
-        } description: {
-            Text("제공처에 검색 기록이 거의 없는 노선일 수 있어요. 인기 노선이나 다른 달을 선택해 보세요.")
-        } actions: {
-            Button("다시 시도") { Task { await load() } }
-        }
-    }
-
-    private var disclaimer: some View {
-        Label {
-            Text("참고용 가격이며 실제 예약 가격과 다를 수 있어요. FLYON은 항공권을 판매하거나 예약을 중개하지 않아요.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } icon: {
-            Image(systemName: "info.circle").foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 4)
     }
 
     // MARK: Loading
