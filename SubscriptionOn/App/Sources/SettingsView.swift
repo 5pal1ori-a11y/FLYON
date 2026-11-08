@@ -4,7 +4,7 @@ import UserNotifications
 struct SettingsView: View {
     @EnvironmentObject var store: Store
     @AppStorage("themeMode") private var themeMode = 0
-    @AppStorage("accentHex") private var accentHex = 0
+    @AppStorage("themeID") private var themeID = "default"
     @State private var budgetText = ""
     @State private var goalText = ""
     @State private var confirmReset = false
@@ -27,19 +27,47 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 BigTitle("나에게\n맞게").stagger(0)
 
+                // 프로필
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle().fill(.white.opacity(0.22)).frame(width: 64, height: 64)
+                        Text(String((store.userName.isEmpty ? "구" : store.userName).prefix(1))).font(.system(size: 28, weight: .heavy)).foregroundStyle(.white)
+                            .contentTransition(.numericText())
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("", text: store.$userName, prompt: Text("이름을 적어주세요").foregroundColor(.white.opacity(0.65)))
+                            .font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
+                        Text("구독 \(store.active.count)개 · 한 달 \(store.monthlyTotal.won)").font(.system(size: 13)).foregroundStyle(.white.opacity(0.85))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(22).frame(maxWidth: .infinity, alignment: .leading)
+                .background(T.hero)
+                .overlay(alignment: .topTrailing) { Circle().fill(.white.opacity(0.1)).frame(width: 130).offset(x: 40, y: -50) }
+                .overlay(alignment: .bottomTrailing) { Circle().fill(T.accent3.opacity(0.45)).frame(width: 100).blur(radius: 6).offset(x: 10, y: 40) }
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .shadow(color: T.blue.opacity(0.3), radius: 18, y: 10)
+                .stagger(1)
+
+                // 목표
+                SectionLabel("목표")
                 Card {
                     VStack(alignment: .leading, spacing: 14) {
-                        TextField("이름", text: store.$userName)
+                        row("wonsign.circle.fill", T.blue, "한 달 예산") {
+                            TextField("0", text: $budgetText).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 110)
+                                .onChange(of: budgetText) { _, v in store.budget = Int(v) ?? 0 }
+                            Text("원").foregroundStyle(T.sub)
+                        }
                         Divider()
-                        HStack { Text("한 달 예산"); Spacer(); TextField("0", text: $budgetText).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 120)
-                            .onChange(of: budgetText) { _, v in store.budget = Int(v) ?? 0 }; Text("원") }
-                        Divider()
-                        HStack { Text("절약 목표"); Spacer(); TextField("0", text: $goalText).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 120)
-                            .onChange(of: goalText) { _, v in store.saveGoal = Int(v) ?? 0 }; Text("원") }
+                        row("target", T.accent3, "절약 목표") {
+                            TextField("0", text: $goalText).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 110)
+                                .onChange(of: goalText) { _, v in store.saveGoal = Int(v) ?? 0 }
+                            Text("원").foregroundStyle(T.sub)
+                        }
                     }.font(.system(size: 16))
-                }.stagger(1)
+                }.stagger(2)
 
-                // 알림
+                SectionLabel("알림")
                 Card {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
@@ -109,12 +137,43 @@ struct SettingsView: View {
                             .transition(.asymmetric(insertion: .move(edge: .top).combined(with: .opacity), removal: .opacity))
                         }
                     }
-                }.stagger(2)
+                }.stagger(3)
+
+                // 테마
+                SectionLabel("테마")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(T.palettes) { p in
+                            let on = themeID == p.id
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { themeID = p.id }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    ZStack(alignment: .leading) {
+                                        ForEach(Array(p.colors.enumerated()), id: \.offset) { i, c in
+                                            Circle().fill(c).frame(width: 34, height: 34).overlay(Circle().stroke(T.card, lineWidth: 3)).offset(x: CGFloat(i) * 22)
+                                        }
+                                    }.frame(width: 80, height: 34, alignment: .leading)
+                                    HStack(spacing: 4) {
+                                        Text(p.name).font(.system(size: 14, weight: .bold)).foregroundStyle(T.text)
+                                        if on { Image(systemName: "checkmark.circle.fill").foregroundStyle(p.colors[0]).font(.system(size: 14)).transition(.scale) }
+                                    }
+                                }
+                                .padding(16).frame(width: 130, alignment: .leading)
+                                .background(T.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(p.colors[0], lineWidth: on ? 2 : 0))
+                                .scaleEffect(on ? 1.04 : 1)
+                                .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 12, y: 5)
+                            }.buttonStyle(PressCard())
+                        }
+                    }.padding(.vertical, 8).padding(.horizontal, 2)
+                }.stagger(4)
 
                 // 화면
+                SectionLabel("화면")
                 Card {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("화면").font(.system(size: 17, weight: .bold))
                         HStack(spacing: 10) {
                             ForEach([(0, "시스템", "circle.lefthalf.filled"), (1, "라이트", "sun.max.fill"), (2, "다크", "moon.fill")], id: \.0) { v, label, icon in
                                 Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { themeMode = v } } label: {
@@ -126,17 +185,6 @@ struct SettingsView: View {
                                     .background(themeMode == v ? T.blueSoft : T.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(T.blue, lineWidth: themeMode == v ? 1.5 : 0))
                                 }.buttonStyle(PressCard())
-                            }
-                        }
-                        Text("포인트 색").font(.system(size: 13)).foregroundStyle(T.sub)
-                        HStack(spacing: 14) {
-                            ForEach(T.accents, id: \.1) { name, hex in
-                                let on = (accentHex == 0 ? 0x3182F6 : accentHex) == Int(hex)
-                                Button { withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { accentHex = Int(hex) } } label: {
-                                    Circle().fill(Color(hex: hex)).frame(width: 36, height: 36)
-                                        .overlay(Image(systemName: "checkmark").font(.system(size: 14, weight: .heavy)).foregroundStyle(.white).opacity(on ? 1 : 0).scaleEffect(on ? 1 : 0.3))
-                                        .scaleEffect(on ? 1.15 : 1)
-                                }.accessibilityLabel(name)
                             }
                         }
                         Text("앱 아이콘").font(.system(size: 13)).foregroundStyle(T.sub)
@@ -158,17 +206,18 @@ struct SettingsView: View {
                             }
                         }
                     }
-                }.stagger(3)
+                }.stagger(5)
 
+                SectionLabel("데이터·보안")
                 Card {
                     VStack(alignment: .leading, spacing: 16) {
-                        Toggle("Face ID 잠금", isOn: store.$faceLock).tint(T.blue)
+                        row("faceid", .green, "Face ID 잠금") { Toggle("", isOn: store.$faceLock).labelsHidden().tint(T.blue) }
                         Divider()
-                        ShareLink(item: store.csv()) { Label("CSV로 내보내기", systemImage: "square.and.arrow.up").foregroundStyle(T.text) }
+                        ShareLink(item: store.csv()) { rowLabel("square.and.arrow.up", T.accent2, "CSV로 내보내기", chevron: true) }
                         Divider()
-                        Button(role: .destructive) { confirmReset = true } label: { Label("모든 데이터 지우기", systemImage: "trash") }
+                        Button(role: .destructive) { confirmReset = true } label: { rowLabel("trash", T.red, "모든 데이터 지우기", chevron: false, color: T.red) }
                     }.font(.system(size: 16))
-                }.stagger(4)
+                }.stagger(6)
                 Text("데이터는 이 폰 안에만 저장돼요.\n결제 캡처와 명세서는 기기에서만 읽고 서버로 보내지 않아요.\n환율은 공개 환율 정보만 받아와요.\n해지는 각 서비스의 공식 페이지에서 직접 진행돼요.")
                     .font(.system(size: 13)).foregroundStyle(T.faint).padding(.horizontal, 4)
                 Spacer(minLength: 100)
@@ -180,6 +229,20 @@ struct SettingsView: View {
         }
         .confirmationDialog("모두 지울까요?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("지우기", role: .destructive) { store.reset() }
+        }
+    }
+
+    func icon(_ name: String, _ color: Color) -> some View {
+        Image(systemName: name).font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+            .frame(width: 30, height: 30).background(color, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+    func row<C: View>(_ ic: String, _ color: Color, _ title: String, @ViewBuilder trailing: () -> C) -> some View {
+        HStack(spacing: 12) { icon(ic, color); Text(title); Spacer(); trailing() }
+    }
+    func rowLabel(_ ic: String, _ color: Color, _ title: String, chevron: Bool, color tc: Color = T.text) -> some View {
+        HStack(spacing: 12) {
+            icon(ic, color); Text(title).foregroundStyle(tc); Spacer()
+            if chevron { Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(T.faint) }
         }
     }
 }

@@ -9,11 +9,29 @@ extension Color {
 }
 
 enum T {
-    static var accentHex: UInt32 { let v = UserDefaults.standard.integer(forKey: "accentHex"); return v == 0 ? 0x3182F6 : UInt32(v) }
-    static let accents: [(String, UInt32)] = [("파랑", 0x3182F6), ("보라", 0x7C5CFA), ("초록", 0x12B76A), ("주황", 0xF97316), ("핑크", 0xEC4899)]
-    static var blue: Color { Color(hex: accentHex) }
-    static var blueSoft: Color { Color(hex: accentHex).opacity(0.13) }
-    static var hero: LinearGradient { LinearGradient(colors: [Color(hex: accentHex), Color(hex: accentHex).opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing) }
+    struct Palette: Identifiable, Hashable {
+        let id: String; let name: String; let c1: UInt32; let c2: UInt32; let c3: UInt32
+        var colors: [Color] { [Color(hex: c1), Color(hex: c2), Color(hex: c3)] }
+    }
+    /// 유명한 3색 팔레트
+    static let palettes: [Palette] = [
+        Palette(id: "default", name: "기본", c1: 0x3182F6, c2: 0x5B6CF2, c3: 0x8B5CF6),
+        Palette(id: "dracula", name: "Dracula", c1: 0xA77BF4, c2: 0xFF79C6, c3: 0x8BE9FD),
+        Palette(id: "nord", name: "Nord", c1: 0x5E81AC, c2: 0x88C0D0, c3: 0xA3BE8C),
+        Palette(id: "catppuccin", name: "Catppuccin", c1: 0x8E6FE0, c2: 0xF5A0D0, c3: 0x89B4FA),
+        Palette(id: "monokai", name: "Monokai", c1: 0xF92672, c2: 0xFD971F, c3: 0x66D9EF),
+        Palette(id: "gruvbox", name: "Gruvbox", c1: 0xD65D0E, c2: 0xD79921, c3: 0x689D6A),
+        Palette(id: "tokyo", name: "Tokyo Night", c1: 0x5A7BEF, c2: 0xBB9AF7, c3: 0x7DCFFF),
+    ]
+    static var palette: Palette {
+        let id = UserDefaults.standard.string(forKey: "themeID") ?? "default"
+        return palettes.first { $0.id == id } ?? palettes[0]
+    }
+    static var blue: Color { Color(hex: palette.c1) }
+    static var accent2: Color { Color(hex: palette.c2) }
+    static var accent3: Color { Color(hex: palette.c3) }
+    static var blueSoft: Color { Color(hex: palette.c1).opacity(0.13) }
+    static var hero: LinearGradient { LinearGradient(colors: [Color(hex: palette.c1), Color(hex: palette.c2)], startPoint: .topLeading, endPoint: .bottomTrailing) }
     static let bg = Color.dyn(0xF2F4F6, 0x0E1014)
     static let card = Color.dyn(0xFFFFFF, 0x1C1F26)
     static let text = Color.dyn(0x191F28, 0xF2F4F6)

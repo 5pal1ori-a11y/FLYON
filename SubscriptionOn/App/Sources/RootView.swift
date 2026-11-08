@@ -100,7 +100,7 @@ struct HomeView: View {
                     .padding(24).frame(maxWidth: .infinity, alignment: .leading)
                     .background(T.hero)
                     .overlay(alignment: .topTrailing) { Circle().fill(.white.opacity(0.09)).frame(width: 150).offset(x: 50, y: -60) }
-                    .overlay(alignment: .bottomTrailing) { Circle().fill(.white.opacity(0.06)).frame(width: 110).offset(x: 20, y: 40) }
+                    .overlay(alignment: .bottomTrailing) { Circle().fill(T.accent3.opacity(0.45)).frame(width: 120).blur(radius: 6).offset(x: 20, y: 44) }
                     .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                     .shadow(color: T.blue.opacity(0.35), radius: 22, y: 12)
                     .stagger(1)

@@ -6,14 +6,14 @@ struct SubscriptionOnApp: App {
     @StateObject private var store = Store()
     @State private var splash = true
     @AppStorage("themeMode") private var themeMode = 0
-    @AppStorage("accentHex") private var accentHex = 0
+    @AppStorage("themeID") private var themeID = "default"
     @State private var locked = false
     @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if !splash { RootView().environmentObject(store).id(accentHex).transition(.opacity) }
+                if !splash { RootView().environmentObject(store).id(themeID).transition(.opacity) }
                 if locked { LockView { unlock() }.transition(.opacity) }
                 if splash {
                     SplashView { withAnimation(.easeInOut(duration: 0.4)) { splash = false }; if store.faceLock { locked = true; unlock() } }
