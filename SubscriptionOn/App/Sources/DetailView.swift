@@ -7,6 +7,7 @@ struct DetailView: View {
     let sub: Subscription
     @State private var editing = false
     @State private var confirmDelete = false
+    @State private var askDone = false
 
     // 최신 값
     var s: Subscription { store.subs.first { $0.id == sub.id } ?? sub }
@@ -79,6 +80,10 @@ struct DetailView: View {
                 ToolbarItem(placement: .primaryAction) { Button { editing = true } label: { Image(systemName: "pencil") } }
             }
             .sheet(isPresented: $editing) { AddView(editing: s).environmentObject(store) }
+            .alert("해지를 마쳤나요?", isPresented: $askDone) {
+                Button("마쳤어요") { var n = s; n.status = .cancelled; store.update(n) }
+                Button("아직이에요", role: .cancel) {}
+            } message: { Text("해지는 서비스 안에서 직접 눌러야 끝나요") }
             .confirmationDialog("삭제할까요?", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("삭제", role: .destructive) { store.delete(s); dismiss() }
             }
@@ -87,8 +92,11 @@ struct DetailView: View {
 
     /// 공식 해지 페이지로 이동하고, 해지 상태로 표시해요 (실제 해지는 해당 서비스에서 진행)
     func cancel() {
-        if let svc = s.service, let u = URL(string: svc.cancelURL), !svc.cancelURL.isEmpty { openURL(u) }
-        var n = s; n.status = .cancelled; store.update(n)
+        // 앱스토어로 결제한 구독은 애플 구독 관리 화면, 그 외에는 서비스 공식 해지 페이지
+        let apple = s.payMethod.contains("애플") || s.payMethod.lowercased().contains("apple") || s.payMethod.contains("앱스토어")
+        let link = apple ? "https://apps.apple.com/account/subscriptions" : (s.service?.cancelURL ?? "")
+        if let u = URL(string: link), !link.isEmpty { openURL(u) }
+        askDone = true
     }
 
     func row(_ k: String, _ v: String, blue: Bool = false) -> some View {
