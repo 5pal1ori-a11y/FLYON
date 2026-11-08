@@ -179,7 +179,17 @@ final class Store: ObservableObject {
             let before = Calendar.current.date(byAdding: .day, value: -notifyDays, to: s.nextDate)!
             add(before, "\(notifyDays)일 뒤 \(s.price.won) 결제돼요", "\(s.id)-b")
             add(s.nextDate, "오늘 \(s.price.won) 결제돼요", "\(s.id)-d")
-            if let t = s.trialEnd { add(Calendar.current.date(byAdding: .day, value: -1, to: t)!, "무료 체험이 내일 끝나요", "\(s.id)-t") }
+            if let t = s.trialEnd {
+                add(Calendar.current.date(byAdding: .day, value: -1, to: t)!, "무료 체험이 내일 끝나요", "\(s.id)-t")
+                // 끝나기 5시간 전 (시각 그대로)
+                let h5 = t.addingTimeInterval(-5 * 3600)
+                if h5 > Date() {
+                    let c5 = UNMutableNotificationContent()
+                    c5.title = s.name; c5.body = "무료 체험이 5시간 뒤에 끝나요. 이후 \(s.price.won) 결제돼요"; c5.sound = .default
+                    let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: h5)
+                    c.add(UNNotificationRequest(identifier: "\(s.id)-t5", content: c5, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+                }
+            }
         }
     }
 

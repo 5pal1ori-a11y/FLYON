@@ -78,6 +78,7 @@ struct HomeView: View {
     @State private var showAI = false
     @State private var showReport = false
     @State private var showUsage = false
+    @State private var showTrials = false
     @State private var greetShift = 0
 
     /// 상황에 맞는 인사말 (눌러서 바꿔볼 수 있어요)
@@ -112,6 +113,7 @@ struct HomeView: View {
                 }.padding(.top, 8).stagger(0)
 
                 if store.subs.isEmpty { empty } else {
+                    TrialCountdownBanner()
                     // 이번달 구독료 (히어로)
                     VStack(alignment: .leading, spacing: 10) {
                         Text("이번달 구독료").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
@@ -189,6 +191,15 @@ struct HomeView: View {
                         }
                         .padding(16).background(T.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }.buttonStyle(PressCard()).stagger(3)
+                    Button { showTrials = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "gift.fill").foregroundStyle(.orange)
+                            Text("이런 무료 체험 어때요?").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.text)
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(T.faint)
+                        }
+                        .padding(16).background(T.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }.buttonStyle(PressCard()).stagger(4)
                 }
                 Spacer(minLength: 130)
             }.padding(.horizontal, 20)
@@ -196,6 +207,7 @@ struct HomeView: View {
         .sheet(item: $selected) { s in DetailView(sub: s).environmentObject(store) }
         .sheet(isPresented: $showAI) { AssistantView().environmentObject(store) }
         .sheet(isPresented: $showReport) { ReportView().environmentObject(store) }
+        .sheet(isPresented: $showTrials) { TrialPickView().environmentObject(store) }
         .sheet(isPresented: $showUsage) { UsageSheet().environmentObject(store).presentationDetents([.medium, .large]) }
     }
 
