@@ -158,3 +158,15 @@ struct Float: ViewModifier {
     }
 }
 extension View { func floating() -> some View { modifier(Float()) } }
+
+/// 추가 화면에서 쓰던 큰 제목 / 섹션 라벨 (모든 화면 공통)
+struct BigTitle: View {
+    let text: String
+    init(_ t: String) { text = t }
+    var body: some View { Text(text).font(.system(size: 30, weight: .heavy)).foregroundStyle(T.text).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading) }
+}
+struct SectionLabel: View {
+    let text: String
+    init(_ t: String) { text = t }
+    var body: some View { Text(text).font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub).frame(maxWidth: .infinity, alignment: .leading) }
+}

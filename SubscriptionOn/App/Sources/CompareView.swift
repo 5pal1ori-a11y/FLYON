@@ -5,8 +5,9 @@ struct AnalysisView: View {
     @State private var mode = 0
     var body: some View {
         VStack(spacing: 0) {
+            BigTitle("내 구독,\n한눈에").padding(.horizontal, 20).stagger(0)
             Picker("", selection: $mode) { Text("통계").tag(0); Text("가격 비교").tag(1) }
-                .pickerStyle(.segmented).padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 4)
+                .pickerStyle(.segmented).padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 4)
             if mode == 0 { StatsView() } else { CompareView() }
         }
     }

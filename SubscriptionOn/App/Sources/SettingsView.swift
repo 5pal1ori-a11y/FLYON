@@ -25,7 +25,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("마이").font(.system(size: 22, weight: .bold)).padding(.top, 8).stagger(0)
+                BigTitle("나에게\n맞게").stagger(0)
 
                 Card {
                     VStack(alignment: .leading, spacing: 14) {

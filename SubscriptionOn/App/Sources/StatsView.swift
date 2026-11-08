@@ -66,7 +66,7 @@ struct StatsView: View {
                         Card {
                             VStack(alignment: .leading, spacing: 14) {
                                 SectionTitle(t: "월별 지출 기록")
-                                let items = store.history.sorted { $0.key < $1.key }.suffix(6).map { ($0.key.suffix(2) + "월", Double($0.value)) }
+                                let items = store.history.sorted { $0.key < $1.key }.suffix(6).map { (String($0.key.suffix(2)) + "월", Double($0.value)) }
                                 Chart(items, id: \.0) { m, v in
                                     BarMark(x: .value("월", m), y: .value("금액", grow ? v : 0)).foregroundStyle(T.blue.gradient).cornerRadius(6)
                                 }.frame(height: 150).chartYAxis(.hidden).animation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.2), value: grow)

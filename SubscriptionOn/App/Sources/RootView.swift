@@ -60,6 +60,10 @@ struct HomeView: View {
     @State private var selected: Subscription?
     @State private var showAll = false
 
+    var bigGreeting: String {
+        if let n = store.upcoming.first { return n.dDay <= 0 ? "\(n.name),\n오늘 결제돼요 👈" : "\(n.name),\n\(n.whenText) 갱신돼요 👈" }
+        return store.userName.isEmpty ? "안녕하세요,\n오늘도 알뜰하게" : "\(store.userName)님,\n안녕하세요"
+    }
     /// 지난달 기록이 있으면 그 차이, 없으면 이번 달에 새로 생긴 구독료
     var delta: Int {
         if let d = store.monthDelta { return d }
@@ -70,10 +74,11 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text(store.userName.isEmpty ? "안녕하세요!" : "안녕하세요 \(store.userName)님!").font(.system(size: 20, weight: .bold))
+                HStack(alignment: .top) {
+                    Text(bigGreeting).font(.system(size: 30, weight: .heavy)).foregroundStyle(T.text).fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Image(systemName: "bell").font(.system(size: 20)).foregroundStyle(T.text).symbolEffect(.bounce, value: store.upcoming.first?.dDay ?? 9)
+                    Image(systemName: "bell").font(.system(size: 20)).foregroundStyle(T.text).padding(.top, 6)
+                        .symbolEffect(.bounce, value: store.upcoming.first?.dDay ?? 9)
                 }.padding(.top, 8).stagger(0)
 
                 if store.subs.isEmpty { empty } else {
@@ -101,38 +106,27 @@ struct HomeView: View {
                     .stagger(1)
 
                     // 오늘 쓴 구독 체크 (월 사용 횟수)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("오늘 쓴 구독을 눌러주세요").font(.system(size: 15, weight: .bold))
-                            Spacer()
-                            Text("이번 달 사용 횟수").font(.system(size: 12)).foregroundStyle(T.faint)
-                        }
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 14) {
-                                ForEach(store.active) { s in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { store.markUsed(s) }
-                                    } label: {
-                                        VStack(spacing: 6) {
-                                            ZStack(alignment: .topTrailing) {
-                                                LogoView(name: s.name, category: s.category, size: 48)
-                                                if s.usesThisMonth > 0 {
-                                                    Text("\(s.usesThisMonth)").font(.system(size: 11, weight: .heavy)).foregroundStyle(.white)
-                                                        .padding(.horizontal, 6).padding(.vertical, 2).background(T.blue, in: Capsule())
-                                                        .offset(x: 8, y: -6).transition(.scale)
-                                                }
-                                            }
-                                            Text(s.name).font(.system(size: 11)).foregroundStyle(T.sub).lineLimit(1).frame(width: 56)
+                    SectionLabel("오늘 쓴 구독을 눌러주세요")
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 18) {
+                        ForEach(Array(store.active.enumerated()), id: \.element.id) { i, s in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { store.markUsed(s) }
+                            } label: {
+                                VStack(spacing: 8) {
+                                    ZStack(alignment: .topTrailing) {
+                                        LogoView(name: s.name, category: s.category, size: 58)
+                                        if s.usesThisMonth > 0 {
+                                            Text("\(s.usesThisMonth)").font(.system(size: 11, weight: .heavy)).foregroundStyle(.white)
+                                                .padding(.horizontal, 6).padding(.vertical, 2).background(T.blue, in: Capsule())
+                                                .offset(x: 6, y: -6).transition(.scale)
                                         }
-                                    }.buttonStyle(PressCard())
+                                    }
+                                    Text(s.name).font(.system(size: 12)).foregroundStyle(T.text).lineLimit(1)
                                 }
-                            }.padding(.top, 4).padding(.horizontal, 4)
+                            }.buttonStyle(PressCard()).stagger(i + 2)
                         }
                     }
-                    .padding(18).background(T.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 14, y: 6)
-                    .stagger(2)
 
                     // 결제일이 가까운 서비스
                     VStack(alignment: .leading, spacing: 4) {
@@ -220,6 +214,7 @@ struct CalendarView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                BigTitle("이번 달\n결제일").stagger(0)
                 HStack {
                     Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: -1, to: month)! } } label: { Image(systemName: "chevron.left") }
                     Spacer()
