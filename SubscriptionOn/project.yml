@@ -23,4 +23,5 @@ targets:
         INFOPLIST_KEY_UIUserInterfaceStyle: Light
         INFOPLIST_KEY_NSFaceIDUsageDescription: 앱 잠금을 위해 Face ID를 사용해요
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: 결제 내역 캡처를 읽어 구독을 찾아드려요
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait

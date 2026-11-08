@@ -34,20 +34,31 @@ struct AddView: View {
                         if method == .text { textBox }
                     }
                     field("무엇을 구독하세요?") {
-                        TextField("서비스 이름", text: $name).font(.system(size: 18, weight: .semibold))
+                        TextField("서비스 이름을 적어주세요", text: $name).font(.system(size: 18, weight: .semibold))
                             .onChange(of: name) { _, v in autofill(v) }
-                        let hits = Catalog.search(name)
-                        if Catalog.find(name)?.name != name {
+                        if !name.trimmingCharacters(in: .whitespaces).isEmpty {
+                            let svc = Catalog.find(name)
+                            HStack(spacing: 12) {
+                                LogoView(name: name, category: category, size: 44)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(svc?.name ?? name).font(.system(size: 16, weight: .semibold))
+                                    Text(svc != nil ? "\(category.rawValue)로 분류했어요" : "처음 보는 서비스예요. 종류를 골라주세요")
+                                        .font(.system(size: 13)).foregroundStyle(T.sub)
+                                }
+                            }
+                        }
+                        let hits = Catalog.search(name).filter { $0.name != Catalog.find(name)?.name }
+                        if !hits.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
-                                    ForEach(hits.prefix(10), id: \.name) { s in
-                                        Button { name = s.name; autofill(s.name, force: true) } label: {
+                                    ForEach(hits.prefix(12), id: \.name) { s in
+                                        Button { name = s.name; catTouched = false; autofill(s.name, force: true) } label: {
                                             VStack(spacing: 6) { LogoView(name: s.name, category: s.category, size: 48); Text(s.name).font(.system(size: 11)).foregroundStyle(T.sub).lineLimit(1) }.frame(width: 64)
                                         }
                                     }
                                 }
                             }
-                        } else { HStack { LogoView(name: name, category: category, size: 36); Text("찾았어요").font(.system(size: 14)).foregroundStyle(T.sub) } }
+                        }
                     }
                     field("얼마예요?") {
                         TextField("0", text: $priceText).keyboardType(.numberPad).font(.system(size: 28, weight: .heavy))

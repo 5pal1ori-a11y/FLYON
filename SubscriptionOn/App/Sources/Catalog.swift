@@ -35,22 +35,71 @@ enum Catalog {
         Service(name: "Xbox Game Pass", aliases: ["xbox", "게임패스"], category: .game, color: 0x107C10, mark: "X", cancelURL: "https://account.microsoft.com/services", defaultPrice: 13900),
         Service(name: "Microsoft 365", aliases: ["office", "오피스", "ms365"], category: .etc, color: 0xD83B01, mark: "M", cancelURL: "https://account.microsoft.com/services", defaultPrice: 14900),
         Service(name: "밀리의 서재", aliases: ["밀리"], category: .life, color: 0xFFD400, mark: "밀", cancelURL: "https://www.millie.co.kr", defaultPrice: 9900),
+        Service(name: "왓챠", aliases: ["watcha"], category: .ott, color: 0xFF0558, mark: "W", cancelURL: "https://watcha.com/settings", defaultPrice: 12900),
+        Service(name: "라프텔", aliases: ["laftel"], category: .ott, color: 0x6C5CE7, mark: "L", cancelURL: "https://laftel.net", defaultPrice: 14900),
+        Service(name: "쿠팡플레이", aliases: ["coupang play"], category: .ott, color: 0xE52528, mark: "▶", cancelURL: "https://www.coupang.com/np/mypage", defaultPrice: 7890),
+        Service(name: "애플 TV+", aliases: ["apple tv", "appletv"], category: .ott, color: 0x000000, mark: "tv", cancelURL: "https://support.apple.com/ko-kr/118428", defaultPrice: 9900),
+        Service(name: "애플 뮤직", aliases: ["apple music"], category: .ott, color: 0xFA243C, mark: "♪", cancelURL: "https://support.apple.com/ko-kr/118428", defaultPrice: 10900),
+        Service(name: "유튜브 뮤직", aliases: ["youtube music"], category: .ott, color: 0xFF0000, mark: "♪", cancelURL: "https://www.youtube.com/paid_memberships", defaultPrice: 10900),
+        Service(name: "지니뮤직", aliases: ["genie", "지니"], category: .ott, color: 0x2D7BFF, mark: "G", cancelURL: "https://www.genie.co.kr", defaultPrice: 10900),
+        Service(name: "바이브", aliases: ["vibe"], category: .ott, color: 0xFF2A5B, mark: "V", cancelURL: "https://vibe.naver.com", defaultPrice: 8400),
+        Service(name: "Perplexity", aliases: ["퍼플렉시티"], category: .ai, color: 0x1F8A8A, mark: "P", cancelURL: "https://www.perplexity.ai/settings/account", defaultPrice: 28000),
+        Service(name: "Midjourney", aliases: ["미드저니"], category: .ai, color: 0x111111, mark: "M", cancelURL: "https://www.midjourney.com/account", defaultPrice: 14000),
+        Service(name: "Cursor", aliases: ["커서"], category: .ai, color: 0x111111, mark: "C", cancelURL: "https://cursor.com/settings", defaultPrice: 28000),
+        Service(name: "GitHub Copilot", aliases: ["copilot", "코파일럿", "깃허브"], category: .ai, color: 0x24292F, mark: "Gh", cancelURL: "https://github.com/settings/billing", defaultPrice: 14000),
+        Service(name: "Notion", aliases: ["노션"], category: .etc, color: 0x111111, mark: "N", cancelURL: "https://www.notion.so/my-account", defaultPrice: 14000),
+        Service(name: "Dropbox", aliases: ["드롭박스"], category: .etc, color: 0x0061FF, mark: "D", cancelURL: "https://www.dropbox.com/account/plan", defaultPrice: 14000),
+        Service(name: "Google One", aliases: ["구글 원", "구글원", "구글 드라이브"], category: .etc, color: 0x4285F4, mark: "G1", cancelURL: "https://one.google.com/settings", defaultPrice: 2400),
+        Service(name: "토스 프라임", aliases: ["토스프라임"], category: .membership, color: 0x3182F6, mark: "T", cancelURL: "https://toss.im", defaultPrice: 4900),
+        Service(name: "배민클럽", aliases: ["배달의민족", "배민", "baemin"], category: .membership, color: 0x2AC1BC, mark: "배", cancelURL: "https://www.baemin.com", defaultPrice: 3990),
+        Service(name: "컬리멤버스", aliases: ["마켓컬리", "컬리", "kurly"], category: .membership, color: 0x5F0080, mark: "K", cancelURL: "https://www.kurly.com", defaultPrice: 1900),
+        Service(name: "카카오 이모티콘 플러스", aliases: ["카카오이모티콘", "이모티콘플러스"], category: .membership, color: 0xFEE500, mark: "K", cancelURL: "https://emoticon.kakao.com", defaultPrice: 4900),
+        Service(name: "SKT", aliases: ["에스케이티", "sk텔레콤"], category: .life, color: 0xE60012, mark: "SK", cancelURL: "", defaultPrice: 55000),
+        Service(name: "KT", aliases: ["케이티"], category: .life, color: 0x0AA0FA, mark: "KT", cancelURL: "", defaultPrice: 55000),
+        Service(name: "LG U+", aliases: ["엘지유플러스", "lgu", "유플러스"], category: .life, color: 0xEB0A8C, mark: "U+", cancelURL: "", defaultPrice: 55000),
+        Service(name: "스팀", aliases: ["steam"], category: .game, color: 0x171A21, mark: "S", cancelURL: "https://store.steampowered.com/account", defaultPrice: 10000),
+        Service(name: "블리자드", aliases: ["blizzard", "디아블로", "wow"], category: .game, color: 0x00AEFF, mark: "B", cancelURL: "https://account.blizzard.com", defaultPrice: 15000),
+        Service(name: "눔", aliases: ["noom", "다이어트"], category: .health, color: 0xFF7A00, mark: "n", cancelURL: "", defaultPrice: 30000),
+        Service(name: "필라테스", aliases: ["요가", "크로스핏"], category: .health, color: 0xEF4444, mark: "P", cancelURL: "", defaultPrice: 150000),
         Service(name: "헬스장", aliases: ["피트니스", "pt", "필라테스"], category: .health, color: 0xEF4444, mark: "H", cancelURL: "", defaultPrice: 50000),
         Service(name: "보험", aliases: ["실손", "화재", "생명", "손해", "자동차"], category: .insurance, color: 0x06B6D4, mark: "보", cancelURL: "", defaultPrice: 50000),
         Service(name: "정수기 렌탈", aliases: ["렌탈", "코웨이", "청호"], category: .life, color: 0xF59E0B, mark: "렌", cancelURL: "", defaultPrice: 30000),
     ]
 
-    static func find(_ text: String) -> Service? {
-        let t = text.lowercased().trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty else { return nil }
-        return all.first { s in
-            ([s.name.lowercased()] + s.aliases.map { $0.lowercased() }).contains { t.contains($0) || ($0.count >= 2 && $0.contains(t) && t.count >= 2) }
+    /// 소문자, 공백·기호 제거 (예: "Chat GPT" == "chatgpt")
+    static func norm(_ t: String) -> String {
+        String(t.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
+    }
+    static func edit(_ a: [Character], _ b: [Character]) -> Int {
+        if a.isEmpty { return b.count }; if b.isEmpty { return a.count }
+        var prev = Array(0...b.count)
+        for i in 1...a.count {
+            var cur = [i] + Array(repeating: 0, count: b.count)
+            for j in 1...b.count { cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)) }
+            prev = cur
         }
+        return prev[b.count]
+    }
+    static func keys(_ s: Service) -> [String] { ([s.name] + s.aliases).map(norm).filter { !$0.isEmpty } }
+
+    static func find(_ text: String) -> Service? {
+        let t = norm(text)
+        guard t.count >= 2 else { return nil }
+        // 1) 정확히 일치  2) 입력에 서비스명이 들어있음(결제 문자 등)  3) 서비스명에 입력이 들어있음
+        if let s = all.first(where: { keys($0).contains(t) }) { return s }
+        if let s = all.first(where: { sv in keys(sv).contains { ($0.count >= 3 || !$0.allSatisfy { $0.isASCII }) && t.contains($0) } }) { return s }
+        if t.count >= 3, let s = all.first(where: { sv in keys(sv).contains { $0.hasPrefix(t) } }) { return s }
+        // 4) 오타 허용 (한 글자 차이)
+        if t.count >= 4, t.count <= 20 {
+            let tc = Array(t)
+            if let s = all.first(where: { sv in keys(sv).contains { $0.count >= 4 && abs($0.count - t.count) <= 1 && edit(tc, Array($0)) <= 1 } }) { return s }
+        }
+        return nil
     }
     static func search(_ q: String) -> [Service] {
-        let t = q.lowercased()
-        if t.isEmpty { return Array(all.prefix(8)) }
-        return all.filter { s in ([s.name] + s.aliases).contains { $0.lowercased().contains(t) } }
+        let t = norm(q)
+        if t.isEmpty { return Array(all.prefix(10)) }
+        return all.filter { s in keys(s).contains { $0.contains(t) } }
     }
     /// 이름만 입력해도 카테고리 자동 분류
     static func classify(_ name: String) -> Category {
@@ -83,7 +132,8 @@ struct LogoView: View {
                 Text(svc.mark).font(.system(size: size * 0.42, weight: .heavy, design: .rounded)).foregroundStyle(.white)
             } else {
                 category.color.opacity(0.15)
-                Image(systemName: category.icon).font(.system(size: size * 0.42)).foregroundStyle(category.color)
+                Text(String(name.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased())
+                    .font(.system(size: size * 0.45, weight: .heavy, design: .rounded)).foregroundStyle(category.color)
             }
         }
         .frame(width: size, height: size)
