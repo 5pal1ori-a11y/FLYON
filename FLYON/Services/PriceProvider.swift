@@ -10,6 +10,8 @@ protocol PriceProvider {
     func deals(origin: Airport, cabin: Cabin) async throws -> [Deal]
     /// 선택한 출발일 하루의 수집일별 가격
     func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint]
+    /// 선택일 앞뒤 며칠의 날짜별 최저가 (서버가 그 날짜들의 항공편도 함께 채운다)
+    func range(origin: Airport, destination: Airport, date: Date, days: Int, airlines: Set<Airline>, cabin: Cabin) async throws -> [CalendarDay]
     /// 그 날짜의 특정 항공권(편명) 가격 기록
     func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint]
 }
@@ -101,6 +103,18 @@ struct MockPriceProvider: PriceProvider {
         let points = try await history(origin: origin, destination: destination, days: 14, airlines: airlines, cabin: cabin)
         let shift = Calendar.current.component(.day, from: date) % 7
         return points.map { PricePoint(date: $0.date, price: $0.price + shift * 1_000) }
+    }
+
+    func range(origin: Airport, destination: Airport, date: Date, days: Int, airlines: Set<Airline>, cabin: Cabin) async throws -> [CalendarDay] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let month = try await calendar(origin: origin, destination: destination, month: date, airlines: airlines, cabin: cabin)
+        let next = cal.date(byAdding: .month, value: 1, to: date) ?? date
+        let more = try await calendar(origin: origin, destination: destination, month: next, airlines: airlines, cabin: cabin)
+        return (month + more).filter {
+            let d = cal.dateComponents([.day], from: date, to: $0.date).day ?? 99
+            return abs(d) <= days && $0.date >= today
+        }
     }
 
     func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint] {
@@ -198,6 +212,13 @@ struct ServerPriceProvider: PriceProvider {
     func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint] {
         let res: HistoryResponse = try await get("day", query(origin, destination, airlines, cabin, ["date": Self.dayParser.string(from: date)]))
         return res.points.compactMap { p in Self.dayParser.date(from: p.date).map { PricePoint(date: $0, price: p.price) } }
+    }
+
+    func range(origin: Airport, destination: Airport, date: Date, days: Int, airlines: Set<Airline>, cabin: Cabin) async throws -> [CalendarDay] {
+        let res: CalendarResponse = try await get("range", query(origin, destination, airlines, cabin, [
+            "date": Self.dayParser.string(from: date), "days": "\(days)",
+        ]))
+        return res.days.compactMap { d in Self.dayParser.date(from: d.date).map { CalendarDay(date: $0, price: d.price) } }
     }
 
     func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint] {

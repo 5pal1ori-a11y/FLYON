@@ -5,6 +5,7 @@
 //   GET /prices/flights?origin=ICN&destination=CJU&date=2026-12-05[&airlines=KE][&cabin=0]
 //   GET /prices/deals?origin=ICN[&cabin=0]
 //   GET /prices/flight?origin=ICN&destination=CJU&date=2026-12-05&airline=KE&flight_number=1201[&cabin=0]  항공권 하나의 가격 기록
+//   GET /prices/range?origin=ICN&destination=CJU&date=2026-12-05[&days=5]  선택일 앞뒤 며칠의 가격 (그 날짜들의 항공편도 함께 채운다)
 //   GET /prices/day?origin=ICN&destination=CJU&date=2026-12-05[&airlines=KE][&cabin=0]  선택한 출발일의 가격 변화
 // cabin: 0 일반석, 1 비즈니스, 2 일등석
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -122,6 +123,29 @@ Deno.serve(async (req) => {
     if (error) return fail();
     return Response.json({
       points: (data ?? []).map((r: { day: string; price: number }) => ({ date: r.day, price: r.price })),
+    });
+  }
+
+  if (path.endsWith("/range")) {
+    const date = url.searchParams.get("date") ?? "";
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(date)) return bad("invalid date");
+    const days = Math.min(Math.max(parseInt(url.searchParams.get("days") ?? "5", 10) || 5, 1), 7);
+    const center = new Date(`${date}T00:00:00Z`);
+    const today = new Date(new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) + "T00:00:00Z");
+    const dates: string[] = [];
+    for (let d = -days; d <= days; d++) {
+      const t = new Date(center.getTime() + d * 86400 * 1000);
+      if (t >= today) dates.push(t.toISOString().slice(0, 10));
+    }
+    if (dates.length === 0) return Response.json({ days: [] });
+    await ensureData(origin, destination, cabin);
+    if (cabin === 0) await Promise.all(dates.map((d) => ensureDay(origin, destination, d)));
+    const { data, error } = await supabase.rpc("get_price_range", {
+      ...base, p_start: dates[0], p_end: dates[dates.length - 1],
+    });
+    if (error) return fail();
+    return Response.json({
+      days: (data ?? []).map((r: { day: string; price: number }) => ({ date: r.day, price: r.price })),
     });
   }
 

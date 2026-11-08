@@ -18,6 +18,8 @@ struct ResultView: View {
     @State private var history: [PricePoint] = []
     @State private var calendar: [CalendarDay] = []
     @State private var calendarFailed = false
+    /// 날짜 띠: 선택일 앞뒤 5일
+    @State private var rangeDays: [CalendarDay] = []
     @State private var tab: Tab = .flights
     @State private var month: Date
     @State private var selectedDate: Date?
@@ -42,9 +44,11 @@ struct ResultView: View {
         FavoriteRoute(originCode: search.origin.code, destinationCode: search.destination.code)
     }
     private var sortedCalendar: [CalendarDay] { calendar.sorted { $0.date < $1.date } }
+    /// 날짜 띠에 보여 줄 날짜들 (앞뒤 5일, 없으면 그 달)
+    private var stripDays: [CalendarDay] { rangeDays.isEmpty ? sortedCalendar : rangeDays.sorted { $0.date < $1.date } }
     private var cheapestDay: CalendarDay? { calendar.min { $0.price < $1.price } }
     private var selectedDay: CalendarDay? {
-        selectedDate.flatMap { d in calendar.first { cal.isDate($0.date, inSameDayAs: d) } }
+        selectedDate.flatMap { d in (rangeDays + calendar).first { cal.isDate($0.date, inSameDayAs: d) } }
     }
 
     private var visibleFlights: [Flight] {
@@ -204,7 +208,7 @@ struct ResultView: View {
 
     @ViewBuilder
     private var dateStrip: some View {
-        if sortedCalendar.isEmpty {
+        if stripDays.isEmpty {
             HStack {
                 Text(calendarFailed ? "날짜별 가격을 불러오지 못했어요" : "\(month.monthShort) 가격 정보가 없어요")
                     .font(.app(14))
@@ -221,7 +225,7 @@ struct ResultView: View {
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(sortedCalendar) { day in dateChip(day).id(day.date) }
+                            ForEach(stripDays) { day in dateChip(day).id(day.date) }
                         }
                         .padding(.vertical, 2)
                     }
@@ -500,6 +504,7 @@ struct ResultView: View {
                 CalendarGrid(month: month, days: calendar, selected: selectedDate) { date in
                     select(date)
                     showCalendar = false
+                    Task { await loadRange(center: date) }
                 }
                 .id(month)
                 .transition(.opacity)
@@ -540,10 +545,20 @@ struct ResultView: View {
         }
         await fetchCalendar()
         chooseInitialDate()
+        if let center = selectedDate { await loadRange(center: center) }
         withAnimation(.easeOut(duration: 0.3)) {
-            phase = (calendarFailed && history.isEmpty) ? .failed : .loaded
+            phase = (calendarFailed && history.isEmpty && rangeDays.isEmpty) ? .failed : .loaded
         }
         await loadFlights()
+    }
+
+    /// 선택일 앞뒤 5일 가격을 불러온다 (서버가 그 날짜들의 항공편도 함께 채운다)
+    private func loadRange(center: Date) async {
+        if let days = try? await appState.provider.range(
+            origin: search.origin, destination: search.destination, date: center, days: 5,
+            airlines: search.airlines, cabin: search.cabin) {
+            withAnimation(.easeOut(duration: 0.25)) { rangeDays = days }
+        }
     }
 
     private func loadMonth() async {
