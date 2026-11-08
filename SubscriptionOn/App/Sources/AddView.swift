@@ -332,17 +332,41 @@ struct AddView: View {
                 HStack {
                     Button("붙여넣기") { pasted = UIPasteboard.general.string ?? "" }.foregroundStyle(T.sub)
                     Spacer()
-                    Button("읽기") { apply(Scanner.parse(pasted)) }.font(.system(size: 16, weight: .bold)).foregroundStyle(T.blue)
+                    Button { readPasted() } label: {
+                        HStack(spacing: 4) { if scanning { ProgressView() } else { Image(systemName: "sparkles") }; Text("읽기") }
+                            .font(.system(size: 16, weight: .bold)).foregroundStyle(T.blue)
+                    }
                 }
                 if !scanMsg.isEmpty { Text(scanMsg).font(.system(size: 14)).foregroundStyle(T.sub) }
             }
         }
     }
 
+    /// 문자·메일: Apple Intelligence가 있으면 AI로, 없으면 규칙으로 읽어요
+    func readPasted() {
+        let t = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, !scanning else { return }
+        scanning = true
+        Task {
+            let d = await SmartParse.parse(t)
+            scanning = false
+            var p = ParsedPayment(); p.name = d.name; p.price = d.price; p.date = d.date
+            if d.trialDays > 0 {
+                trial = true
+                trialEnd = Calendar.current.date(byAdding: .day, value: d.trialDays, to: Date())!
+                nextDate = trialEnd
+            }
+            if d.cycle != .monthly { cycle = d.cycle }
+            apply(p)
+            if d.trialDays > 0 { scanMsg = "무료 체험 \(d.trialDays)일을 찾았어요. 끝나기 하루 전에 알려드릴게요" }
+            else if d.usedAI { scanMsg = "AI가 읽었어요! 확인해주세요" }
+        }
+    }
+
     func apply(_ p: ParsedPayment) {
         if !p.name.isEmpty { name = p.name; autofill(p.name, force: true) }
         if p.price > 0 { priceText = String(p.price) }
-        if let d = p.date { nextDate = d < Date() ? Cycle.monthly.next(after: d) : d }
+        if let d = p.date, !trial { nextDate = d < Date() ? Cycle.monthly.next(after: d) : d }
         scanMsg = (p.name.isEmpty && p.price == 0) ? "찾지 못했어요. 직접 적어주세요" : "찾았어요! 확인해주세요"
         if p.name.isEmpty && p.price > 0 { scanMsg = "금액만 찾았어요. 이름을 적어주세요" }
         method = .manual

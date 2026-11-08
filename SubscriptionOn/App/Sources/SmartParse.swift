@@ -3,7 +3,7 @@ import Foundation
 import FoundationModels
 #endif
 
-struct Draft { var name = ""; var price = 0; var cycle: Cycle = .monthly; var day: Int? = nil; var usedAI = false }
+struct Draft { var name = ""; var price = 0; var cycle: Cycle = .monthly; var day: Int? = nil; var usedAI = false; var trialDays = 0; var date: Date? = nil }
 
 enum SmartParse {
     /// Apple Intelligence(기기 내 모델)를 쓸 수 있는지
@@ -25,6 +25,7 @@ enum SmartParse {
             if a.price > 0 { d.price = a.price }
             if let day = a.day { d.day = day }
             d.cycle = a.cycle; d.usedAI = true
+            if a.trialDays > 0 { d.trialDays = a.trialDays }
         }
         #endif
         if let s = Catalog.find(d.name) ?? Catalog.find(text) { d.name = s.name }
@@ -39,6 +40,11 @@ enum SmartParse {
         if let re = try? NSRegularExpression(pattern: #"(\d{1,2})\s*일"#),
            let m = re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)), let r = Range(m.range(at: 1), in: t),
            let v = Int(t[r]), (1...31).contains(v) { d.day = v }
+        if let re = try? NSRegularExpression(pattern: #"(\d{1,3})\s*일(?:간)?\s*무료|무료\s*(?:체험)?\s*(\d{1,3})\s*일|(\d{1,2})\s*개월\s*무료"#),
+           let m = re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) {
+            for g in 1...3 { if let r = Range(m.range(at: g), in: t), let v = Int(t[r]) { d.trialDays = g == 3 ? v * 30 : v; break } }
+        }
+        d.date = Scanner.parse(t).date
         if let s = Catalog.find(t) { d.name = s.name } else {
             var n = t.replacingOccurrences(of: #"[0-9,]+\s*(원|일)?"#, with: " ", options: .regularExpression)
             for w in ["매달", "매월", "매주", "매년", "마다", "결제", "구독", "정기", "연간", "월간", "에"] { n = n.replacingOccurrences(of: w, with: " ") }
@@ -68,6 +74,8 @@ enum SmartParse {
         var cycle: String
         @Guide(description: "결제되는 날짜(일). 1~31. 말하지 않았으면 0")
         var day: Int
+        @Guide(description: "무료 체험 기간(일). 1개월=30. 무료 체험이 없으면 0. price에는 체험이 끝난 뒤 결제 금액을 넣는다")
+        var trialDays: Int
     }
 
     @available(iOS 26.0, *)
@@ -80,6 +88,7 @@ enum SmartParse {
         d.price = max(0, a.price)
         d.cycle = a.cycle.contains("주") ? .weekly : a.cycle.contains("년") ? .yearly : .monthly
         d.day = (1...31).contains(a.day) ? a.day : nil
+        d.trialDays = max(0, min(365, a.trialDays))
         return d
     }
     #endif

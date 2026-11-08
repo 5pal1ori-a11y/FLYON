@@ -12,6 +12,7 @@ final class Store: ObservableObject {
     @AppStorage("notifyOn") var notifyOn = true
     @AppStorage("faceLock") var faceLock = false
     @AppStorage("monthHistory") private var historyRaw = "{}"
+    @AppStorage("monthNames") private var namesRaw = "{}"
 
     private var url: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("subs.json") }
 
@@ -33,7 +34,15 @@ final class Store: ObservableObject {
         var h = history
         h[Store.key(Date())] = Int(monthlyTotal.rounded())
         if let d = try? JSONEncoder().encode(h), let s = String(data: d, encoding: .utf8), s != historyRaw { historyRaw = s }
+        var n = monthNames
+        n[Store.key(Date())] = active.map(\.name).sorted()
+        if let d = try? JSONEncoder().encode(n), let s = String(data: d, encoding: .utf8), s != namesRaw { namesRaw = s }
     }
+    var monthNames: [String: [String]] {
+        guard let d = namesRaw.data(using: .utf8), let h = try? JSONDecoder().decode([String: [String]].self, from: d) else { return [:] }
+        return h
+    }
+    func names(of date: Date) -> [String]? { monthNames[Store.key(date)] }
     /// 지난달 기록이 있으면 그 값
     var prevMonthTotal: Int? {
         guard let p = Calendar.current.date(byAdding: .month, value: -1, to: Date()) else { return nil }
@@ -154,6 +163,9 @@ final class Store: ObservableObject {
         let weekly = UNMutableNotificationContent()
         weekly.title = "구독온"; weekly.body = "이번 주에 쓴 구독을 체크해볼까요?"; weekly.sound = .default
         c.add(UNNotificationRequest(identifier: "weekly-use", content: weekly, trigger: UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: 20, weekday: 1), repeats: true)))
+        let rep = UNMutableNotificationContent()
+        rep.title = "구독온"; rep.body = "지난달 구독 리포트가 도착했어요 📊"; rep.sound = .default
+        c.add(UNNotificationRequest(identifier: "monthly-report", content: rep, trigger: UNCalendarNotificationTrigger(dateMatching: DateComponents(day: 1, hour: 9), repeats: true)))
         for s in active {
             func add(_ date: Date, _ body: String, _ id: String) {
                 guard date > Date() else { return }

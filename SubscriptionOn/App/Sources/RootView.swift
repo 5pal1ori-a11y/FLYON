@@ -59,6 +59,8 @@ struct HomeView: View {
     var onAdd: () -> Void
     @State private var selected: Subscription?
     @State private var showAll = false
+    @State private var showAI = false
+    @State private var showReport = false
 
     var bigGreeting: String {
         if let n = store.upcoming.first { return n.dDay <= 0 ? "\(n.name),\n오늘 결제돼요 👈" : "\(n.name),\n\(n.whenText) 갱신돼요 👈" }
@@ -104,6 +106,12 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                     .shadow(color: T.blue.opacity(0.35), radius: 22, y: 12)
                     .stagger(1)
+
+                    // AI 도우미 · 월간 리포트
+                    HStack(spacing: 12) {
+                        entryCard("sparkles", "AI에게 물어보기", "궁금한 걸 물어봐요", T.blue) { showAI = true }
+                        entryCard("chart.bar.doc.horizontal.fill", "\(Calendar.current.component(.month, from: Calendar.current.date(byAdding: .month, value: -1, to: Date())!))월 리포트", "지난달 한눈에", T.accent2) { showReport = true }
+                    }.stagger(2)
 
                     // 오늘 쓴 구독 체크 (월 사용 횟수)
                     SectionLabel("오늘 쓴 구독을 눌러주세요")
@@ -178,6 +186,24 @@ struct HomeView: View {
             }.padding(.horizontal, 20)
         }
         .sheet(item: $selected) { s in DetailView(sub: s).environmentObject(store) }
+        .sheet(isPresented: $showAI) { AssistantView().environmentObject(store) }
+        .sheet(isPresented: $showReport) { ReportView().environmentObject(store) }
+    }
+
+    func entryCard(_ icon: String, _ title: String, _ sub: String, _ color: Color, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon).font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 34, height: 34).background(color, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(T.text)
+                    Text(sub).font(.system(size: 12)).foregroundStyle(T.sub)
+                }
+            }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(T.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 12, y: 5)
+        }.buttonStyle(PressCard())
     }
 
     var empty: some View {
