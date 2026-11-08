@@ -6,7 +6,12 @@ struct AddView: View {
     @Environment(\.dismiss) var dismiss
     var editing: Subscription? = nil
 
-    enum Method: String, CaseIterable { case manual = "직접", photo = "캡처", text = "문자·메일" }
+    enum Method { case manual, photo, text }
+    enum Stage { case pick, form }
+    @State private var stage: Stage = .pick
+    @State private var query = ""
+    @State private var aiText = ""
+    @State private var aiBusy = false
     @State private var method: Method = .manual
     @State private var name = ""
     @State private var priceText = ""
@@ -27,9 +32,9 @@ struct AddView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                if stage == .pick && editing == nil { pickView } else {
                 VStack(alignment: .leading, spacing: 20) {
                     if editing == nil {
-                        Picker("", selection: $method) { ForEach(Method.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
                         if method == .photo { photoBox }
                         if method == .text { textBox }
                     }
@@ -92,12 +97,101 @@ struct AddView: View {
                     }
                     BigButton(title: editing == nil ? "추가하기" : "저장", action: save)
                         .opacity(canSave ? 1 : 0.4).disabled(!canSave)
-                }.padding(20)
+                }.padding(20) }
             }
             .background(T.bg)
             .navigationTitle(editing == nil ? "구독 추가" : "수정").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if stage == .form && editing == nil { Button("뒤로") { stage = .pick } } else { Button("닫기") { dismiss() } }
+                }
+            }
             .onAppear { load() }
+        }
+    }
+
+
+    // MARK: 1단계 — 말로 추가 / 검색
+    var results: [Service] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty ? Catalog.all : Catalog.search(q)
+    }
+    var pickView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("말로 추가").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub)
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles").foregroundStyle(T.blue)
+                TextField("예: 유튜브 프리미엄 매달 15일 14,900원", text: $aiText).submitLabel(.done).onSubmit(runAI)
+                if aiBusy { ProgressView() } else if !aiText.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button(action: runAI) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 26)).foregroundStyle(T.blue) }
+                }
+            }
+            .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Text(SmartParse.aiAvailable ? "Apple Intelligence가 기기 안에서 읽고, 추가하기 전에 확인할 수 있어요" : "기기 안에서 읽고, 추가하기 전에 확인할 수 있어요")
+                .font(.system(size: 12)).foregroundStyle(T.faint)
+
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass").foregroundStyle(T.faint)
+                TextField("서비스 검색", text: $query).submitLabel(.search)
+                if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(T.faint) } }
+            }
+            .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+            HStack(spacing: 10) {
+                quick("photo", "캡처로") { method = .photo; stage = .form }
+                quick("text.bubble", "문자·메일로") { method = .text; stage = .form }
+            }
+
+            Card {
+                VStack(spacing: 0) {
+                    ForEach(results, id: \.name) { s in
+                        Button { choose(s) } label: {
+                            HStack(spacing: 14) {
+                                LogoView(name: s.name, category: s.category, size: 40)
+                                Text(s.name).font(.system(size: 16)).foregroundStyle(T.text)
+                                Spacer()
+                                Image(systemName: "plus").foregroundStyle(T.blue)
+                            }.padding(.vertical, 10).contentShape(Rectangle())
+                        }
+                    }
+                    let q = query.trimmingCharacters(in: .whitespaces)
+                    if !q.isEmpty {
+                        Button { name = q; catTouched = false; autofill(q, force: true); stage = .form } label: {
+                            HStack(spacing: 14) {
+                                LogoView(name: q, category: Catalog.classify(q), size: 40)
+                                Text("‘\(q)’ 그대로 추가").font(.system(size: 16)).foregroundStyle(T.text)
+                                Spacer(); Image(systemName: "plus").foregroundStyle(T.blue)
+                            }.padding(.vertical, 10).contentShape(Rectangle())
+                        }
+                    } else if results.isEmpty { Text("검색 결과가 없어요").foregroundStyle(T.sub) }
+                }
+            }
+            Button("직접 입력") { stage = .form }.font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
+        }.padding(20)
+    }
+
+    func quick(_ icon: String, _ title: String, _ a: @escaping () -> Void) -> some View {
+        Button(action: a) {
+            Label(title, systemImage: icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(T.blue)
+                .frame(maxWidth: .infinity).frame(height: 46).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    func choose(_ s: Service) {
+        name = s.name; catTouched = false; autofill(s.name, force: true); stage = .form
+    }
+
+    func runAI() {
+        let t = aiText.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, !aiBusy else { return }
+        aiBusy = true
+        Task {
+            let d = await SmartParse.parse(t)
+            aiBusy = false
+            name = d.name; catTouched = false; autofill(d.name, force: true)
+            if d.price > 0 { priceText = String(d.price) }
+            cycle = d.cycle; nextDate = SmartParse.nextDate(day: d.day, cycle: d.cycle)
+            stage = .form
         }
     }
 

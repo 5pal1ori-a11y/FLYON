@@ -73,6 +73,15 @@ struct Subscription: Identifiable, Codable, Hashable {
         let c = Calendar.current
         return c.dateComponents([.day], from: c.startOfDay(for: Date()), to: c.startOfDay(for: nextDate)).day ?? 0
     }
+    var whenText: String { dDay <= 0 ? "오늘" : dDay == 1 ? "내일" : "\(dDay)일 뒤" }
+    var cycleText: String {
+        let c = Calendar.current
+        switch cycle {
+        case .weekly: return "매주 " + nextDate.formatted(.dateTime.weekday(.wide))
+        case .monthly: return "매월 \(c.component(.day, from: nextDate))일"
+        case .yearly: return "매년 \(c.component(.month, from: nextDate))월 \(c.component(.day, from: nextDate))일"
+        }
+    }
     var totalPaid: Int { price * payCount }
     var service: Service? { Catalog.find(name) }
     var priceHike: (from: Int, to: Int)? {

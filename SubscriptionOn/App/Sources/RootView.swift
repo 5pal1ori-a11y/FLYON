@@ -72,7 +72,15 @@ struct HomeView: View {
                             HStack(spacing: 8) {
                                 Text("1년이면 \(store.yearlyTotal.won)").font(.system(size: 14)).foregroundStyle(T.sub)
                             }
-                            if store.overBudget { Text("예산을 \((store.monthlyTotal - Double(store.budget)).won) 넘었어요").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.red).padding(.top, 2) }
+                            if store.budget > 0 {
+                                let used = min(1, store.monthlyTotal / Double(store.budget))
+                                ProgressView(value: used).tint(store.overBudget ? T.red : T.green).padding(.top, 8)
+                                HStack {
+                                    Text(store.overBudget ? "예산을 넘었어요" : "예산까지 \((Double(store.budget) - store.monthlyTotal).won) 남았어요").font(.system(size: 13)).foregroundStyle(T.sub)
+                                    Spacer(); Text("\(Int(used * 100))%").font(.system(size: 13)).foregroundStyle(T.sub)
+                                }
+                            }
+                            if store.overBudget && false { Text("예산을 \((store.monthlyTotal - Double(store.budget)).won) 넘었어요").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.red).padding(.top, 2) }
                         }
                     }
 
@@ -81,18 +89,8 @@ struct HomeView: View {
                     if !q.isEmpty {
                         Card { VStack(spacing: 16) { ForEach(store.search(q)) { s in SubRow(s: s).onTapGesture { selected = s } } } }
                     } else {
-                        Card {
-                            VStack(alignment: .leading, spacing: 16) {
-                                SectionTitle(t: "곧 결제돼요")
-                                let list = store.upcoming
-                                ForEach(showAll ? list : Array(list.prefix(4))) { s in SubRow(s: s).onTapGesture { selected = s } }
-                                if list.count > 4 {
-                                    Button { withAnimation { showAll.toggle() } } label: {
-                                        Text(showAll ? "접기" : "더보기").font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
-                                    }
-                                }
-                            }
-                        }
+                        UpcomingList { selected = $0 }
+                        NoticeCard()
                         if !store.insights.isEmpty {
                             Card {
                                 VStack(alignment: .leading, spacing: 14) {
