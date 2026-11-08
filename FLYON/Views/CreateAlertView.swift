@@ -249,6 +249,7 @@ struct FlightDetailView: View {
     @State private var loading = true
     @State private var showAlert = false
     @State private var reveal: CGFloat = 0
+    @State private var liveURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -278,11 +279,22 @@ struct FlightDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(flight.isLive ? "실시간 가격" : "저장된 가격").font(.app(13, .medium)).foregroundStyle(.secondary)
+                        Text("최근 확인된 가격").font(.app(13, .medium)).foregroundStyle(.secondary)
                         Text(flight.priceText).font(.app(34, .heavy))
                         if let change = priceChange {
                             Pill(text: change.text, systemImage: change.symbol, color: change.color)
                         }
+                        Button {
+                            liveURL = LivePriceLink.url(origin: search.origin, destination: search.destination, date: date)
+                        } label: {
+                            Label("실시간 가격 확인", systemImage: "bolt.fill")
+                                .font(.app(14, .semibold))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .foregroundStyle(.white)
+                                .background(Theme.mid, in: Capsule())
+                        }
+                        .buttonStyle(PressableStyle())
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .card()
@@ -323,6 +335,9 @@ struct FlightDetailView: View {
             .navigationTitle("항공권")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } } }
+            .sheet(item: $liveURL) { url in
+                SafariView(url: url).ignoresSafeArea()
+            }
             .sheet(isPresented: $showAlert) {
                 CreateAlertView(search: search, selectedDate: date, month: date, currentPrice: flight.price, flight: flight)
             }

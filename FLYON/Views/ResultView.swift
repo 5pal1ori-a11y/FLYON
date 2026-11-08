@@ -37,6 +37,7 @@ struct ResultView: View {
     @State private var liveFlights: [Flight] = []
     @State private var liveLoading = false
     @State private var liveMessage: String?
+    @State private var liveURL: URL?
 
     init(search: RouteSearch) {
         self.search = search
@@ -144,6 +145,9 @@ struct ResultView: View {
         .sheet(isPresented: $showAlertSheet) {
             CreateAlertView(search: search, selectedDate: selectedDate, month: month, currentPrice: currentLowest)
         }
+        .sheet(item: $liveURL) { url in
+            SafariView(url: url).ignoresSafeArea()
+        }
         .sheet(item: $detailFlight) { flight in
             if let date = selectedDate {
                 FlightDetailView(search: search, date: date, flight: flight)
@@ -154,7 +158,7 @@ struct ResultView: View {
 
     private var subtitle: some View {
         HStack(spacing: 6) {
-            Text(search.cabin.title)
+            Text("최근 48시간 기준")
             Text("·")
             Text(search.airlines.isEmpty ? "전체 항공사" : search.airlines.map(\.name).sorted().joined(separator: ", "))
                 .lineLimit(1)
@@ -298,24 +302,24 @@ struct ResultView: View {
         .buttonStyle(PressableStyle())
     }
 
-    /// 실시간 가격(Duffel)으로 보기
+    /// 실시간 가격: 가격 비교 사이트의 해당 날짜 검색 결과를 앱 안에서 연다
     private var liveChip: some View {
         Button {
-            withAnimation(.snappy) { liveMode.toggle() }
-            if liveMode { Task { await loadLive() } } else { liveMessage = nil }
+            if let date = selectedDate {
+                liveURL = LivePriceLink.url(origin: search.origin, destination: search.destination, date: date)
+            }
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "bolt.fill").font(.system(size: 11, weight: .bold))
-                    .symbolEffect(.pulse, isActive: liveLoading)
-                Text("실시간").font(.app(14, .semibold))
+                Text("실시간 가격").font(.app(14, .semibold))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .foregroundStyle(liveMode ? Color.white : Theme.mid)
-            .background(liveMode ? Theme.mid : Theme.mid.opacity(0.14), in: Capsule())
+            .foregroundStyle(.white)
+            .background(Theme.mid, in: Capsule())
         }
         .buttonStyle(PressableStyle())
-        .sensoryFeedback(.selection, trigger: liveMode)
+        .disabled(selectedDate == nil)
     }
 
     private func loadLive() async {
