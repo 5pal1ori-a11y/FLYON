@@ -3,6 +3,7 @@ import LocalAuthentication
 
 @main
 struct SubscriptionOnApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = Store()
     @State private var splash = true
     @AppStorage("themeMode") private var themeMode = 0
@@ -23,7 +24,7 @@ struct SubscriptionOnApp: App {
             .preferredColorScheme(themeMode == 1 ? .light : themeMode == 2 ? .dark : nil)
             .tint(T.blue)
             .onChange(of: phase) { _, p in if p == .background { store.autoBackup() }; if p == .background, store.faceLock { locked = true } else if p == .active, locked, !splash { unlock() } }
-            .onAppear { store.requestNotify() }
+            .onAppear { store.requestNotify(); ShortcutRouter.install() }
         }
     }
 

@@ -8,6 +8,9 @@ struct RootView: View {
     @State private var adding = false
     @State private var plusSpin: Double = 0
     @Namespace private var pill
+    @ObservedObject private var router = ShortcutRouter.shared
+    @State private var qaAsk = false
+    @State private var qaReport = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -24,6 +27,19 @@ struct RootView: View {
             tabBar
         }
         .sheet(isPresented: $adding) { AddView().environmentObject(store) }
+        .sheet(isPresented: $qaAsk) { AssistantView().environmentObject(store) }
+        .sheet(isPresented: $qaReport) { ReportView().environmentObject(store) }
+        .onChange(of: router.action) { _, act in
+            guard let act else { return }
+            switch act { case "add": adding = true; case "ask": qaAsk = true; case "report": qaReport = true; default: break }
+            router.action = nil
+        }
+        .onAppear {
+            if let act = router.action {
+                switch act { case "add": adding = true; case "ask": qaAsk = true; case "report": qaReport = true; default: break }
+                router.action = nil
+            }
+        }
     }
 
     var tabBar: some View {
@@ -61,6 +77,7 @@ struct HomeView: View {
     @State private var showAll = false
     @State private var showAI = false
     @State private var showReport = false
+    @State private var showUsage = false
 
     var bigGreeting: String {
         if let n = store.upcoming.first { return n.dDay <= 0 ? "\(n.name),\n오늘 결제돼요 👈" : "\(n.name),\n\(n.whenText) 갱신돼요 👈" }
@@ -107,35 +124,6 @@ struct HomeView: View {
                     .shadow(color: T.blue.opacity(0.35), radius: 22, y: 12)
                     .stagger(1)
 
-                    // AI 도우미 · 월간 리포트
-                    HStack(spacing: 12) {
-                        entryCard("sparkles", "AI에게 물어보기", "궁금한 걸 물어봐요", T.blue) { showAI = true }
-                        entryCard("chart.bar.doc.horizontal.fill", "\(Calendar.current.component(.month, from: Calendar.current.date(byAdding: .month, value: -1, to: Date())!))월 리포트", "지난달 한눈에", T.accent2) { showReport = true }
-                    }.stagger(2)
-
-                    // 오늘 쓴 구독 체크 (월 사용 횟수)
-                    SectionLabel("오늘 쓴 구독을 눌러주세요")
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 18) {
-                        ForEach(Array(store.active.enumerated()), id: \.element.id) { i, s in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { store.markUsed(s) }
-                            } label: {
-                                VStack(spacing: 8) {
-                                    ZStack(alignment: .topTrailing) {
-                                        LogoView(name: s.name, category: s.category, size: 58)
-                                        if s.usesThisMonth > 0 {
-                                            Text("\(s.usesThisMonth)").font(.system(size: 11, weight: .heavy)).foregroundStyle(.white)
-                                                .padding(.horizontal, 6).padding(.vertical, 2).background(T.blue, in: Capsule())
-                                                .offset(x: 6, y: -6).transition(.scale)
-                                        }
-                                    }
-                                    Text(s.name).font(.system(size: 12)).foregroundStyle(T.text).lineLimit(1)
-                                }
-                            }.buttonStyle(PressCard()).stagger(i + 2)
-                        }
-                    }
-
                     // 결제일이 가까운 서비스
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -174,13 +162,22 @@ struct HomeView: View {
                     .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 14, y: 6)
                     .animation(.spring(response: 0.45, dampingFraction: 0.85), value: showAll)
 
-                    if store.potentialSave > 0 {
-                        HStack(spacing: 10) {
-                            Image(systemName: "sparkles").foregroundStyle(T.blue)
-                            Text("\(store.potentialSave.won) 아낄 수 있어요").font(.system(size: 15, weight: .semibold))
+                    // AI · 리포트
+                    HStack(spacing: 12) {
+                        entryCard("sparkles", "AI에게 물어보기", "궁금한 걸 물어봐요", T.blue) { showAI = true }
+                        entryCard("chart.bar.doc.horizontal.fill", "\(Calendar.current.component(.month, from: Calendar.current.date(byAdding: .month, value: -1, to: Date())!))월 리포트", "지난달 한눈에", T.accent2) { showReport = true }
+                    }.stagger(2)
+
+                    // 오늘 쓴 구독 체크 (한 줄)
+                    Button { showUsage = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "hand.tap.fill").foregroundStyle(T.blue)
+                            Text("오늘 쓴 구독 체크하기").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.text)
                             Spacer()
-                        }.padding(16).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 20, style: .continuous)).stagger(8)
-                    }
+                            Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(T.faint)
+                        }
+                        .padding(16).background(T.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }.buttonStyle(PressCard()).stagger(3)
                 }
                 Spacer(minLength: 130)
             }.padding(.horizontal, 20)
@@ -188,6 +185,7 @@ struct HomeView: View {
         .sheet(item: $selected) { s in DetailView(sub: s).environmentObject(store) }
         .sheet(isPresented: $showAI) { AssistantView().environmentObject(store) }
         .sheet(isPresented: $showReport) { ReportView().environmentObject(store) }
+        .sheet(isPresented: $showUsage) { UsageSheet().environmentObject(store).presentationDetents([.medium, .large]) }
     }
 
     func entryCard(_ icon: String, _ title: String, _ sub: String, _ color: Color, _ action: @escaping () -> Void) -> some View {

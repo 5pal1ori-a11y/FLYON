@@ -6,9 +6,9 @@ struct AnalysisView: View {
     var body: some View {
         VStack(spacing: 0) {
             BigTitle("내 구독,\n한눈에").padding(.horizontal, 20).stagger(0)
-            Picker("", selection: $mode) { Text("통계").tag(0); Text("가격 비교").tag(1) }
+            Picker("", selection: $mode) { Text("통계").tag(0); Text("가격 비교").tag(1); Text("인기").tag(2) }
                 .pickerStyle(.segmented).padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 4)
-            if mode == 0 { StatsView() } else { CompareView() }
+            if mode == 0 { StatsView() } else if mode == 1 { CompareView() } else { PopularView() }
         }
     }
 }
@@ -114,6 +114,47 @@ struct CompareView: View {
                     }
                 } else { Text("월 결제 구독을 추가하면 비교해드려요").font(.system(size: 14)).foregroundStyle(T.sub) }
             }
+        }
+    }
+}
+
+
+/// 인기 서비스: 구독온이 직접 고른 목록이에요 (사용자 집계가 아니에요)
+struct PopularView: View {
+    @EnvironmentObject var store: Store
+    @Environment(\.openURL) private var openURL
+    static let top = ["넷플릭스", "유튜브 프리미엄", "쿠팡 와우", "티빙", "스포티파이", "ChatGPT", "네이버 플러스 멤버십", "디즈니 플러스", "멜론", "iCloud+"]
+    var items: [Service] { Self.top.compactMap { n in Catalog.all.first { $0.name == n } } }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("한국에서 많이 쓰는 구독 서비스예요").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub).padding(.top, 8)
+                ForEach(Array(items.enumerated()), id: \.element.name) { i, s in
+                    let using = store.active.contains { $0.service?.name == s.name }
+                    HStack(spacing: 14) {
+                        Text("\(i + 1)").font(.system(size: 18, weight: .heavy)).foregroundStyle(i < 3 ? T.blue : T.faint).frame(width: 24)
+                        LogoView(name: s.name, category: s.category, size: 46)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(s.name).font(.system(size: 16, weight: .semibold))
+                            Text(s.defaultPrice.won + (s.verified ? "" : " · 확인 필요")).font(.system(size: 13)).foregroundStyle(T.sub)
+                        }
+                        Spacer()
+                        if using {
+                            Text("이용 중").font(.system(size: 12, weight: .bold)).foregroundStyle(T.blue).padding(.horizontal, 10).padding(.vertical, 5).background(T.blueSoft, in: Capsule())
+                        } else if let u = s.joinURL {
+                            Button { openURL(u) } label: {
+                                Text("가입").font(.system(size: 12, weight: .bold)).foregroundStyle(.white).padding(.horizontal, 14).padding(.vertical, 7).background(T.blue, in: Capsule())
+                            }
+                        }
+                    }
+                    .padding(14).background(T.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 10, y: 4)
+                    .stagger(i)
+                }
+                Text("구독온이 직접 고른 목록이고, 사용자 데이터를 모아 만든 순위가 아니에요.").font(.system(size: 12)).foregroundStyle(T.faint)
+                Spacer(minLength: 120)
+            }.padding(.horizontal, 20)
         }
     }
 }

@@ -37,6 +37,33 @@ struct StatsView: View {
                             }
                         }
                     }
+                    if store.history.count >= 1 {
+                        Card {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionTitle(t: "월별 지출 기록")
+                                let items = store.history.sorted { $0.key < $1.key }.suffix(6).map { (String($0.key.suffix(2)) + "월", Double($0.value)) }
+                                Chart(items, id: \.0) { m, v in
+                                    BarMark(x: .value("월", m), y: .value("금액", grow ? v : 0)).foregroundStyle(LinearGradient(colors: [T.blue, T.accent3], startPoint: .bottom, endPoint: .top)).cornerRadius(6)
+                                }.frame(height: 150).chartYAxis(.hidden).animation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.2), value: grow)
+                                Text("앱을 쓴 달부터 기록돼요").font(.system(size: 12)).foregroundStyle(T.faint)
+                            }
+                        }
+                    }
+                    Card {
+                        VStack(alignment: .leading, spacing: 10) {
+                            SectionTitle(t: "구독 건강도")
+                            Text("\(store.health)점").font(.system(size: 28, weight: .heavy)).foregroundStyle(store.health >= 70 ? T.green : store.health >= 40 ? .orange : T.red)
+                            if store.saveGoal > 0 {
+                                let got = Int(store.savedMonthly.rounded())
+                                let r = min(1, Double(got) / Double(store.saveGoal))
+                                AnimBar(value: r, tint: T.green)
+                                Text("절약 목표 \(store.saveGoal.won) 중 \(got.won) 아꼈어요").font(.system(size: 13)).foregroundStyle(T.sub)
+                            }
+                        }
+                    }
+
+                    DisclosureGroup {
+                        VStack(spacing: 16) {
                     Card {
                         VStack(alignment: .leading, spacing: 14) {
                             SectionTitle(t: "앞으로 6개월")
@@ -62,18 +89,6 @@ struct StatsView: View {
                             Text("다른 앱을 열었는지는 알 수 없어서, 쓴 날 직접 눌러 기록해요").font(.system(size: 12)).foregroundStyle(T.faint)
                         }
                     }
-                    if store.history.count >= 1 {
-                        Card {
-                            VStack(alignment: .leading, spacing: 14) {
-                                SectionTitle(t: "월별 지출 기록")
-                                let items = store.history.sorted { $0.key < $1.key }.suffix(6).map { (String($0.key.suffix(2)) + "월", Double($0.value)) }
-                                Chart(items, id: \.0) { m, v in
-                                    BarMark(x: .value("월", m), y: .value("금액", grow ? v : 0)).foregroundStyle(LinearGradient(colors: [T.blue, T.accent3], startPoint: .bottom, endPoint: .top)).cornerRadius(6)
-                                }.frame(height: 150).chartYAxis(.hidden).animation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.2), value: grow)
-                                Text("앱을 쓴 달부터 기록돼요").font(.system(size: 12)).foregroundStyle(T.faint)
-                            }
-                        }
-                    }
                     Card {
                         VStack(alignment: .leading, spacing: 14) {
                             SectionTitle(t: "서비스별")
@@ -82,18 +97,11 @@ struct StatsView: View {
                             }
                         }
                     }
-                    Card {
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionTitle(t: "구독 건강도")
-                            Text("\(store.health)점").font(.system(size: 28, weight: .heavy)).foregroundStyle(store.health >= 70 ? T.green : store.health >= 40 ? .orange : T.red)
-                            if store.saveGoal > 0 {
-                                let got = Int(store.savedMonthly.rounded())
-                                let r = min(1, Double(got) / Double(store.saveGoal))
-                                AnimBar(value: r, tint: T.green)
-                                Text("절약 목표 \(store.saveGoal.won) 중 \(got.won) 아꼈어요").font(.system(size: 13)).foregroundStyle(T.sub)
-                            }
-                        }
+                        }.padding(.top, 12)
+                    } label: {
+                        Text("자세히 보기").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.sub)
                     }
+                    .tint(T.sub).padding(18).background(T.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 }
                 Spacer(minLength: 100)
             }.padding(.horizontal, 20)
