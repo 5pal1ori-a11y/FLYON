@@ -31,6 +31,9 @@ struct ResultView: View {
     @State private var month: Date
     @State private var monthLoading = false
     @State private var showAllQuotes = false
+    @State private var errorDetail: String?
+    @State private var calendarError: String?
+    @State private var quotesError: String?
 
     init(search: RouteSearch) {
         self.search = search
@@ -50,6 +53,7 @@ struct ResultView: View {
 
     private var hasAnyData: Bool {
         !(data.history.isEmpty && data.calendar.isEmpty && data.quotes.isEmpty)
+            || calendarError != nil || quotesError != nil
     }
 
     var body: some View {
@@ -65,7 +69,7 @@ struct ResultView: View {
                     ContentUnavailableView {
                         Label("가격을 불러오지 못했어요", systemImage: "wifi.exclamationmark")
                     } description: {
-                        Text("네트워크 상태를 확인하고 다시 시도해 주세요.")
+                        Text("네트워크 상태를 확인하고 다시 시도해 주세요." + (errorDetail.map { "\n(\($0))" } ?? ""))
                     } actions: {
                         Button("다시 시도") { Task { await load() } }
                             .buttonStyle(.borderedProminent)
@@ -261,7 +265,7 @@ struct ResultView: View {
             }
 
             if data.calendar.isEmpty {
-                Text(monthLoading ? "불러오는 중..." : "이 달의 출발일별 가격 데이터가 아직 없어요.")
+                Text(monthLoading ? "불러오는 중..." : (calendarError.map { "불러오지 못했어요 (\($0))" } ?? "이 달의 출발일별 가격 데이터가 아직 없어요."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
@@ -310,7 +314,7 @@ struct ResultView: View {
                 .padding(.bottom, 8)
 
             if quotes.isEmpty {
-                Text(monthLoading ? "불러오는 중..." : "선택한 조건에 맞는 항공사 가격이 없어요.")
+                Text(monthLoading ? "불러오는 중..." : (quotesError.map { "불러오지 못했어요 (\($0))" } ?? "선택한 조건에 맞는 항공사 가격이 없어요."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -380,37 +384,51 @@ struct ResultView: View {
 
     private func load() async {
         phase = .loading
+        errorDetail = nil
         do {
             // 처음 조회하는 노선은 서버가 이 호출에서 수집을 시작하므로 이력을 먼저 기다린다
             let history = try await appState.provider.history(
                 origin: search.origin, destination: search.destination, days: 90, airlines: search.airlines)
-            async let calendar = appState.provider.calendar(
-                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
-            async let quotes = appState.provider.quotes(
-                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
-            let (c, q) = try await (calendar, quotes)
-            data = Loaded(history: history, calendar: c, quotes: q)
-            phase = .loaded
+            data = Loaded(history: history, calendar: [], quotes: [])
         } catch {
+            errorDetail = error.localizedDescription
             phase = .failed
+            return
         }
+        await fetchMonthData()
+        phase = .loaded
     }
 
     private func loadMonth() async {
         monthLoading = true
         defer { monthLoading = false }
-        do {
-            async let calendar = appState.provider.calendar(
+        await fetchMonthData()
+    }
+
+    /// 달력과 항공사 목록은 서로 독립적으로 가져온다. 한쪽이 실패해도 나머지는 보여 준다.
+    private func fetchMonthData() async {
+        async let calendarResult = capture {
+            try await appState.provider.calendar(
                 origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
-            async let quotes = appState.provider.quotes(
-                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
-            let (c, q) = try await (calendar, quotes)
-            data.calendar = c
-            data.quotes = q
-        } catch {
-            data.calendar = []
-            data.quotes = []
         }
+        async let quotesResult = capture {
+            try await appState.provider.quotes(
+                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
+        }
+        let (c, q) = await (calendarResult, quotesResult)
+
+        switch c {
+        case .success(let days): data.calendar = days; calendarError = nil
+        case .failure(let error): data.calendar = []; calendarError = error.localizedDescription
+        }
+        switch q {
+        case .success(let quotes): data.quotes = quotes; quotesError = nil
+        case .failure(let error): data.quotes = []; quotesError = error.localizedDescription
+        }
+    }
+
+    private func capture<T>(_ work: () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await work()) } catch { return .failure(error) }
     }
 }
 

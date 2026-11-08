@@ -14,6 +14,18 @@ protocol PriceProvider {
     func quotes(origin: Airport, destination: Airport, month: Date, airlines: Set<Airline>) async throws -> [PriceQuote]
 }
 
+enum PriceError: LocalizedError {
+    case http(Int)
+    case decoding
+
+    var errorDescription: String? {
+        switch self {
+        case .http(let code): return "서버 응답 오류 \(code)"
+        case .decoding: return "서버 응답을 읽지 못함"
+        }
+    }
+}
+
 // MARK: - 샘플 데이터 (개발용)
 
 struct MockPriceProvider: PriceProvider {
@@ -169,7 +181,12 @@ struct ServerPriceProvider: PriceProvider {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        return try JSONDecoder().decode(T.self, from: data)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard code == 200 else { throw PriceError.http(code) }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw PriceError.decoding
+        }
     }
 }
