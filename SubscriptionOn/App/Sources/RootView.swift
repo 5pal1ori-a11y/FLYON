@@ -12,7 +12,7 @@ struct RootView: View {
             T.bg.ignoresSafeArea()
             Group {
                 switch tab {
-                case .home: HomeView()
+                case .home: HomeView(onAdd: { adding = true })
                 case .calendar: CalendarView()
                 case .stats: StatsView()
                 case .my: SettingsView()
@@ -52,82 +52,154 @@ struct RootView: View {
 // MARK: 홈
 struct HomeView: View {
     @EnvironmentObject var store: Store
-    @State private var showAll = false
+    var onAdd: () -> Void
     @State private var q = ""
     @State private var selected: Subscription?
+    @State private var showAllList = false
+
+    var headline: String {
+        guard let n = store.upcoming.first else { return store.userName.isEmpty ? "안녕하세요" : "\(store.userName)님, 안녕하세요" }
+        return n.dDay <= 0 ? "\(n.name),\n오늘 결제돼요 👈" : "\(n.name),\n\(n.whenText) 갱신돼요 👈"
+    }
+    var paid: Double { max(0, store.monthlyTotal - Double(store.remainingThisMonth)) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Text(store.userName.isEmpty ? "안녕하세요 👋" : "\(store.userName)님, 안녕하세요").font(.system(size: 22, weight: .bold))
-                    Spacer()
-                }.padding(.top, 8)
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if store.subs.isEmpty { empty } else {
+                        Text(headline).font(.system(size: 28, weight: .heavy)).foregroundStyle(T.text).padding(.top, 12).padding(.bottom, 4)
 
-                if store.subs.isEmpty { empty } else {
-                    Card {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("이번 달 구독료").font(.system(size: 15)).foregroundStyle(T.sub)
-                            Text(store.monthlyTotal.won).font(.system(size: 32, weight: .heavy))
-                            HStack(spacing: 8) {
-                                Text("1년이면 \(store.yearlyTotal.won)").font(.system(size: 14)).foregroundStyle(T.sub)
+                        // 이번 달 요약 (링 + 결제 완료 / 지출 총액)
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle().stroke(T.bg, lineWidth: 5)
+                                Circle().trim(from: 0, to: store.monthlyTotal > 0 ? paid / store.monthlyTotal : 0)
+                                    .stroke(T.blue, style: StrokeStyle(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
+                                Text("\(Calendar.current.component(.month, from: Date()))월").font(.system(size: 14, weight: .semibold))
+                            }.frame(width: 52, height: 52)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("결제 완료").font(.system(size: 12)).foregroundStyle(T.blue)
+                                Text(paid.won).font(.system(size: 18, weight: .bold)).foregroundStyle(T.blue)
                             }
-                            if store.budget > 0 {
-                                let used = min(1, store.monthlyTotal / Double(store.budget))
-                                ProgressView(value: used).tint(store.overBudget ? T.red : T.green).padding(.top, 8)
-                                HStack {
-                                    Text(store.overBudget ? "예산을 넘었어요" : "예산까지 \((Double(store.budget) - store.monthlyTotal).won) 남았어요").font(.system(size: 13)).foregroundStyle(T.sub)
-                                    Spacer(); Text("\(Int(used * 100))%").font(.system(size: 13)).foregroundStyle(T.sub)
+                            Text("/").foregroundStyle(T.faint)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("지출 총액").font(.system(size: 12)).foregroundStyle(T.sub)
+                                Text(store.monthlyTotal.won).font(.system(size: 18, weight: .bold)).foregroundStyle(T.text)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(18).background(.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                        if store.budget > 0 {
+                            let used = min(1, store.monthlyTotal / Double(store.budget))
+                            Card {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text(store.overBudget ? "예산을 넘었어요" : "예산까지 \((Double(store.budget) - store.monthlyTotal).won) 남았어요").font(.system(size: 14, weight: .semibold))
+                                        Spacer(); Text("\(Int(used * 100))%").font(.system(size: 14)).foregroundStyle(T.sub)
+                                    }
+                                    ProgressView(value: used).tint(store.overBudget ? T.red : T.green)
                                 }
                             }
-                            if store.overBudget && false { Text("예산을 \((store.monthlyTotal - Double(store.budget)).won) 넘었어요").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.red).padding(.top, 2) }
                         }
-                    }
 
-                    TextField("넷플릭스, AI, 3만원 이하…", text: $q)
-                        .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16))
-                    if !q.isEmpty {
-                        Card { VStack(spacing: 16) { ForEach(store.search(q)) { s in SubRow(s: s).onTapGesture { selected = s } } } }
-                    } else {
-                        UpcomingList { selected = $0 }
-                        NoticeCard()
-                        if !store.insights.isEmpty {
-                            Card {
-                                VStack(alignment: .leading, spacing: 14) {
-                                    SectionTitle(t: store.potentialSave > 0 ? "\(store.potentialSave.won) 아낄 수 있어요" : "확인해보세요")
-                                    ForEach(store.insights) { i in
-                                        HStack(spacing: 12) {
-                                            Image(systemName: i.icon).foregroundStyle(T.blue).frame(width: 32, height: 32).background(T.blueSoft, in: Circle())
-                                            Text(i.text).font(.system(size: 15)).foregroundStyle(T.text)
+                        // 다음 결제일 카드 2개
+                        let nexts = nextDays()
+                        if !nexts.isEmpty {
+                            HStack(spacing: 12) {
+                                ForEach(nexts, id: \.0) { d, subs in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(d.formatted(.dateTime.month().day())).font(.system(size: 13)).foregroundStyle(T.sub)
+                                        Text(subs.reduce(0) { $0 + $1.price }.won).font(.system(size: 20, weight: .bold))
+                                        HStack(spacing: -8) {
+                                            ForEach(subs.prefix(4)) { s in LogoView(name: s.name, category: s.category, size: 26) }
+                                        }.padding(.top, 4)
+                                    }
+                                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                }
+                            }
+                        }
+
+                        // 구독 서비스
+                        HStack {
+                            Text("구독 서비스").font(.system(size: 15)).foregroundStyle(T.sub)
+                            Spacer()
+                            Text("총 \(store.monthlyTotal.won)").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.text)
+                        }.padding(.top, 8)
+                        TextField("서비스 검색", text: $q)
+                            .padding(12).background(.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        let list = q.isEmpty ? store.upcoming : store.search(q)
+                        ForEach(showAllList || !q.isEmpty ? list : Array(list.prefix(6))) { s in
+                            HStack(spacing: 14) {
+                                LogoView(name: s.name, category: s.category, size: 48)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(s.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(T.text)
+                                    Text("\(s.price.won) / \(s.cycle == .monthly ? "1개월" : s.cycle == .yearly ? "1년" : "1주")").font(.system(size: 14)).foregroundStyle(T.sub)
+                                }
+                                Spacer()
+                                if s.isActive { badge(s) } else { Text(s.status.rawValue).font(.system(size: 13)).foregroundStyle(T.faint) }
+                            }
+                            .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            .onTapGesture { selected = s }
+                        }
+                        if q.isEmpty && list.count > 6 {
+                            Button { withAnimation { showAllList.toggle() } } label: {
+                                Text(showAllList ? "접기" : "\(list.count - 6)개 더 보기").font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
+                            }
+                        }
+
+                        if q.isEmpty {
+                            NoticeCard()
+                            UpcomingList { selected = $0 }
+                            if !store.insights.isEmpty {
+                                Card {
+                                    VStack(alignment: .leading, spacing: 14) {
+                                        SectionTitle(t: store.potentialSave > 0 ? "\(store.potentialSave.won) 아낄 수 있어요" : "확인해보세요")
+                                        ForEach(store.insights) { i in
+                                            HStack(spacing: 12) {
+                                                Image(systemName: i.icon).foregroundStyle(T.blue).frame(width: 32, height: 32).background(T.blueSoft, in: Circle())
+                                                Text(i.text).font(.system(size: 15)).foregroundStyle(T.text)
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                        if !store.top3.isEmpty {
-                            Card {
-                                VStack(alignment: .leading, spacing: 16) {
-                                    SectionTitle(t: "제일 비싼 구독")
-                                    ForEach(Array(store.top3.enumerated()), id: \.element.id) { i, s in
-                                        HStack { Text("\(i + 1)").font(.system(size: 16, weight: .bold)).foregroundStyle(T.blue).frame(width: 20); SubRow(s: s) }
-                                            .onTapGesture { selected = s }
-                                    }
-                                }
-                            }
-                        }
                     }
-                }
-                Spacer(minLength: 100)
-            }.padding(.horizontal, 20)
+                    Spacer(minLength: 160)
+                }.padding(.horizontal, 20)
+            }
+            if !store.subs.isEmpty {
+                Button(action: onAdd) {
+                    Label("등록하기", systemImage: "plus").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                        .padding(.horizontal, 20).frame(height: 52).background(T.blue, in: Capsule())
+                        .shadow(color: T.blue.opacity(0.35), radius: 10, y: 4)
+                }.buttonStyle(Press()).padding(.trailing, 20).padding(.bottom, 104)
+            }
         }
         .sheet(item: $selected) { s in DetailView(sub: s).environmentObject(store) }
     }
 
+    func badge(_ s: Subscription) -> some View {
+        let d = s.dDay
+        let (txt, fg, bg): (String, Color, Color) = d <= 1 ? (s.whenText, T.red, Color(hex: 0xFFE9EB)) : ("\(d)일 뒤", T.blue, T.blueSoft)
+        return Text(txt).font(.system(size: 13, weight: .bold)).foregroundStyle(fg).padding(.horizontal, 12).padding(.vertical, 6).background(bg, in: Capsule())
+    }
+
+    func nextDays() -> [(Date, [Subscription])] {
+        let cal = Calendar.current
+        let g = Dictionary(grouping: store.upcoming) { cal.startOfDay(for: $0.nextDate) }
+        return Array(g.keys.sorted().prefix(2).map { ($0, g[$0]!) })
+    }
+
     var empty: some View {
         VStack(spacing: 14) {
-            Image("AppLogo").resizable().scaledToFit().frame(width: 120).colorInvertIfNeeded()
+            Image("AppLogo").resizable().scaledToFit().frame(width: 120).luminanceToAlpha()
             Text("어떤 구독을 쓰고 있나요?").font(.system(size: 20, weight: .bold))
             Text("+ 버튼으로 추가해보세요").font(.system(size: 15)).foregroundStyle(T.sub)
+            BigButton(title: "구독 추가하기", action: onAdd).padding(.horizontal, 40).padding(.top, 10)
         }.frame(maxWidth: .infinity).padding(.top, 120)
     }
 }
