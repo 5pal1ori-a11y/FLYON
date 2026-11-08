@@ -58,7 +58,10 @@ struct CompareView: View {
                                     Text(s.name).font(.system(size: 15, weight: .semibold))
                                     if using != nil { Text("이용 중").font(.system(size: 11, weight: .bold)).foregroundStyle(T.blue).padding(.horizontal, 8).padding(.vertical, 3).background(T.blueSoft, in: Capsule()) }
                                     Spacer()
-                                    Text(s.defaultPrice.won).font(.system(size: 15, weight: .semibold))
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        Text(s.defaultPrice.won).font(.system(size: 15, weight: .semibold))
+                                        if !s.verified { Text("확인 필요").font(.system(size: 10)).foregroundStyle(T.faint) }
+                                    }
                                 }
                                 GeometryReader { g in
                                     ZStack(alignment: .leading) {
@@ -73,7 +76,7 @@ struct CompareView: View {
 
                 calculator
 
-                Text("요금은 참고용이에요. 실제 요금과 할인은 각 서비스에서 확인하세요.")
+                Text("2026년 11월 기준으로 확인한 요금은 넷플릭스(스탠다드), 유튜브 프리미엄, 쿠팡 와우, Google AI Pro예요. \"확인 필요\"는 대략적인 값이라 서비스에서 직접 확인하세요.")
                     .font(.system(size: 12)).foregroundStyle(T.faint)
                 Spacer(minLength: 120)
             }.padding(.horizontal, 20)

@@ -8,6 +8,8 @@ struct Service: Hashable {
     let mark: String        // 로고 에셋이 없을 때 쓰는 이니셜
     let cancelURL: String
     let defaultPrice: Int
+    /// 2026년 11월 기준 공개 자료로 확인한 요금이면 true
+    var verified: Bool = false
     var assetName: String { "logo_" + name }
 }
 
@@ -15,18 +17,18 @@ struct Service: Hashable {
 /// (예: logo_넷플릭스). 없으면 브랜드 색 + 이니셜로 보여줘요.
 enum Catalog {
     static let all: [Service] = [
-        Service(name: "넷플릭스", aliases: ["netflix", "넷플"], category: .ott, color: 0x141414, mark: "N", cancelURL: "https://www.netflix.com/cancelplan", defaultPrice: 17000),
-        Service(name: "유튜브 프리미엄", aliases: ["youtube", "유튜브", "youtube premium"], category: .ott, color: 0xFF0000, mark: "▶", cancelURL: "https://www.youtube.com/paid_memberships", defaultPrice: 14900),
+        Service(name: "넷플릭스", aliases: ["netflix", "넷플"], category: .ott, color: 0x141414, mark: "N", cancelURL: "https://www.netflix.com/cancelplan", defaultPrice: 13500, verified: true),
+        Service(name: "유튜브 프리미엄", aliases: ["youtube", "유튜브", "youtube premium"], category: .ott, color: 0xFF0000, mark: "▶", cancelURL: "https://www.youtube.com/paid_memberships", defaultPrice: 14900, verified: true),
         Service(name: "티빙", aliases: ["tving"], category: .ott, color: 0xFF153C, mark: "T", cancelURL: "https://www.tving.com/account", defaultPrice: 13900),
         Service(name: "웨이브", aliases: ["wavve", "웨에브"], category: .ott, color: 0x1351F9, mark: "W", cancelURL: "https://www.wavve.com/my", defaultPrice: 13900),
         Service(name: "디즈니 플러스", aliases: ["disney", "디즈니", "disney+"], category: .ott, color: 0x0B2A4A, mark: "D+", cancelURL: "https://www.disneyplus.com/account", defaultPrice: 13900),
-        Service(name: "쿠팡 와우", aliases: ["coupang", "쿠팡", "와우"], category: .membership, color: 0xE52528, mark: "C", cancelURL: "https://www.coupang.com/np/mypage", defaultPrice: 7890),
+        Service(name: "쿠팡 와우", aliases: ["coupang", "쿠팡", "와우"], category: .membership, color: 0xE52528, mark: "C", cancelURL: "https://www.coupang.com/np/mypage", defaultPrice: 7890, verified: true),
         Service(name: "스포티파이", aliases: ["spotify"], category: .ott, color: 0x1DB954, mark: "S", cancelURL: "https://www.spotify.com/account/subscription", defaultPrice: 10900),
         Service(name: "멜론", aliases: ["melon"], category: .ott, color: 0x00CD3C, mark: "M", cancelURL: "https://www.melon.com", defaultPrice: 13200),
         Service(name: "플로", aliases: ["flo"], category: .ott, color: 0x3F3FFF, mark: "F", cancelURL: "https://www.music-flo.com", defaultPrice: 10900),
         Service(name: "ChatGPT", aliases: ["gpt", "지피티", "챗지피티", "openai", "chat gpt"], category: .ai, color: 0x10A37F, mark: "G", cancelURL: "https://chatgpt.com/#settings/Account", defaultPrice: 29000),
         Service(name: "Claude", aliases: ["클로드", "anthropic"], category: .ai, color: 0xD97757, mark: "C", cancelURL: "https://claude.ai/settings/billing", defaultPrice: 28000),
-        Service(name: "Gemini", aliases: ["제미나이", "google one", "구글 원"], category: .ai, color: 0x4285F4, mark: "G", cancelURL: "https://one.google.com/settings", defaultPrice: 29000),
+        Service(name: "Gemini", aliases: ["제미나이", "google one", "구글 원"], category: .ai, color: 0x4285F4, mark: "G", cancelURL: "https://one.google.com/settings", defaultPrice: 29000, verified: true),
         Service(name: "Creative Cloud", aliases: ["adobe", "어도비"], category: .etc, color: 0xFA0F00, mark: "Cc", cancelURL: "https://account.adobe.com/plans", defaultPrice: 78100),
         Service(name: "iCloud+", aliases: ["icloud", "아이클라우드"], category: .etc, color: 0x3693F5, mark: "☁︎", cancelURL: "https://support.apple.com/ko-kr/118428", defaultPrice: 1100),
         Service(name: "네이버 플러스 멤버십", aliases: ["naver", "네이버"], category: .membership, color: 0x03C75A, mark: "N", cancelURL: "https://nid.naver.com", defaultPrice: 4900),
