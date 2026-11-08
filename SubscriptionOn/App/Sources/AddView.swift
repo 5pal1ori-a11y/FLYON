@@ -10,7 +10,7 @@ struct AddView: View {
     enum Stage { case pick, form }
     @State private var stage: Stage = .pick
     @State private var query = ""
-    @State private var aiText = ""
+    @State private var showAllServices = false
     @State private var aiBusy = false
     @State private var saved = false
     @State private var method: Method = .manual
@@ -30,79 +30,23 @@ struct AddView: View {
     @State private var scanning = false
     @State private var scanMsg = ""
 
+    static let popular = ["넷플릭스", "유튜브 프리미엄", "티빙", "쿠팡 와우", "디즈니 플러스", "스포티파이", "멜론", "ChatGPT", "Claude", "웨이브", "Gemini", "네이버 플러스 멤버십"]
+    var popularServices: [Service] { Self.popular.compactMap { n in Catalog.all.first { $0.name == n } } }
+    var q: String { query.trimmingCharacters(in: .whitespaces) }
+    var looksLikeSentence: Bool { q.rangeOfCharacter(from: .decimalDigits) != nil || q.contains("매달") || q.contains("매주") || q.contains("매년") }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                if stage == .pick && editing == nil { pickView.transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity))) } else {
-                VStack(alignment: .leading, spacing: 20) {
-                    if editing == nil {
-                        if method == .photo { photoBox }
-                        if method == .text { textBox }
-                    }
-                    field("무엇을 구독하세요?") {
-                        TextField("서비스 이름을 적어주세요", text: $name).font(.system(size: 18, weight: .semibold))
-                            .onChange(of: name) { _, v in autofill(v) }
-                        if !name.trimmingCharacters(in: .whitespaces).isEmpty {
-                            let svc = Catalog.find(name)
-                            HStack(spacing: 12) {
-                                LogoView(name: name, category: category, size: 44).id(svc?.name ?? "none").transition(.scale(scale: 0.6).combined(with: .opacity))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(svc?.name ?? name).font(.system(size: 16, weight: .semibold))
-                                    Text(svc != nil ? "\(category.rawValue)로 분류했어요" : "처음 보는 서비스예요. 종류를 골라주세요")
-                                        .font(.system(size: 13)).foregroundStyle(T.sub).contentTransition(.opacity)
-                                }
-                            }.animation(.spring(response: 0.4, dampingFraction: 0.7), value: svc?.name)
-                        }
-                        let hits = Catalog.search(name).filter { $0.name != Catalog.find(name)?.name }
-                        if !hits.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(hits.prefix(12), id: \.name) { s in
-                                        Button { name = s.name; catTouched = false; autofill(s.name, force: true) } label: {
-                                            VStack(spacing: 6) { LogoView(name: s.name, category: s.category, size: 48); Text(s.name).font(.system(size: 11)).foregroundStyle(T.sub).lineLimit(1) }.frame(width: 64)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    field("얼마예요?") {
-                        TextField("0", text: $priceText).keyboardType(.numberPad).font(.system(size: 28, weight: .heavy))
-                        if let v = Int(priceText), v > 0 { Text(v.won).font(.system(size: 14)).foregroundStyle(T.sub) }
-                    }
-                    field("종류") {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
-                            ForEach(Category.allCases) { c in
-                                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { category = c; catTouched = true } } label: {
-                                    Text(c.rawValue).font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(category == c ? .white : T.sub).frame(maxWidth: .infinity).frame(height: 40)
-                                        .background(category == c ? c.color : T.bg, in: Capsule()).scaleEffect(category == c ? 1.05 : 1)
-                                }
-                            }
-                        }
-                        if !catTouched && !name.isEmpty { Text("자동으로 골랐어요").font(.system(size: 12)).foregroundStyle(T.faint) }
-                    }
-                    field("언제 결제돼요?") {
-                        Picker("", selection: $cycle) { ForEach(Cycle.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
-                        DatePicker("다음 결제일", selection: $nextDate, displayedComponents: .date).environment(\.locale, Locale(identifier: "ko_KR"))
-                    }
-                    field("더 적어둘래요?") {
-                        TextField("결제수단 (예: 토스 체크카드)", text: $pay)
-                        Divider()
-                        Stepper("인원 \(people)명", value: $people, in: 1...10)
-                        Divider()
-                        Toggle("무료 체험 중이에요", isOn: $trial).tint(T.blue)
-                        if trial { DatePicker("체험 종료일", selection: $trialEnd, displayedComponents: .date).environment(\.locale, Locale(identifier: "ko_KR")) }
-                        Divider()
-                        TextField("메모", text: $memo)
-                    }
-                    BigButton(title: editing == nil ? "추가하기" : "저장", action: save)
-                        .opacity(canSave ? 1 : 0.4).disabled(!canSave)
-                }.padding(20).transition(.move(edge: .trailing).combined(with: .opacity)) }
+                if stage == .pick && editing == nil {
+                    pickView.transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity)))
+                } else {
+                    formView.transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
             .animation(.spring(response: 0.45, dampingFraction: 0.85), value: stage)
             .background(T.bg)
-            .navigationTitle(editing == nil ? "구독 추가" : "수정").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(editing == nil ? "" : "수정").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if stage == .form && editing == nil { Button("뒤로") { stage = .pick } } else { Button("닫기") { dismiss() } }
@@ -114,8 +58,7 @@ struct AddView: View {
                     ZStack {
                         Color.white.opacity(0.92).ignoresSafeArea()
                         VStack(spacing: 14) {
-                            Image(systemName: "checkmark.circle.fill").font(.system(size: 84)).foregroundStyle(T.green)
-                                .symbolEffect(.bounce, value: saved)
+                            Image(systemName: "checkmark.circle.fill").font(.system(size: 84)).foregroundStyle(T.green).symbolEffect(.bounce, value: saved)
                             Text(editing == nil ? "추가했어요" : "저장했어요").font(.system(size: 20, weight: .bold))
                         }.transition(.scale(scale: 0.5).combined(with: .opacity))
                     }.transition(.opacity)
@@ -124,63 +67,81 @@ struct AddView: View {
         }
     }
 
+    // MARK: 1단계 — 검색 하나만
+    var results: [Service] { q.isEmpty ? [] : Catalog.search(q) }
 
-    // MARK: 1단계 — 말로 추가 / 검색
-    var results: [Service] {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        return q.isEmpty ? Catalog.all : Catalog.search(q)
-    }
     var pickView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("말로 추가").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub)
-            HStack(spacing: 10) {
-                Image(systemName: "sparkles").foregroundStyle(T.blue)
-                TextField("예: 유튜브 프리미엄 매달 15일 14,900원", text: $aiText).submitLabel(.done).onSubmit(runAI)
-                if aiBusy { ProgressView() } else if !aiText.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Button(action: runAI) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 26)).foregroundStyle(T.blue) }
-                }
-            }
-            .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            Text(SmartParse.aiAvailable ? "Apple Intelligence가 기기 안에서 읽고, 추가하기 전에 확인할 수 있어요" : "기기 안에서 읽고, 추가하기 전에 확인할 수 있어요")
-                .font(.system(size: 12)).foregroundStyle(T.faint)
-
+        VStack(alignment: .leading, spacing: 20) {
+            Text("무엇을\n구독하세요?").font(.system(size: 30, weight: .heavy)).padding(.top, 8)
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(T.faint)
-                TextField("서비스 검색", text: $query).submitLabel(.search)
-                if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(T.faint) } }
+                TextField("서비스 이름", text: $query).submitLabel(.done).onSubmit(submitQuery)
+                if aiBusy { ProgressView() } else if !query.isEmpty {
+                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(T.faint) }
+                }
             }
-            .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-            HStack(spacing: 10) {
-                quick("photo", "캡처로") { method = .photo; stage = .form }
-                quick("text.bubble", "문자·메일로") { method = .text; stage = .form }
-            }
-
-            let q = query.trimmingCharacters(in: .whitespaces)
             if q.isEmpty {
-                ForEach(Category.allCases) { cat in
-                    let items = Catalog.all.filter { $0.category == cat }
-                    if !items.isEmpty {
-                        Text(cat.rawValue).font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub).padding(.top, 6)
-                        Card { VStack(spacing: 0) { ForEach(items, id: \.name) { serviceRow($0) } } }
+                Text("많이 쓰는 서비스").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 18) {
+                    ForEach(Array(popularServices.enumerated()), id: \.element.name) { i, s in
+                        Button { choose(s) } label: {
+                            VStack(spacing: 8) {
+                                LogoView(name: s.name, category: s.category, size: 58)
+                                Text(s.name.replacingOccurrences(of: " 프리미엄", with: "").replacingOccurrences(of: " 플러스 멤버십", with: ""))
+                                    .font(.system(size: 12)).foregroundStyle(T.text).lineLimit(1)
+                            }
+                        }.buttonStyle(PressCard()).stagger(i)
+                    }
+                }
+                HStack(spacing: 10) {
+                    quick("photo", "캡처로") { method = .photo; stage = .form }
+                    quick("text.bubble", "문자·메일로") { method = .text; stage = .form }
+                }
+                Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showAllServices.toggle() } } label: {
+                    HStack(spacing: 4) { Text(showAllServices ? "접기" : "전체 서비스 보기"); Image(systemName: showAllServices ? "chevron.up" : "chevron.down") }
+                        .font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
+                }
+                if showAllServices {
+                    ForEach(Category.allCases) { cat in
+                        let items = Catalog.all.filter { $0.category == cat }
+                        if !items.isEmpty {
+                            Text(cat.rawValue).font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub)
+                            Card { VStack(spacing: 0) { ForEach(items, id: \.name) { serviceRow($0) } } }
+                        }
                     }
                 }
             } else {
                 Card {
                     VStack(spacing: 0) {
-                        ForEach(results, id: \.name) { serviceRow($0) }
+                        if looksLikeSentence {
+                            Button(action: runAI) {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "sparkles").foregroundStyle(T.blue).frame(width: 40, height: 40).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 12))
+                                    Text("‘\(q)’ 이대로 읽기").font(.system(size: 16, weight: .semibold)).foregroundStyle(T.text).lineLimit(1)
+                                    Spacer()
+                                }.padding(.vertical, 10).contentShape(Rectangle())
+                            }
+                        }
+                        ForEach(results.prefix(6), id: \.name) { serviceRow($0) }
                         Button { name = q; catTouched = false; autofill(q, force: true); stage = .form } label: {
                             HStack(spacing: 14) {
                                 LogoView(name: q, category: Catalog.classify(q), size: 40)
-                                Text("‘\(q)’ 그대로 추가").font(.system(size: 16)).foregroundStyle(T.text)
+                                Text("‘\(q)’ 그대로 추가").font(.system(size: 16)).foregroundStyle(T.text).lineLimit(1)
                                 Spacer(); Image(systemName: "plus").foregroundStyle(T.blue)
                             }.padding(.vertical, 10).contentShape(Rectangle())
                         }
                     }
                 }
             }
-            Button("직접 입력") { stage = .form }.font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
         }.padding(20)
+    }
+
+    func submitQuery() {
+        if looksLikeSentence { runAI() }
+        else if let s = results.first { choose(s) }
+        else if !q.isEmpty { name = q; catTouched = false; autofill(q, force: true); stage = .form }
     }
 
     func serviceRow(_ s: Service) -> some View {
@@ -206,7 +167,7 @@ struct AddView: View {
     }
 
     func runAI() {
-        let t = aiText.trimmingCharacters(in: .whitespaces)
+        let t = q
         guard !t.isEmpty, !aiBusy else { return }
         aiBusy = true
         Task {
@@ -217,6 +178,75 @@ struct AddView: View {
             cycle = d.cycle; nextDate = SmartParse.nextDate(day: d.day, cycle: d.cycle)
             stage = .form
         }
+    }
+
+    // MARK: 2단계 — 꼭 필요한 것만
+    var catChips: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
+            ForEach(Category.allCases) { c in
+                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { category = c; catTouched = true } } label: {
+                    Text(c.rawValue).font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(category == c ? .white : T.sub).frame(maxWidth: .infinity).frame(height: 40)
+                        .background(category == c ? c.color : T.bg, in: Capsule()).scaleEffect(category == c ? 1.05 : 1)
+                }
+            }
+        }
+    }
+
+    var formView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if editing == nil {
+                if method == .photo { photoBox }
+                if method == .text { textBox }
+            }
+            let svc = Catalog.find(name)
+            Card {
+                HStack(spacing: 16) {
+                    LogoView(name: name, category: category, size: 64).id(svc?.name ?? "none").transition(.scale(scale: 0.6).combined(with: .opacity))
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("서비스 이름", text: $name).font(.system(size: 22, weight: .bold)).onChange(of: name) { _, v in autofill(v) }
+                        Text(category.rawValue).font(.system(size: 13, weight: .semibold)).foregroundStyle(category.color)
+                            .padding(.horizontal, 10).padding(.vertical, 4).background(category.color.opacity(0.12), in: Capsule())
+                    }
+                }.animation(.spring(response: 0.4, dampingFraction: 0.7), value: svc?.name)
+            }
+            Card {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("한 번에 얼마예요?").font(.system(size: 14)).foregroundStyle(T.sub)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        TextField("0", text: $priceText).keyboardType(.numberPad).font(.system(size: 34, weight: .heavy))
+                        Text("원").font(.system(size: 20, weight: .bold)).foregroundStyle(T.sub)
+                    }
+                }
+            }
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    Picker("", selection: $cycle) { ForEach(Cycle.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
+                    DatePicker("다음 결제일", selection: $nextDate, displayedComponents: .date).environment(\.locale, Locale(identifier: "ko_KR"))
+                }
+            }
+            if svc == nil {
+                Card { VStack(alignment: .leading, spacing: 10) { Text("종류를 골라주세요").font(.system(size: 14)).foregroundStyle(T.sub); catChips } }
+            }
+            Card {
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if svc != nil { catChips.padding(.top, 8) }
+                        TextField("결제수단 (예: 토스 체크카드)", text: $pay)
+                        Divider()
+                        Stepper("인원 \(people)명", value: $people, in: 1...10)
+                        Divider()
+                        Toggle("무료 체험 중이에요", isOn: $trial).tint(T.blue)
+                        if trial { DatePicker("체험 종료일", selection: $trialEnd, displayedComponents: .date).environment(\.locale, Locale(identifier: "ko_KR")) }
+                        Divider()
+                        TextField("메모", text: $memo)
+                    }.padding(.top, 6)
+                } label: { Text("더 적기").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.sub) }
+                .tint(T.sub)
+            }
+            BigButton(title: editing == nil ? "추가하기" : "저장", action: save)
+                .opacity(canSave ? 1 : 0.4).disabled(!canSave).padding(.top, 6)
+        }.padding(20)
     }
 
     var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && (Int(priceText) ?? 0) > 0 }
