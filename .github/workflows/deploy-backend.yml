@@ -82,6 +82,7 @@ jobs:
             "prices/history?origin=ICN&destination=CJU&days=30" \
             "prices/calendar?origin=ICN&destination=CJU&month=$month" \
             "prices/flights?origin=ICN&destination=CJU&date=$day" \
+            "prices/day?origin=ICN&destination=CJU&date=$day" \
             "prices/deals?origin=ICN" \
             "prices/calendar?origin=ICN&destination=NRT&month=$month&cabin=1" \
             "alerts?device_token=$(printf '0%.0s' $(seq 64))"; do

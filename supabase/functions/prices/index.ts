@@ -4,6 +4,7 @@
 //   GET /prices/quotes?origin=ICN&destination=CJU&month=2026-12[&airlines=KE][&cabin=0]
 //   GET /prices/flights?origin=ICN&destination=CJU&date=2026-12-05[&airlines=KE][&cabin=0]
 //   GET /prices/deals?origin=ICN[&cabin=0]
+//   GET /prices/day?origin=ICN&destination=CJU&date=2026-12-05[&airlines=KE][&cabin=0]  선택한 출발일의 가격 변화
 // cabin: 0 일반석, 1 비즈니스, 2 일등석
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchRoute, SNAPSHOT_CONFLICT } from "../_shared/travelpayouts.ts";
@@ -88,6 +89,17 @@ Deno.serve(async (req) => {
     const days = Math.min(Math.max(parseInt(url.searchParams.get("days") ?? "30", 10) || 30, 1), 90);
     await ensureData(origin, destination, cabin);
     const { data, error } = await supabase.rpc("get_price_history", { ...base, p_days: days });
+    if (error) return fail();
+    return Response.json({
+      points: (data ?? []).map((r: { day: string; price: number }) => ({ date: r.day, price: r.price })),
+    });
+  }
+
+  if (path.endsWith("/day")) {
+    const date = url.searchParams.get("date") ?? "";
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(date)) return bad("invalid date");
+    await ensureData(origin, destination, cabin);
+    const { data, error } = await supabase.rpc("get_day_history", { ...base, p_date: date });
     if (error) return fail();
     return Response.json({
       points: (data ?? []).map((r: { day: string; price: number }) => ({ date: r.day, price: r.price })),

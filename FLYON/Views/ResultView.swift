@@ -22,6 +22,7 @@ struct ResultView: View {
     @State private var month: Date
     @State private var selectedDate: Date?
     @State private var flights: [Flight] = []
+    @State private var dayHistory: [PricePoint] = []
     @State private var flightsLoading = false
     @State private var flightsFailed = false
     @State private var directOnly = false
@@ -58,9 +59,9 @@ struct ResultView: View {
 
     private var analysis: PriceAnalysis? { PriceAnalysis(history: recentHistory) }
 
-    /// 지금 고른 조건의 최저가 (알림 기준가)
+    /// 선택한 날짜의 최저가 (알림 기준가)
     private var currentLowest: Int? {
-        visibleFlights.first?.price ?? cheapestDay?.price ?? analysis?.current
+        selectedDay?.price ?? visibleFlights.first?.price ?? dayHistory.last?.price
     }
 
     var body: some View {
@@ -324,16 +325,19 @@ struct ResultView: View {
     // MARK: 가격 흐름
 
     private var trendTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let dayAnalysis = PriceAnalysis(history: dayHistory)
+        return VStack(alignment: .leading, spacing: 16) {
+            // 선택한 날짜 하루의 가격
             VStack(alignment: .leading, spacing: 10) {
-                Text("현재 최저가")
+                Text(selectedDate.map { "\($0.dayTitle) 출발" } ?? "날짜를 골라 주세요")
                     .font(.app(13, .medium))
                     .foregroundStyle(.white.opacity(0.7))
-                Text((currentLowest ?? 0) > 0 ? currentLowest!.won : "––")
+                Text(currentLowest.map { $0.won } ?? "––")
                     .font(.app(38, .heavy))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                if let a = analysis, a.verdict != .collecting {
+                    .animation(.snappy, value: currentLowest)
+                if let a = dayAnalysis, a.verdict != .collecting {
                     Pill(text: a.verdict.title, systemImage: a.verdict.symbol,
                          color: a.verdict.color == Theme.mid ? .yellow : a.verdict.color)
                 }
@@ -342,47 +346,44 @@ struct ResultView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.headerGradient, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
 
-            // 출발일별 가격: 수집 첫날부터 바로 볼 수 있다
+            // 이 날짜 가격이 날마다 어떻게 변했는지
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("출발일별 가격").font(.app(16, .bold))
-                    Spacer()
-                    Text(month.monthShort).font(.app(13, .medium)).foregroundStyle(.secondary)
-                }
-                if sortedCalendar.count >= 2 {
-                    priceChart(sortedCalendar.map { ($0.date, $0.price) }, highlight: selectedDate)
-                    HStack {
-                        stat("최저", (sortedCalendar.map(\.price).min() ?? 0).won, Theme.cheap)
-                        stat("최고", (sortedCalendar.map(\.price).max() ?? 0).won, Theme.expensive)
-                    }
-                } else {
-                    Text("이 달의 가격 정보가 부족해요")
-                        .font(.app(14))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                }
-            }
-            .card()
-
-            // 수집일별 최저가 변화: 이틀 이상 쌓이면 나타난다
-            VStack(alignment: .leading, spacing: 14) {
-                Text("최근 가격 변화").font(.app(16, .bold))
-                if let a = analysis, recentHistory.count >= 2 {
-                    priceChart(recentHistory.map { ($0.date, $0.price) }, highlight: nil)
+                Text("이 날짜 가격 변화").font(.app(16, .bold))
+                if dayHistory.count >= 2, let a = dayAnalysis {
+                    priceChart(dayHistory.map { ($0.date, $0.price) }, highlight: nil)
                     HStack {
                         stat("최저", a.lowest.won, Theme.cheap)
                         stat("최고", a.highest.won, Theme.expensive)
+                        stat("기록", "\(a.sampleCount)일", .primary)
                     }
                 } else {
                     HStack(spacing: 10) {
                         Image(systemName: "hourglass")
                             .foregroundStyle(Theme.accent)
                             .symbolEffect(.pulse)
-                        Text("매일 가격을 기록하고 있어요. 내일부터 변화가 보여요.")
+                        Text("이 날짜의 가격 기록을 모으는 중이에요")
                             .font(.app(13))
                             .foregroundStyle(.secondary)
                     }
+                }
+            }
+            .card()
+
+            // 같은 달 다른 날짜와 비교
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("날짜별 가격").font(.app(16, .bold))
+                    Spacer()
+                    Text(month.monthShort).font(.app(13, .medium)).foregroundStyle(.secondary)
+                }
+                if sortedCalendar.count >= 2 {
+                    priceChart(sortedCalendar.map { ($0.date, $0.price) }, highlight: selectedDate)
+                } else {
+                    Text("이 달의 가격 정보가 부족해요")
+                        .font(.app(14))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
                 }
             }
             .card()
@@ -548,14 +549,19 @@ struct ResultView: View {
         }
         flightsLoading = true
         flightsFailed = false
+        async let dayPoints = try? appState.provider.dayHistory(
+            origin: search.origin, destination: search.destination, date: date, airlines: search.airlines, cabin: search.cabin)
         do {
             let result = try await appState.provider.flights(
                 origin: search.origin, destination: search.destination, date: date, airlines: search.airlines, cabin: search.cabin)
             withAnimation(.easeOut(duration: 0.25)) { flights = result }
         } catch {
             flights = []
-            flightsFailed = true
+            // 항공편 상세가 없어도 그날 최저가가 있으면 실패로 보이지 않게 한다
+            flightsFailed = selectedDay == nil
         }
+        let points = await dayPoints ?? []
+        withAnimation(.easeOut(duration: 0.25)) { dayHistory = points }
         flightsLoading = false
     }
 }

@@ -28,7 +28,8 @@ export async function fetchMonth(origin: string, destination: string, month: str
   return (body?.data ?? []) as Item[];
 }
 
-/** 비즈니스(1)·일등석(2): 최근 발견된 가격 (항공사·시각 정보는 없음) */
+/** 최근 발견된 가격 기록 (일반석 0, 비즈니스 1, 일등석 2). 항공사·시각 정보는 없지만
+ *  found_at(발견 시각)이 있어 지난 며칠의 가격 이력을 채우는 데 쓴다. */
 export async function fetchLatestByClass(origin: string, destination: string, tripClass: number, token: string): Promise<Item[]> {
   const url = new URL("https://api.travelpayouts.com/v2/prices/latest");
   url.searchParams.set("origin", origin);
@@ -65,11 +66,19 @@ export function toRows(origin: string, destination: string, items: Item[]) {
     }));
 }
 
+/** found_at(UTC)을 한국 날짜로 바꾼다. 없으면 오늘. */
+function seoulDate(foundAt: unknown): string {
+  const t = typeof foundAt === "string" ? Date.parse(foundAt) : NaN;
+  const ms = Number.isFinite(t) ? t : Date.now();
+  return new Date(ms + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 export function toRowsLatest(origin: string, destination: string, cabin: number, items: Item[]) {
   const today = new Date().toISOString().slice(0, 10);
   return items
     .filter((i) => typeof i.value === "number" && typeof i.depart_date === "string" && String(i.depart_date) >= today)
     .map((i) => ({
+      fetched_on: seoulDate(i.found_at),
       origin,
       destination,
       cabin,
@@ -86,10 +95,13 @@ export function toRowsLatest(origin: string, destination: string, cabin: number,
 /** 노선 하나를 좌석 등급에 맞게 수집한다 */
 export async function fetchRoute(origin: string, destination: string, cabin: number, token: string) {
   if (cabin === 0) {
-    const results = await Promise.allSettled(
-      Array.from({ length: MONTHS_AHEAD }, (_, m) => fetchMonth(origin, destination, monthString(m), token)),
-    );
-    return results.flatMap((r) => (r.status === "fulfilled" ? toRows(origin, destination, r.value) : []));
+    const results = await Promise.allSettled([
+      ...Array.from({ length: MONTHS_AHEAD }, (_, m) => fetchMonth(origin, destination, monthString(m), token)),
+    ]);
+    const rows = results.flatMap((r) => (r.status === "fulfilled" ? toRows(origin, destination, r.value) : []));
+    // 지난 며칠의 기록으로 가격 이력을 채운다
+    const history = await fetchLatestByClass(origin, destination, 0, token).catch(() => []);
+    return [...rows, ...toRowsLatest(origin, destination, 0, history)];
   }
   return toRowsLatest(origin, destination, cabin, await fetchLatestByClass(origin, destination, cabin, token));
 }

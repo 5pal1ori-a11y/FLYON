@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
   const jobs: Job[] = [];
   for (const r of routes ?? []) {
     for (let m = 0; m < MONTHS_AHEAD; m++) jobs.push({ origin: r.origin, destination: r.destination, cabin: 0, month: monthString(m) });
+    jobs.push({ origin: r.origin, destination: r.destination, cabin: 0 }); // 최근 기록(이력 채우기)
     jobs.push({ origin: r.origin, destination: r.destination, cabin: 1 });
     jobs.push({ origin: r.origin, destination: r.destination, cabin: 2 });
   }
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
     while (jobs.length > 0) {
       const job = jobs.shift()!;
       try {
-        const rows = job.cabin === 0
+        const rows = job.cabin === 0 && job.month
           ? toRows(job.origin, job.destination, await fetchMonth(job.origin, job.destination, job.month!, token!))
           : toRowsLatest(job.origin, job.destination, job.cabin, await fetchLatestByClass(job.origin, job.destination, job.cabin, token!));
         if (rows.length === 0) { empty++; continue; }

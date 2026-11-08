@@ -8,6 +8,8 @@ protocol PriceProvider {
     func calendar(origin: Airport, destination: Airport, month: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [CalendarDay]
     func flights(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [Flight]
     func deals(origin: Airport, cabin: Cabin) async throws -> [Deal]
+    /// 선택한 출발일 하루의 수집일별 가격
+    func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint]
 }
 
 enum PriceError: LocalizedError {
@@ -91,6 +93,12 @@ struct MockPriceProvider: PriceProvider {
             guard let date = cal.date(byAdding: .day, value: 14 + index * 3, to: cal.startOfDay(for: .now)) else { return nil }
             return Deal(destination: dest, lowest: lowest, average: average, lowestDate: date)
         }
+    }
+
+    func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint] {
+        let points = try await history(origin: origin, destination: destination, days: 14, airlines: airlines, cabin: cabin)
+        let shift = Calendar.current.component(.day, from: date) % 7
+        return points.map { PricePoint(date: $0.date, price: $0.price + shift * 1_000) }
     }
 
     private static func basePrice(_ a: Airport, _ b: Airport, seed: Int, cabin: Cabin) -> Int {
@@ -177,6 +185,11 @@ struct ServerPriceProvider: PriceProvider {
             guard let dest = Catalog.airport(d.destination), let date = Self.dayParser.date(from: d.lowest_date) else { return nil }
             return Deal(destination: dest, lowest: d.lowest, average: d.average, lowestDate: date)
         }
+    }
+
+    func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint] {
+        let res: HistoryResponse = try await get("day", query(origin, destination, airlines, cabin, ["date": Self.dayParser.string(from: date)]))
+        return res.points.compactMap { p in Self.dayParser.date(from: p.date).map { PricePoint(date: $0, price: p.price) } }
     }
 
     private func query(_ o: Airport, _ d: Airport, _ airlines: Set<Airline>, _ cabin: Cabin, _ extra: [String: String]) -> [String: String] {
