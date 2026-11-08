@@ -278,8 +278,8 @@ struct FlightDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("지금 가격").font(.app(13, .medium)).foregroundStyle(.secondary)
-                        Text(flight.price.won).font(.app(34, .heavy))
+                        Text(flight.isLive ? "실시간 가격" : "저장된 가격").font(.app(13, .medium)).foregroundStyle(.secondary)
+                        Text(flight.priceText).font(.app(34, .heavy))
                         if let change = priceChange {
                             Pill(text: change.text, systemImage: change.symbol, color: change.color)
                         }

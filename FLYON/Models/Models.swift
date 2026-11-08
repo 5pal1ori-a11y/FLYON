@@ -116,6 +116,14 @@ struct Flight: Identifiable, Hashable {
     let durationMinutes: Int?
     let price: Int
     let transfers: Int
+    var currency: String = "KRW"
+    /// Duffel 실시간 조회 결과인지
+    var isLive: Bool = false
+
+    /// 원화가 아니면 통화 코드와 함께 표시
+    var priceText: String {
+        currency == "KRW" ? price.won : "\(currency) \(price.formatted())"
+    }
 
     var durationText: String? {
         guard let m = durationMinutes, m > 0 else { return nil }

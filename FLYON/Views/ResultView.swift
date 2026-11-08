@@ -33,6 +33,10 @@ struct ResultView: View {
     @State private var showAlertSheet = false
     @State private var chartReveal: CGFloat = 0
     @State private var detailFlight: Flight?
+    @State private var liveMode = false
+    @State private var liveFlights: [Flight] = []
+    @State private var liveLoading = false
+    @State private var liveMessage: String?
 
     init(search: RouteSearch) {
         self.search = search
@@ -52,7 +56,7 @@ struct ResultView: View {
     }
 
     private var visibleFlights: [Flight] {
-        flights
+        (liveMode ? liveFlights : flights)
             .filter { (!directOnly || $0.transfers == 0) && (!excludeLowCost || !$0.airline.isLowCost) }
             .sorted { $0.price < $1.price }
     }
@@ -197,9 +201,17 @@ struct ResultView: View {
             dateStrip
 
             HStack(spacing: 8) {
+                liveChip
                 FilterChip(title: "직항만", isOn: $directOnly)
                 FilterChip(title: "저비용 제외", isOn: $excludeLowCost)
-                Spacer()
+                Spacer(minLength: 0)
+            }
+
+            if let liveMessage {
+                Text(liveMessage)
+                    .font(.app(12))
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
             }
 
             flightList
@@ -286,9 +298,49 @@ struct ResultView: View {
         .buttonStyle(PressableStyle())
     }
 
+    /// 실시간 가격(Duffel)으로 보기
+    private var liveChip: some View {
+        Button {
+            withAnimation(.snappy) { liveMode.toggle() }
+            if liveMode { Task { await loadLive() } } else { liveMessage = nil }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "bolt.fill").font(.system(size: 11, weight: .bold))
+                    .symbolEffect(.pulse, isActive: liveLoading)
+                Text("실시간").font(.app(14, .semibold))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .foregroundStyle(liveMode ? Color.white : Theme.mid)
+            .background(liveMode ? Theme.mid : Theme.mid.opacity(0.14), in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .sensoryFeedback(.selection, trigger: liveMode)
+    }
+
+    private func loadLive() async {
+        guard let date = selectedDate else { return }
+        liveLoading = true
+        defer { liveLoading = false }
+        do {
+            let result = try await appState.provider.liveFlights(
+                origin: search.origin, destination: search.destination, date: date, cabin: search.cabin)
+            withAnimation(.easeOut(duration: 0.25)) {
+                liveFlights = result
+                liveMessage = result.isEmpty ? "이 날짜는 실시간으로 조회되는 항공편이 없어요" : "항공사 실시간 가격이에요 (최대 30분 전 기준)"
+            }
+        } catch PriceError.http(503) {
+            withAnimation { liveMode = false; liveMessage = "실시간 가격은 아직 준비 중이에요" }
+        } catch PriceError.http(429) {
+            withAnimation { liveMode = false; liveMessage = "오늘 실시간 조회 한도를 다 썼어요. 내일 다시 시도해 주세요" }
+        } catch {
+            withAnimation { liveMode = false; liveMessage = "실시간 가격을 불러오지 못했어요" }
+        }
+    }
+
     @ViewBuilder
     private var flightList: some View {
-        if flightsLoading {
+        if flightsLoading || (liveMode && liveLoading) {
             VStack(spacing: 10) {
                 ForEach(0..<3, id: \.self) { _ in SkeletonBlock(height: 84) }
             }
@@ -531,7 +583,10 @@ struct ResultView: View {
 
     private func select(_ date: Date) {
         selectedDate = date
-        Task { await loadFlights() }
+        Task {
+            await loadFlights()
+            if liveMode { await loadLive() }
+        }
     }
 
     private func load() async {
@@ -666,10 +721,11 @@ private struct FlightCard: View {
             Spacer(minLength: 6)
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text(flight.price.won)
+                Text(flight.priceText)
                     .font(.app(17, .bold))
                     .foregroundStyle(isCheapest ? Theme.accent : .primary)
                 if isCheapest { Pill(text: "최저가", color: Theme.cheap) }
+                else if flight.isLive { Pill(text: "실시간", systemImage: "bolt.fill", color: Theme.mid) }
             }
         }
         .card(padding: 16)

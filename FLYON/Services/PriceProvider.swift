@@ -12,6 +12,8 @@ protocol PriceProvider {
     func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint]
     /// 선택일 앞뒤 며칠의 날짜별 최저가 (서버가 그 날짜들의 항공편도 함께 채운다)
     func range(origin: Airport, destination: Airport, date: Date, days: Int, airlines: Set<Airline>, cabin: Cabin) async throws -> [CalendarDay]
+    /// 실시간 가격 (Duffel). 서버 설정이 없으면 PriceError.http(503)
+    func liveFlights(origin: Airport, destination: Airport, date: Date, cabin: Cabin) async throws -> [Flight]
     /// 그 날짜의 특정 항공권(편명) 가격 기록
     func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint]
 }
@@ -114,6 +116,14 @@ struct MockPriceProvider: PriceProvider {
         return (month + more).filter {
             let d = cal.dateComponents([.day], from: date, to: $0.date).day ?? 99
             return abs(d) <= days && $0.date >= today
+        }
+    }
+
+    func liveFlights(origin: Airport, destination: Airport, date: Date, cabin: Cabin) async throws -> [Flight] {
+        try await flights(origin: origin, destination: destination, date: date, airlines: [], cabin: cabin).map {
+            var f = $0
+            f.isLive = true
+            return f
         }
     }
 
@@ -221,6 +231,32 @@ struct ServerPriceProvider: PriceProvider {
         return res.days.compactMap { d in Self.dayParser.date(from: d.date).map { CalendarDay(date: $0, price: d.price) } }
     }
 
+    private struct LiveResponse: Decodable {
+        struct Item: Decodable {
+            let airline: String
+            let flight_number: String
+            let departure_time: String?
+            let duration_min: Int?
+            let price: Int
+            let currency: String
+            let transfers: Int
+        }
+        let flights: [Item]
+    }
+
+    func liveFlights(origin: Airport, destination: Airport, date: Date, cabin: Cabin) async throws -> [Flight] {
+        let liveURL = baseURL.deletingLastPathComponent().appendingPathComponent("live")
+        let res: LiveResponse = try await get("", [
+            "origin": origin.code, "destination": destination.code,
+            "date": Self.dayParser.string(from: date), "cabin": "\(cabin.rawValue)",
+        ], base: liveURL)
+        return res.flights.map { f in
+            Flight(airline: Catalog.airlineOrUnknown(f.airline), flightNumber: f.flight_number,
+                   departureTime: f.departure_time, durationMinutes: f.duration_min,
+                   price: f.price, transfers: f.transfers, currency: f.currency, isLive: true)
+        }
+    }
+
     func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint] {
         let res: HistoryResponse = try await get("flight", [
             "origin": origin.code, "destination": destination.code, "cabin": "\(cabin.rawValue)",
@@ -236,8 +272,9 @@ struct ServerPriceProvider: PriceProvider {
         return q.merging(extra) { _, new in new }
     }
 
-    private func get<T: Decodable>(_ path: String, _ query: [String: String]) async throws -> T {
-        var comps = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+    private func get<T: Decodable>(_ path: String, _ query: [String: String], base: URL? = nil) async throws -> T {
+        let root = base ?? baseURL
+        var comps = URLComponents(url: path.isEmpty ? root : root.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         comps.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
         var request = URLRequest(url: comps.url!)
         request.timeoutInterval = 60   // 처음 조회하는 노선은 서버가 수집하느라 몇 초 걸릴 수 있다

@@ -3,6 +3,7 @@ name: Deploy backend
 # Supabase DB 마이그레이션과 Edge Function을 배포하고, 주요 API를 점검한다.
 # 필요한 저장소 Secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF, SUPABASE_ANON_KEY
 # (선택, 가격 알림) APNS_KEY_ID, APNS_PRIVATE_KEY
+# (선택, 실시간 가격) DUFFEL_ACCESS_TOKEN
 on:
   workflow_dispatch: {}
   push:
@@ -54,6 +55,7 @@ jobs:
         run: |
           supabase functions deploy prices --project-ref "$PROJECT_REF" --yes
           supabase functions deploy alerts --project-ref "$PROJECT_REF" --yes
+          supabase functions deploy live --project-ref "$PROJECT_REF" --yes
           supabase functions deploy collect --project-ref "$PROJECT_REF" --no-verify-jwt --yes
 
       - name: Sync push notification secrets
@@ -68,6 +70,17 @@ jobs:
             echo "APNs secrets synced"
           else
             echo "APNs secrets not set; price alert pushes stay off"
+          fi
+
+      - name: Sync live price secret
+        env:
+          DUFFEL_ACCESS_TOKEN: ${{ secrets.DUFFEL_ACCESS_TOKEN }}
+        run: |
+          if [ -n "$DUFFEL_ACCESS_TOKEN" ]; then
+            supabase secrets set --project-ref "$PROJECT_REF" --yes DUFFEL_ACCESS_TOKEN="$DUFFEL_ACCESS_TOKEN"
+            echo "Duffel token synced"
+          else
+            echo "Duffel token not set; live prices stay off"
           fi
 
       - name: Smoke test API
@@ -91,4 +104,7 @@ jobs:
             echo "$out  $(wc -c < /tmp/body) bytes  ${path%%\?*}"
             [ "$out" = "200" ] || fail=1
           done
+          live=$(curl -sS -o /tmp/body -w "%{http_code}" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
+            "$base/live?origin=GMP&destination=CJU&date=$day")
+          echo "$live  $(wc -c < /tmp/body) bytes  live (503 = Duffel token not set)"
           exit $fail
