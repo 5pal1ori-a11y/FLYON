@@ -32,8 +32,16 @@ struct StatsView: View {
                                 SectorMark(angle: .value("금액", v), innerRadius: .ratio(0.62), angularInset: 2).foregroundStyle(c.color).cornerRadius(5)
                             }.frame(height: 190).scaleEffect(grow ? 1 : 0.5).rotationEffect(.degrees(grow ? 0 : -90)).opacity(grow ? 1 : 0)
                             ForEach(store.byCategory(), id: \.0) { c, v in
-                                HStack { Circle().fill(c.color).frame(width: 10, height: 10); Text(c.rawValue); Spacer()
-                                    Text(v.won).foregroundStyle(T.sub) }.font(.system(size: 15))
+                                HStack(spacing: 12) {
+                                    Image(systemName: c.icon).font(.system(size: 13, weight: .bold)).foregroundStyle(c.color)
+                                        .frame(width: 30, height: 30).background(c.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                    Text(c.rawValue).font(.system(size: 15, weight: .semibold))
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        Text(v.won).font(.system(size: 15, weight: .semibold))
+                                        Text("\(Int((v / max(1, store.monthlyTotal) * 100).rounded()))%").font(.system(size: 11)).foregroundStyle(T.faint)
+                                    }
+                                }
                             }
                         }
                     }

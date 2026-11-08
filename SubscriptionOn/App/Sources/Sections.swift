@@ -29,7 +29,7 @@ struct UpcomingList: View {
         Card {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("다가오는 결제 ").font(.system(size: 20, weight: .bold)) + Text("\(store.upcoming.count)건").font(.system(size: 20, weight: .bold)).foregroundColor(T.sub)
+                    Text("다가오는 결제는 \(store.upcoming.count)건이에요.").font(.system(size: 20, weight: .bold))
                     Spacer()
                     Text("남은 결제 \(store.remainingThisMonth.won)").font(.system(size: 13)).foregroundStyle(T.sub)
                 }

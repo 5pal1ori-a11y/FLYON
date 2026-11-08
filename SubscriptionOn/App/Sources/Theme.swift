@@ -73,7 +73,7 @@ struct Press: ButtonStyle {
 struct DBadge: View {
     let d: Int
     var body: some View {
-        Text(d <= 0 ? "D-day" : "D-\(d)").font(.system(size: 13, weight: .bold))
+        Text(d <= 0 ? "D-DAY" : "D-\(d)").font(.system(size: 13, weight: .bold))
             .foregroundStyle(d <= 0 ? .white : T.blue)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(d <= 0 ? T.blue : T.blueSoft, in: Capsule())

@@ -27,15 +27,22 @@ struct CompareView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(cats) { c in
-                            Button { cat = c } label: {
-                                Text(c.rawValue).font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(cat == c ? .white : T.sub).padding(.horizontal, 16).frame(height: 38)
-                                    .background(cat == c ? T.blue : .white, in: Capsule())
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+                    ForEach(cats) { c in
+                        let on = cat == c
+                        let n = Catalog.all.filter { $0.category == c && $0.defaultPrice > 0 }.count
+                        Button { withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { cat = c } } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: c.icon).font(.system(size: 18, weight: .bold)).foregroundStyle(on ? .white : c.color)
+                                    .frame(width: 40, height: 40).background(on ? c.color : c.color.opacity(0.14), in: Circle())
+                                Text(c.rawValue).font(.system(size: 12, weight: .bold)).foregroundStyle(on ? T.text : T.sub)
+                                Text("\(n)").font(.system(size: 10)).foregroundStyle(T.faint)
                             }
-                        }
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                            .background(T.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(c.color, lineWidth: on ? 1.8 : 0))
+                            .scaleEffect(on ? 1.03 : 1)
+                        }.buttonStyle(PressCard())
                     }
                 }.padding(.top, 8)
 
@@ -51,7 +58,7 @@ struct CompareView: View {
                 let maxP = Double(services.map(\.defaultPrice).max() ?? 1)
                 Card {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("한 달 요금 낮은 순").font(.system(size: 17, weight: .bold))
+                        Text("\(cat.rawValue) · 한 달 요금 낮은 순").font(.system(size: 17, weight: .bold))
                         ForEach(services, id: \.name) { s in
                             let using = store.active.first { $0.service?.name == s.name }
                             VStack(alignment: .leading, spacing: 8) {

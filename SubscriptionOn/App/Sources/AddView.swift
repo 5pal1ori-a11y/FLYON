@@ -100,10 +100,10 @@ struct AddView: View {
                     }
                 }
                 HStack(spacing: 10) {
-                    quick("photo", "캡처로") { method = .photo; stage = .form }
-                    quick("text.bubble", "문자·메일로") { method = .text; stage = .form }
+                    quick("photo", "사진으로") { method = .photo; stage = .form }
+                    quick("text.bubble", "문자 혹은 메일로") { method = .text; stage = .form }
                 }
-                quick("doc.text.magnifyingglass", "여러 장·카드 명세서로 한 번에") { showBulk = true }
+                quick("doc.text.magnifyingglass", "여러 장을 명세서로 한 번에") { showBulk = true }
                 Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showAllServices.toggle() } } label: {
                     HStack(spacing: 4) { Text(showAllServices ? "접기" : "전체 서비스 보기"); Image(systemName: showAllServices ? "chevron.up" : "chevron.down") }
                         .font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
@@ -305,7 +305,7 @@ struct AddView: View {
         Card {
             VStack(spacing: 10) {
                 PhotosPicker(selection: $picked, matching: .images) {
-                    Label("결제 캡처 고르기", systemImage: "photo").font(.system(size: 16, weight: .bold)).frame(maxWidth: .infinity).frame(height: 48)
+                    Label("사진 고르기", systemImage: "photo").font(.system(size: 16, weight: .bold)).frame(maxWidth: .infinity).frame(height: 48)
                         .background(T.blueSoft, in: RoundedRectangle(cornerRadius: 14)).foregroundStyle(T.blue)
                 }
                 if scanning { ProgressView() }

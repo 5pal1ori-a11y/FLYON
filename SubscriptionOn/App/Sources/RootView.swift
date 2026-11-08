@@ -78,10 +78,19 @@ struct HomeView: View {
     @State private var showAI = false
     @State private var showReport = false
     @State private var showUsage = false
+    @State private var greetShift = 0
 
+    /// 상황에 맞는 인사말 (눌러서 바꿔볼 수 있어요)
     var bigGreeting: String {
-        if let n = store.upcoming.first { return n.dDay <= 0 ? "\(n.name),\n오늘 결제돼요 👈" : "\(n.name),\n\(n.whenText) 갱신돼요 👈" }
-        return store.userName.isEmpty ? "안녕하세요,\n오늘도 알뜰하게" : "\(store.userName)님,\n안녕하세요"
+        let cal = Calendar.current
+        let name = store.userName.isEmpty ? "" : "\(store.userName)님, "
+        if store.upcoming.contains(where: { $0.dDay <= 0 }) { return name + "오늘 결제될 내역,\n꼭 확인하세요!" }
+        var pool = ["오늘 기분은 어떠신가요?", "즐거운 하루 되세요 :)"]
+        let wd = cal.component(.weekday, from: Date())      // 1 일 ... 7 토
+        let hour = cal.component(.hour, from: Date())
+        if wd == 1 || wd == 7 || (wd == 6 && hour >= 15) { pool.insert("이번주도 수고하셨어요", at: 0) }
+        let seed = (cal.ordinality(of: .day, in: .year, for: Date()) ?? 0) + hour / 6 + greetShift
+        return name + pool[seed % pool.count]
     }
     /// 지난달 기록이 있으면 그 차이, 없으면 이번 달에 새로 생긴 구독료
     var delta: Int {
@@ -95,6 +104,8 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top) {
                     Text(bigGreeting).font(.system(size: 30, weight: .heavy)).foregroundStyle(T.text).fixedSize(horizontal: false, vertical: true)
+                        .contentTransition(.opacity).id(bigGreeting).transition(.opacity)
+                        .onTapGesture { withAnimation(.easeInOut(duration: 0.3)) { greetShift += 1 } }
                     Spacer()
                     Image(systemName: "bell").font(.system(size: 20)).foregroundStyle(T.text).padding(.top, 6)
                         .symbolEffect(.bounce, value: store.upcoming.first?.dDay ?? 9)
@@ -106,7 +117,7 @@ struct HomeView: View {
                         Text("이번달 구독료").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
                         CountingWon(target: store.monthlyTotal).font(.system(size: 38, weight: .heavy)).foregroundStyle(.white)
                         Group {
-                            if delta > 0 { Text("저번달보다 +\(delta.won)") } else if delta < 0 { Text("저번달보다 -\((-delta).won)") } else { Text("1년이면 \(store.yearlyTotal.won)") }
+                            if delta > 0 { Text("저번달보다 \(delta.won) 늘었어요") } else if delta < 0 { Text("저번달보다 \((-delta).won) 줄었어요") } else { Text("저번달과 같아요") }
                         }
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 6).background(.white.opacity(0.2), in: Capsule())
@@ -164,8 +175,8 @@ struct HomeView: View {
 
                     // AI · 리포트
                     HStack(spacing: 12) {
-                        entryCard("sparkles", "AI에게 물어보기", "궁금한 걸 물어봐요", T.blue) { showAI = true }
-                        entryCard("chart.bar.doc.horizontal.fill", "\(Calendar.current.component(.month, from: Calendar.current.date(byAdding: .month, value: -1, to: Date())!))월 리포트", "지난달 한눈에", T.accent2) { showReport = true }
+                        entryCard("sparkles", "AI에게 물어보세요", "무엇이든 물어봐요", T.blue) { showAI = true }
+                        entryCard("chart.bar.doc.horizontal.fill", "\(Calendar.current.component(.month, from: Calendar.current.date(byAdding: .month, value: -1, to: Date())!))월 리포트", "지난달을 한눈에", T.accent2) { showReport = true }
                     }.stagger(2)
 
                     // 오늘 쓴 구독 체크 (한 줄)
@@ -238,19 +249,19 @@ struct CalendarView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                BigTitle("이번 달\n결제일").stagger(0)
-                HStack {
-                    Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: -1, to: month)! } } label: { Image(systemName: "chevron.left") }
+                HStack(alignment: .center) {
+                    BigTitle("\(cal.component(.year, from: month))년 \(cal.component(.month, from: month))월").contentTransition(.numericText()).id(month)
                     Spacer()
-                    Text(month.formatted(.dateTime.year().month())).font(.system(size: 18, weight: .bold))
-                    Spacer()
-                    Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: 1, to: month)! } } label: { Image(systemName: "chevron.right") }
-                }.foregroundStyle(T.text).padding(.top, 8)
+                    HStack(spacing: 18) {
+                        Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: -1, to: month)! } } label: { Image(systemName: "chevron.left") }
+                        Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: 1, to: month)! } } label: { Image(systemName: "chevron.right") }
+                    }.font(.system(size: 18, weight: .semibold)).foregroundStyle(T.sub).padding(.top, 8)
+                }.stagger(0)
                 Card { grid.id(month).transition(.opacity.combined(with: .move(edge: .trailing))) }.clipped()
                 let todays = payments(on: day)
                 Card {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text(todays.isEmpty ? "결제 없는 날이에요" : "\(day.formatted(.dateTime.month().day())) 결제 \(todays.reduce(0) { $0 + $1.price }.won)")
+                        Text(todays.isEmpty ? "결제 없는 날이에요" : "\(cal.isDateInToday(day) ? "오늘은" : "\(cal.component(.month, from: day))월 \(cal.component(.day, from: day))일은") \(todays.reduce(0) { $0 + $1.price }.won) 결제해요.")
                             .font(.system(size: 17, weight: .bold))
                         ForEach(todays) { s in SubRow(s: s).onTapGesture { selected = s } }
                     }

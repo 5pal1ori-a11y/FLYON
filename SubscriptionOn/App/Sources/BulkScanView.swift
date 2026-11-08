@@ -83,7 +83,7 @@ struct BulkScanView: View {
                     if cands.isEmpty {
                         Text("한 번에\n찾아드려요").font(.system(size: 30, weight: .heavy)).padding(.top, 8)
                         Text("결제 캡처 여러 장이나 카드 명세서 PDF를 올려주세요. 폰 안에서만 읽고 서버로 보내지 않아요.").font(.system(size: 14)).foregroundStyle(T.sub)
-                        PhotosPicker(selection: $picks, maxSelectionCount: 10, matching: .images) { big("photo.on.rectangle", "캡처 여러 장 고르기") }
+                        PhotosPicker(selection: $picks, maxSelectionCount: 10, matching: .images) { big("photo.on.rectangle", "사진 여러 장 고르기") }
                         Button { showPDF = true } label: { big("doc.text", "카드 명세서 PDF 고르기") }
                         if busy { HStack { ProgressView(); Text("읽는 중이에요").foregroundStyle(T.sub) }.frame(maxWidth: .infinity).padding(.top, 10) }
                         if !msg.isEmpty { Text(msg).font(.system(size: 14)).foregroundStyle(T.sub) }
