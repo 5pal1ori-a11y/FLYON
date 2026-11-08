@@ -324,59 +324,95 @@ struct ResultView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.headerGradient, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
 
+            // 출발일별 가격: 수집 첫날부터 바로 볼 수 있다
             VStack(alignment: .leading, spacing: 14) {
-                if let a = analysis, recentHistory.count >= 2 {
-                    Chart {
-                        ForEach(recentHistory) { p in
-                            AreaMark(x: .value("날짜", p.date), y: .value("가격", p.price))
-                                .interpolationMethod(.catmullRom)
-                                .foregroundStyle(LinearGradient(colors: [Theme.accent.opacity(0.25), Theme.accent.opacity(0)],
-                                                                startPoint: .top, endPoint: .bottom))
-                            LineMark(x: .value("날짜", p.date), y: .value("가격", p.price))
-                                .interpolationMethod(.catmullRom)
-                                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                                .foregroundStyle(Theme.accent)
-                        }
+                HStack {
+                    Text("출발일별 가격").font(.app(16, .bold))
+                    Spacer()
+                    Text(month.monthShort).font(.app(13, .medium)).foregroundStyle(.secondary)
+                }
+                if sortedCalendar.count >= 2 {
+                    priceChart(sortedCalendar.map { ($0.date, $0.price) }, highlight: selectedDate)
+                    HStack {
+                        stat("최저", (sortedCalendar.map(\.price).min() ?? 0).won, Theme.cheap)
+                        stat("최고", (sortedCalendar.map(\.price).max() ?? 0).won, Theme.expensive)
                     }
-                    .chartYScale(domain: .automatic(includesZero: false))
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { value in
-                            AxisGridLine()
-                            AxisValueLabel { if let v = value.as(Int.self) { Text(v.shortWon).font(.app(10)) } }
-                        }
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                            AxisValueLabel(format: .dateTime.month().day())
-                        }
-                    }
-                    .frame(height: 200)
-                    .mask(alignment: .leading) {
-                        GeometryReader { g in Rectangle().frame(width: g.size.width * chartReveal) }
-                    }
-                    .onAppear {
-                        chartReveal = 0
-                        withAnimation(.easeOut(duration: 1.0)) { chartReveal = 1 }
-                    }
+                } else {
+                    Text("이 달의 가격 정보가 부족해요")
+                        .font(.app(14))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                }
+            }
+            .card()
 
+            // 수집일별 최저가 변화: 이틀 이상 쌓이면 나타난다
+            VStack(alignment: .leading, spacing: 14) {
+                Text("최근 가격 변화").font(.app(16, .bold))
+                if let a = analysis, recentHistory.count >= 2 {
+                    priceChart(recentHistory.map { ($0.date, $0.price) }, highlight: nil)
                     HStack {
                         stat("최저", a.lowest.won, Theme.cheap)
                         stat("최고", a.highest.won, Theme.expensive)
                     }
                 } else {
-                    VStack(spacing: 10) {
-                        Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.system(size: 30))
+                    HStack(spacing: 10) {
+                        Image(systemName: "hourglass")
                             .foregroundStyle(Theme.accent)
                             .symbolEffect(.pulse)
-                        Text("가격 흐름을 모으는 중이에요")
-                            .font(.app(15, .semibold))
+                        Text("매일 가격을 기록하고 있어요. 내일부터 변화가 보여요.")
+                            .font(.app(13))
+                            .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
                 }
             }
             .card()
+        }
+    }
+
+    private func priceChart(_ points: [(Date, Int)], highlight: Date?) -> some View {
+        Chart {
+            ForEach(points, id: \.0) { p in
+                AreaMark(x: .value("날짜", p.0), y: .value("가격", p.1))
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(LinearGradient(colors: [Theme.accent.opacity(0.25), Theme.accent.opacity(0)],
+                                                    startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("날짜", p.0), y: .value("가격", p.1))
+                    .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .foregroundStyle(Theme.accent)
+            }
+            if let low = points.min(by: { $0.1 < $1.1 }) {
+                PointMark(x: .value("날짜", low.0), y: .value("가격", low.1))
+                    .foregroundStyle(Theme.cheap)
+                    .symbolSize(80)
+            }
+            if let highlight, let sel = points.first(where: { cal.isDate($0.0, inSameDayAs: highlight) }) {
+                RuleMark(x: .value("선택", sel.0))
+                    .foregroundStyle(Theme.accent.opacity(0.3))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+        }
+        .chartYScale(domain: .automatic(includesZero: false))
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisGridLine()
+                AxisValueLabel { if let v = value.as(Int.self) { Text(v.shortWon).font(.app(10)) } }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                AxisValueLabel(format: .dateTime.month().day())
+            }
+        }
+        .frame(height: 190)
+        .mask(alignment: .leading) {
+            GeometryReader { g in Rectangle().frame(width: g.size.width * chartReveal) }
+        }
+        .onAppear {
+            chartReveal = 0
+            withAnimation(.easeOut(duration: 1.0)) { chartReveal = 1 }
         }
     }
 
