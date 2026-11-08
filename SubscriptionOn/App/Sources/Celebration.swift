@@ -1,22 +1,42 @@
 import SwiftUI
 
+struct ConfettiPiece: View {
+    let i: Int
+    let size: CGSize
+    let go: Bool
+    let color: Color
+
+    var body: some View {
+        let r: Double = Double((i * 37) % 100) / 100.0
+        let r2: Double = Double((i * 53) % 100) / 100.0
+        let startX: CGFloat = size.width * 0.5
+        let endX: CGFloat = size.width * CGFloat(0.05 + 0.9 * r2)
+        let startY: CGFloat = size.height * 0.38
+        let endY: CGFloat = size.height * CGFloat(0.6 + 0.4 * r)
+        let spin: Double = go ? Double(i) * 47.0 : 0.0
+        RoundedRectangle(cornerRadius: 2)
+            .fill(color)
+            .frame(width: 8, height: 14)
+            .rotationEffect(.degrees(spin))
+            .position(x: go ? endX : startX, y: go ? endY : startY)
+            .opacity(go ? 0 : 1)
+            .animation(.easeOut(duration: 1.5 + r).delay(Double(i % 8) * 0.03), value: go)
+    }
+}
+
 struct Confetti: View {
     @State private var go = false
-    var colors: [Color] { T.palette.colors + [.yellow, .orange, .pink, .mint] }
+    var colors: [Color] { T.palette.colors + [Color.yellow, Color.orange, Color.pink, Color.mint] }
     var body: some View {
         GeometryReader { g in
             ZStack {
                 ForEach(0..<48, id: \.self) { i in
-                    let r = Double((i * 37) % 100) / 100
-                    let r2 = Double((i * 53) % 100) / 100
-                    RoundedRectangle(cornerRadius: 2).fill(colors[i % colors.count]).frame(width: 8, height: 14)
-                        .rotationEffect(.degrees(go ? Double(i) * 47 : 0))
-                        .position(x: g.size.width * (go ? 0.05 + 0.9 * r2 : 0.5), y: go ? g.size.height * (0.6 + 0.4 * r) : g.size.height * 0.38)
-                        .opacity(go ? 0 : 1)
-                        .animation(.easeOut(duration: 1.5 + r).delay(Double(i % 8) * 0.03), value: go)
+                    ConfettiPiece(i: i, size: g.size, go: go, color: colors[i % colors.count])
                 }
             }
-        }.allowsHitTesting(false).onAppear { go = true }
+        }
+        .allowsHitTesting(false)
+        .onAppear { go = true }
     }
 }
 
