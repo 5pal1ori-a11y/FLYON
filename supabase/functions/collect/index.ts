@@ -10,7 +10,7 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-const CONCURRENCY = 6;
+const CONCURRENCY = 4;
 
 type Job = { origin: string; destination: string; cabin: number; month?: string };
 
@@ -72,9 +72,18 @@ Deno.serve(async (req) => {
     while (jobs.length > 0) {
       const job = jobs.shift()!;
       try {
-        const rows = job.cabin === 0 && job.month
+        const fetchOnce = async () => job.cabin === 0 && job.month
           ? toRows(job.origin, job.destination, await fetchMonth(job.origin, job.destination, job.month!, token!))
           : toRowsLatest(job.origin, job.destination, job.cabin, await fetchLatestByClass(job.origin, job.destination, job.cabin, token!));
+        let rows;
+        try {
+          rows = await fetchOnce();
+        } catch (first) {
+          // 호출 제한(429)이나 일시 오류는 잠시 쉬고 한 번 더 시도한다
+          console.warn(`retry ${job.origin}-${job.destination} c${job.cabin}:`, (first as Error).message);
+          await new Promise((r) => setTimeout(r, 2500));
+          rows = await fetchOnce();
+        }
         if (rows.length === 0) { empty++; continue; }
         const { error: insErr } = await supabase.from("price_snapshots").upsert(rows, { onConflict: SNAPSHOT_CONFLICT });
         if (insErr) throw new Error(insErr.message);
@@ -83,7 +92,7 @@ Deno.serve(async (req) => {
         failed++;
         console.error(`${job.origin}-${job.destination} c${job.cabin} ${job.month ?? ""}:`, (e as Error).message);
       }
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 250));
     }
   }
 
