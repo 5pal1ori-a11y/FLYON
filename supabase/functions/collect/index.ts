@@ -62,8 +62,7 @@ Deno.serve(async (req) => {
   for (const r of routes ?? []) {
     for (let m = 0; m < MONTHS_AHEAD; m++) jobs.push({ origin: r.origin, destination: r.destination, cabin: 0, month: monthString(m) });
     jobs.push({ origin: r.origin, destination: r.destination, cabin: 0 }); // 최근 기록(이력 채우기)
-    jobs.push({ origin: r.origin, destination: r.destination, cabin: 1 });
-    jobs.push({ origin: r.origin, destination: r.destination, cabin: 2 });
+    // 비즈니스·일등석은 현재 제공처가 지원하지 않아(HTTP 400) 수집하지 않는다
   }
 
   // 가격 알림이 걸린 출발일은 그 날짜로 따로 조회해서 같은 날짜 가격 변동을 놓치지 않는다

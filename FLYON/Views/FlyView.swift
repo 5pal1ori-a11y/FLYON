@@ -202,12 +202,7 @@ struct FlyView: View {
             } label: {
                 OptionCell(label: "출발", value: month.monthShort)
             }
-            Divider().frame(height: 44)
-            Menu {
-                ForEach(Cabin.allCases) { c in Button(c.title) { cabin = c } }
-            } label: {
-                OptionCell(label: "좌석", value: cabin.title)
-            }
+            // 좌석 등급(비즈니스·일등석)은 가격 제공처가 지원하지 않아 숨겨 둔다
             Divider().frame(height: 44)
             Button { showAirlinePicker = true } label: {
                 OptionCell(label: "항공사", value: airlineSummary)
