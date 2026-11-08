@@ -17,6 +17,7 @@ struct CompareView: View {
     @State private var cat: Category = .ott
     @State private var calcID: UUID?
     @State private var yearlyText = ""
+    @Environment(\.openURL) private var openURL
 
     var services: [Service] { Catalog.all.filter { $0.category == cat && $0.defaultPrice > 0 }.sorted { $0.defaultPrice < $1.defaultPrice } }
     var mine: [Subscription] { store.active.filter { $0.category == cat } }
@@ -58,6 +59,12 @@ struct CompareView: View {
                                     Text(s.name).font(.system(size: 15, weight: .semibold))
                                     if using != nil { Text("이용 중").font(.system(size: 11, weight: .bold)).foregroundStyle(T.blue).padding(.horizontal, 8).padding(.vertical, 3).background(T.blueSoft, in: Capsule()) }
                                     Spacer()
+                                    if using == nil, let u = s.joinURL {
+                                        Button { openURL(u) } label: {
+                                            Text("가입").font(.system(size: 12, weight: .bold)).foregroundStyle(T.blue)
+                                                .padding(.horizontal, 12).padding(.vertical, 6).background(T.blueSoft, in: Capsule())
+                                        }
+                                    }
                                     VStack(alignment: .trailing, spacing: 1) {
                                         Text(s.defaultPrice.won).font(.system(size: 15, weight: .semibold))
                                         if !s.verified { Text("확인 필요").font(.system(size: 10)).foregroundStyle(T.faint) }

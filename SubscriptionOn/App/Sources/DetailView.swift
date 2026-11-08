@@ -62,6 +62,7 @@ struct DetailView: View {
                             }.font(.system(size: 15)).foregroundStyle(T.sub)
                         } else {
                             Button("다시 이용 중으로") { var n = s; n.status = .active; store.update(n) }.foregroundStyle(T.sub)
+                            if let u = s.service?.joinURL { Button("다시 가입하러 가기") { openURL(u) }.foregroundStyle(T.blue) }
                         }
                         Spacer(minLength: 110)
                     }.padding(20)

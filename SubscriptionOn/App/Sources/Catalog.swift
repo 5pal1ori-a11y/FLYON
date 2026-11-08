@@ -11,6 +11,20 @@ struct Service: Hashable {
     /// 2026년 11월 기준 공개 자료로 확인한 요금이면 true
     var verified: Bool = false
     var assetName: String { "logo_" + name }
+    /// 공식 가입 페이지(알려진 곳) 또는 "서비스명 가입" 검색
+    var joinURL: URL? {
+        let known: [String: String] = [
+            "넷플릭스": "https://www.netflix.com/kr/", "유튜브 프리미엄": "https://www.youtube.com/premium", "티빙": "https://www.tving.com",
+            "웨이브": "https://www.wavve.com", "디즈니 플러스": "https://www.disneyplus.com/ko-kr", "쿠팡 와우": "https://www.coupang.com",
+            "스포티파이": "https://www.spotify.com/kr-ko/premium/", "멜론": "https://www.melon.com", "플로": "https://www.music-flo.com",
+            "ChatGPT": "https://chatgpt.com", "Claude": "https://claude.ai", "Gemini": "https://gemini.google.com", "Google One": "https://one.google.com",
+            "라프텔": "https://laftel.net", "왓챠": "https://watcha.com", "Notion": "https://www.notion.so", "Dropbox": "https://www.dropbox.com",
+            "iCloud+": "https://support.apple.com/ko-kr/108047", "Creative Cloud": "https://www.adobe.com/kr/creativecloud.html",
+        ]
+        if let u = known[name] { return URL(string: u) }
+        let q = "\(name) 가입".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
+        return URL(string: "https://www.google.com/search?q=" + q)
+    }
 }
 
 /// 공식 로고 파일은 Assets.xcassets 에 `logo_서비스명` 이름으로 넣으면 자동으로 사용돼요.
