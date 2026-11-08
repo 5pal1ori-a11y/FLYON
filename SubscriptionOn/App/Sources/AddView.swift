@@ -4,6 +4,7 @@ import PhotosUI
 struct AddView: View {
     @EnvironmentObject var store: Store
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) private var openURL
     var editing: Subscription? = nil
 
     enum Method { case manual, photo, text }
@@ -209,6 +210,16 @@ struct AddView: View {
                             .padding(.horizontal, 10).padding(.vertical, 4).background(category.color.opacity(0.12), in: Capsule())
                     }
                 }.animation(.spring(response: 0.4, dampingFraction: 0.7), value: svc?.name)
+            }
+            if editing == nil, let svc, let u = svc.joinURL {
+                Button { openURL(u) } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.up.right.square")
+                        Text("아직 가입 전이면 \(svc.name) 가입하러 가기")
+                        Spacer()
+                    }.font(.system(size: 14, weight: .semibold)).foregroundStyle(T.blue)
+                    .padding(14).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
             }
             Card {
                 VStack(alignment: .leading, spacing: 4) {
