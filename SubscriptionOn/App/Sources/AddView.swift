@@ -12,6 +12,7 @@ struct AddView: View {
     @State private var query = ""
     @State private var aiText = ""
     @State private var aiBusy = false
+    @State private var saved = false
     @State private var method: Method = .manual
     @State private var name = ""
     @State private var priceText = ""
@@ -32,7 +33,7 @@ struct AddView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                if stage == .pick && editing == nil { pickView } else {
+                if stage == .pick && editing == nil { pickView.transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity))) } else {
                 VStack(alignment: .leading, spacing: 20) {
                     if editing == nil {
                         if method == .photo { photoBox }
@@ -44,13 +45,13 @@ struct AddView: View {
                         if !name.trimmingCharacters(in: .whitespaces).isEmpty {
                             let svc = Catalog.find(name)
                             HStack(spacing: 12) {
-                                LogoView(name: name, category: category, size: 44)
+                                LogoView(name: name, category: category, size: 44).id(svc?.name ?? "none").transition(.scale(scale: 0.6).combined(with: .opacity))
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(svc?.name ?? name).font(.system(size: 16, weight: .semibold))
                                     Text(svc != nil ? "\(category.rawValue)로 분류했어요" : "처음 보는 서비스예요. 종류를 골라주세요")
-                                        .font(.system(size: 13)).foregroundStyle(T.sub)
+                                        .font(.system(size: 13)).foregroundStyle(T.sub).contentTransition(.opacity)
                                 }
-                            }
+                            }.animation(.spring(response: 0.4, dampingFraction: 0.7), value: svc?.name)
                         }
                         let hits = Catalog.search(name).filter { $0.name != Catalog.find(name)?.name }
                         if !hits.isEmpty {
@@ -72,10 +73,10 @@ struct AddView: View {
                     field("종류") {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
                             ForEach(Category.allCases) { c in
-                                Button { category = c; catTouched = true } label: {
+                                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { category = c; catTouched = true } } label: {
                                     Text(c.rawValue).font(.system(size: 14, weight: .semibold))
                                         .foregroundStyle(category == c ? .white : T.sub).frame(maxWidth: .infinity).frame(height: 40)
-                                        .background(category == c ? c.color : T.bg, in: Capsule())
+                                        .background(category == c ? c.color : T.bg, in: Capsule()).scaleEffect(category == c ? 1.05 : 1)
                                 }
                             }
                         }
@@ -97,8 +98,9 @@ struct AddView: View {
                     }
                     BigButton(title: editing == nil ? "추가하기" : "저장", action: save)
                         .opacity(canSave ? 1 : 0.4).disabled(!canSave)
-                }.padding(20) }
+                }.padding(20).transition(.move(edge: .trailing).combined(with: .opacity)) }
             }
+            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: stage)
             .background(T.bg)
             .navigationTitle(editing == nil ? "구독 추가" : "수정").navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -107,6 +109,18 @@ struct AddView: View {
                 }
             }
             .onAppear { load() }
+            .overlay {
+                if saved {
+                    ZStack {
+                        Color.white.opacity(0.92).ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            Image(systemName: "checkmark.circle.fill").font(.system(size: 84)).foregroundStyle(T.green)
+                                .symbolEffect(.bounce, value: saved)
+                            Text(editing == nil ? "추가했어요" : "저장했어요").font(.system(size: 20, weight: .bold))
+                        }.transition(.scale(scale: 0.5).combined(with: .opacity))
+                    }.transition(.opacity)
+                }
+            }
         }
     }
 
@@ -281,6 +295,7 @@ struct AddView: View {
         s.trialEnd = trial ? trialEnd : nil
         if editing == nil { store.add(s) } else { store.update(s) }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) { saved = true }
+        Task { try? await Task.sleep(nanoseconds: 900_000_000); dismiss() }
     }
 }

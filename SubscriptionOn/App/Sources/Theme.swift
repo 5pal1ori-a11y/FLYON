@@ -47,6 +47,7 @@ struct DBadge: View {
             .foregroundStyle(d <= 0 ? .white : T.blue)
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(d <= 0 ? T.blue : T.blueSoft, in: Capsule())
+            .pulse(d <= 0)
     }
 }
 
@@ -69,3 +70,78 @@ struct SubRow: View {
         }.contentShape(Rectangle())
     }
 }
+
+// MARK: 애니메이션 도구
+/// 아래에서 부드럽게 떠오르며 순서대로 나타나요
+struct Stagger: ViewModifier {
+    let i: Int
+    @State private var on = false
+    func body(content: Content) -> some View {
+        content.opacity(on ? 1 : 0).offset(y: on ? 0 : 16).scaleEffect(on ? 1 : 0.98)
+            .onAppear { withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(Double(min(i, 12)) * 0.06)) { on = true } }
+    }
+}
+extension View { func stagger(_ i: Int) -> some View { modifier(Stagger(i: i)) } }
+
+/// 숫자가 0에서 올라가듯 변해요
+struct CountText: View, Animatable {
+    var value: Double
+    var animatableData: Double { get { value } set { value = newValue } }
+    var body: some View { Text(Int(value.rounded()).won) }
+}
+struct CountingWon: View {
+    let target: Double
+    @State private var shown: Double = 0
+    var body: some View {
+        CountText(value: shown)
+            .onAppear { withAnimation(.easeOut(duration: 0.9)) { shown = target } }
+            .onChange(of: target) { _, v in withAnimation(.easeOut(duration: 0.6)) { shown = v } }
+    }
+}
+
+/// 차오르는 진행 막대
+struct AnimBar: View {
+    let value: Double
+    var tint: Color = T.blue
+    @State private var shown: Double = 0
+    var body: some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(T.bg)
+                Capsule().fill(tint).frame(width: max(8, g.size.width * shown))
+            }
+        }
+        .frame(height: 8)
+        .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.25)) { shown = min(1, max(0, value)) } }
+        .onChange(of: value) { _, v in withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) { shown = min(1, max(0, v)) } }
+    }
+}
+
+/// 두근두근 (오늘 결제 등 강조)
+struct Pulse: ViewModifier {
+    let active: Bool
+    @State private var on = false
+    func body(content: Content) -> some View {
+        content.scaleEffect(active && on ? 1.08 : 1)
+            .onAppear { guard active else { return }; withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { on = true } }
+    }
+}
+extension View { func pulse(_ active: Bool) -> some View { modifier(Pulse(active: active)) } }
+
+/// 눌렀을 때 살짝 눌리는 카드
+struct PressCard: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.scaleEffect(configuration.isPressed ? 0.97 : 1).opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+/// 둥둥 떠 있는 느낌
+struct Float: ViewModifier {
+    @State private var up = false
+    func body(content: Content) -> some View {
+        content.offset(y: up ? -8 : 8)
+            .onAppear { withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { up = true } }
+    }
+}
+extension View { func floating() -> some View { modifier(Float()) } }

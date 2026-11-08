@@ -6,6 +6,7 @@ struct RootView: View {
     @EnvironmentObject var store: Store
     @State private var tab: Tab = .home
     @State private var adding = false
+    @State private var plusSpin: Double = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -18,6 +19,7 @@ struct RootView: View {
                 case .my: SettingsView()
                 }
             }
+            .id(tab).transition(.opacity.combined(with: .scale(scale: 0.985)))
             tabBar
         }
         .sheet(isPresented: $adding) { AddView().environmentObject(store) }
@@ -27,8 +29,8 @@ struct RootView: View {
         HStack {
             item(.home, "house.fill", "홈")
             item(.calendar, "calendar", "일정")
-            Button { adding = true } label: {
-                Image(systemName: "plus").font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
+            Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { plusSpin += 90 }; adding = true } label: {
+                Image(systemName: "plus").font(.system(size: 24, weight: .bold)).foregroundStyle(.white).rotationEffect(.degrees(plusSpin))
                     .frame(width: 56, height: 56).background(T.blue, in: Circle())
                     .shadow(color: T.blue.opacity(0.35), radius: 10, y: 4)
             }.buttonStyle(Press()).offset(y: -10)
@@ -40,9 +42,9 @@ struct RootView: View {
         .padding(.horizontal, 16).padding(.bottom, 6)
     }
     func item(_ t: Tab, _ icon: String, _ label: String) -> some View {
-        Button { tab = t } label: {
+        Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { tab = t } } label: {
             VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 20))
+                Image(systemName: icon).font(.system(size: 20)).symbolEffect(.bounce, value: tab == t).scaleEffect(tab == t ? 1.12 : 1)
                 Text(label).font(.system(size: 11, weight: .medium))
             }.foregroundStyle(tab == t ? T.blue : T.faint).frame(maxWidth: .infinity)
         }
@@ -68,8 +70,8 @@ struct HomeView: View {
                 HStack {
                     Text(store.userName.isEmpty ? "안녕하세요!" : "안녕하세요 \(store.userName)님!").font(.system(size: 20, weight: .bold))
                     Spacer()
-                    Image(systemName: "bell").font(.system(size: 20)).foregroundStyle(T.text)
-                }.padding(.top, 8)
+                    Image(systemName: "bell").font(.system(size: 20)).foregroundStyle(T.text).symbolEffect(.bounce, value: store.upcoming.first?.dDay ?? 9)
+                }.padding(.top, 8).stagger(0)
 
                 if store.subs.isEmpty { empty } else {
                     // 결제일이 가까운 서비스
@@ -80,7 +82,7 @@ struct HomeView: View {
                             Image(systemName: "chevron.right").font(.system(size: 14)).foregroundStyle(T.faint)
                         }.padding(.bottom, 8)
                         let list = store.upcoming
-                        ForEach(showAll ? list : Array(list.prefix(5))) { s in
+                        ForEach(Array((showAll ? list : Array(list.prefix(5))).enumerated()), id: \.element.id) { idx, s in
                             HStack(spacing: 14) {
                                 LogoView(name: s.name, category: s.category, size: 48)
                                 VStack(alignment: .leading, spacing: 2) {
@@ -90,6 +92,7 @@ struct HomeView: View {
                                 Spacer()
                                 DBadge(d: s.dDay)
                             }.padding(.vertical, 8).contentShape(Rectangle()).onTapGesture { selected = s }
+                            .stagger(idx + 1).transition(.opacity.combined(with: .move(edge: .top)))
                         }
                         if list.count > 5 {
                             Divider().padding(.top, 6)
@@ -100,11 +103,12 @@ struct HomeView: View {
                         }
                     }
                     .padding(20).background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .animation(.spring(response: 0.45, dampingFraction: 0.85), value: showAll)
 
                     // 이번달 구독료
                     VStack(alignment: .leading, spacing: 8) {
                         Text("이번달 구독료").font(.system(size: 17, weight: .bold))
-                        Text(store.monthlyTotal.won).font(.system(size: 30, weight: .heavy))
+                        CountingWon(target: store.monthlyTotal).font(.system(size: 30, weight: .heavy))
                         if delta > 0 {
                             (Text("저번달보다 ").foregroundColor(T.sub) + Text("+\(delta.won)").foregroundColor(T.red).bold() + Text(" 나왔어요").foregroundColor(T.sub)).font(.system(size: 15))
                         } else {
@@ -112,19 +116,20 @@ struct HomeView: View {
                         }
                         if store.budget > 0 {
                             let used = min(1, store.monthlyTotal / Double(store.budget))
-                            ProgressView(value: used).tint(store.overBudget ? T.red : T.blue).padding(.top, 6)
+                            AnimBar(value: used, tint: store.overBudget ? T.red : T.blue).padding(.top, 6)
                             Text(store.overBudget ? "예산을 넘었어요" : "예산까지 \((Double(store.budget) - store.monthlyTotal).won) 남았어요").font(.system(size: 13)).foregroundStyle(T.sub)
                         }
                     }
                     .padding(20).frame(maxWidth: .infinity, alignment: .leading)
                     .background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .stagger(7)
 
                     if store.potentialSave > 0 {
                         HStack(spacing: 10) {
                             Image(systemName: "sparkles").foregroundStyle(T.blue)
                             Text("\(store.potentialSave.won) 아낄 수 있어요").font(.system(size: 15, weight: .semibold))
                             Spacer()
-                        }.padding(16).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        }.padding(16).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 20, style: .continuous)).stagger(8)
                     }
                 }
                 Spacer(minLength: 130)
@@ -135,7 +140,7 @@ struct HomeView: View {
 
     var empty: some View {
         VStack(spacing: 14) {
-            Image("AppLogo").resizable().scaledToFit().frame(width: 120).luminanceToAlpha()
+            Image("AppLogo").resizable().scaledToFit().frame(width: 120).luminanceToAlpha().floating()
             Text("어떤 구독을 쓰고 있나요?").font(.system(size: 20, weight: .bold))
             Text("+ 버튼으로 추가해보세요").font(.system(size: 15)).foregroundStyle(T.sub)
             BigButton(title: "구독 추가하기", action: onAdd).padding(.horizontal, 40).padding(.top, 10)
@@ -160,13 +165,13 @@ struct CalendarView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Button { month = cal.date(byAdding: .month, value: -1, to: month)! } label: { Image(systemName: "chevron.left") }
+                    Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: -1, to: month)! } } label: { Image(systemName: "chevron.left") }
                     Spacer()
                     Text(month.formatted(.dateTime.year().month())).font(.system(size: 18, weight: .bold))
                     Spacer()
-                    Button { month = cal.date(byAdding: .month, value: 1, to: month)! } label: { Image(systemName: "chevron.right") }
+                    Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { month = cal.date(byAdding: .month, value: 1, to: month)! } } label: { Image(systemName: "chevron.right") }
                 }.foregroundStyle(T.text).padding(.top, 8)
-                Card { grid }
+                Card { grid.id(month).transition(.opacity.combined(with: .move(edge: .trailing))) }.clipped()
                 let todays = payments(on: day)
                 Card {
                     VStack(alignment: .leading, spacing: 14) {
@@ -211,9 +216,9 @@ struct CalendarView: View {
                         VStack(spacing: 2) {
                             Text("\(i - offset + 1)").font(.system(size: 15, weight: sel ? .bold : .regular))
                                 .foregroundStyle(sel ? .white : T.text)
-                                .frame(width: 32, height: 32).background(sel ? T.blue : .clear, in: Circle())
+                                .frame(width: 32, height: 32).background(sel ? T.blue : .clear, in: Circle()).scaleEffect(sel ? 1.1 : 1)
                             Text(n > 0 ? "\(n)건" : " ").font(.system(size: 10)).foregroundStyle(T.blue)
-                        }.frame(height: 48).contentShape(Rectangle()).onTapGesture { day = d }
+                        }.frame(height: 48).contentShape(Rectangle()).onTapGesture { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { day = d } }
                     }
                 }
             }

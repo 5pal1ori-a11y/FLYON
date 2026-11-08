@@ -11,7 +11,7 @@ struct SubscriptionOnApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                RootView().environmentObject(store)
+                if !splash { RootView().environmentObject(store).transition(.opacity) }
                 if locked { LockView { unlock() }.transition(.opacity) }
                 if splash {
                     SplashView { withAnimation(.easeInOut(duration: 0.4)) { splash = false }; if store.faceLock { locked = true; unlock() } }

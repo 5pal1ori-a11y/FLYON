@@ -32,7 +32,7 @@ struct DetailView: View {
                                 Spacer()
                                 LogoView(name: s.name, category: s.category, size: 56)
                             }
-                        }
+                        }.stagger(0)
                         Card {
                             VStack(spacing: 14) {
                                 row("다음 결제일", s.nextDate.formatted(.dateTime.year().month().day()))
@@ -47,7 +47,7 @@ struct DetailView: View {
                                 row("1년 환산", s.yearly.won)
                                 row("상태", s.status.rawValue)
                             }
-                        }
+                        }.stagger(1)
                         if s.history.count > 1 {
                             Card {
                                 VStack(alignment: .leading, spacing: 12) {

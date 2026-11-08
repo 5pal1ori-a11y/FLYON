@@ -4,6 +4,7 @@ import Charts
 struct StatsView: View {
     @EnvironmentObject var store: Store
     @State private var mode = 1  // 0 주 1 월 2 연
+    @State private var grow = false
     var total: Double { mode == 0 ? store.weeklyTotal : mode == 1 ? store.monthlyTotal : store.yearlyTotal }
 
     var body: some View {
@@ -13,7 +14,7 @@ struct StatsView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(mode == 0 ? "이번 주 평균" : mode == 1 ? "한 달에" : "1년이면").font(.system(size: 15)).foregroundStyle(T.sub)
-                        Text(total.won).font(.system(size: 32, weight: .heavy))
+                        CountingWon(target: total).font(.system(size: 32, weight: .heavy))
                         if store.budget > 0 {
                             ProgressView(value: min(1, store.monthlyTotal / Double(store.budget))).tint(store.overBudget ? T.red : T.blue).padding(.top, 6)
                             Text("예산 \(store.budget.won) 중 \(Int(store.monthlyTotal / Double(store.budget) * 100))%").font(.system(size: 13)).foregroundStyle(T.sub)
@@ -29,7 +30,7 @@ struct StatsView: View {
                             SectionTitle(t: "어디에 많이 쓰나요")
                             Chart(store.byCategory(), id: \.0) { c, v in
                                 SectorMark(angle: .value("금액", v), innerRadius: .ratio(0.62), angularInset: 2).foregroundStyle(c.color).cornerRadius(5)
-                            }.frame(height: 190)
+                            }.frame(height: 190).scaleEffect(grow ? 1 : 0.5).rotationEffect(.degrees(grow ? 0 : -90)).opacity(grow ? 1 : 0)
                             ForEach(store.byCategory(), id: \.0) { c, v in
                                 HStack { Circle().fill(c.color).frame(width: 10, height: 10); Text(c.rawValue); Spacer()
                                     Text(v.won).foregroundStyle(T.sub) }.font(.system(size: 15))
@@ -40,8 +41,8 @@ struct StatsView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             SectionTitle(t: "앞으로 6개월")
                             Chart(projection(), id: \.0) { m, v in
-                                BarMark(x: .value("월", m), y: .value("금액", v)).foregroundStyle(T.blue).cornerRadius(6)
-                            }.frame(height: 160).chartYAxis(.hidden)
+                                BarMark(x: .value("월", m), y: .value("금액", grow ? v : 0)).foregroundStyle(T.blue).cornerRadius(6)
+                            }.frame(height: 160).chartYAxis(.hidden).animation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.2), value: grow)
                         }
                     }
                     Card {
@@ -67,6 +68,7 @@ struct StatsView: View {
                 Spacer(minLength: 100)
             }.padding(.horizontal, 20)
         }
+        .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.15)) { grow = true } }
     }
 
     func projection() -> [(String, Double)] {
