@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum AppTab: Hashable {
-    case home, pricing, settings
+    case home, fly, alerts, settings
 }
 
 struct RecentSearch: Identifiable, Hashable, Codable {
@@ -18,6 +18,8 @@ final class AppState {
     let provider: PriceProvider = AppConfig.makePriceProvider()
 
     var selectedTab: AppTab = .home
+    /// 알림을 새로 만들면 늘려서 알림 탭이 다시 불러오게 한다
+    var alertsVersion = 0
     /// 홈에서 노선을 누르면 책정 탭에 미리 채워 줄 값
     var pendingRoute: FavoriteRoute?
     var pendingDate: Date?

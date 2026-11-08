@@ -47,7 +47,7 @@ def make_token() -> str:
     return signing_input + "." + b64u(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
 
 
-def call(method: str, path: str, body=None, allow_404=False):
+def call(method: str, path: str, body=None, allow_404=False, soft=False):
     url = API + urllib.parse.quote(path, safe="/?=&[]")
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
@@ -61,6 +61,9 @@ def call(method: str, path: str, body=None, allow_404=False):
     except urllib.error.HTTPError as e:
         if allow_404 and e.code == 404:
             return {}
+        if soft:
+            print(f"warning: API {e.code} on {method} {path}: {e.read().decode()[:300]}", file=sys.stderr)
+            return None
         print(f"API error {e.code} on {method} {path}: {e.read().decode()[:1000]}", file=sys.stderr)
         raise SystemExit(1)
 
@@ -106,6 +109,21 @@ def setup(outdir: str) -> None:
     if not exact:
         print(f"Bundle ID not found in this team: {bundle_identifier}", file=sys.stderr)
         raise SystemExit(1)
+
+    # 2-1) 앱에 필요한 기능(푸시 알림, Apple 로그인)을 App ID에 켠다. 프로파일은 이 설정을 따른다.
+    bundle_resource_id = exact[0]["id"]
+    caps = call("GET", f"/bundleIds/{bundle_resource_id}/bundleIdCapabilities", soft=True) or {"data": []}
+    enabled = {c["attributes"].get("capabilityType") for c in caps.get("data", [])}
+    for cap in ("PUSH_NOTIFICATIONS", "APPLE_ID_AUTH"):
+        if cap not in enabled:
+            body = {"data": {"type": "bundleIdCapabilities",
+                             "attributes": {"capabilityType": cap},
+                             "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bundle_resource_id}}}}}
+            if cap == "APPLE_ID_AUTH":
+                body["data"]["attributes"]["settings"] = [{"key": "APPLE_ID_AUTH_APP_CONSENT",
+                                                           "options": [{"key": "PRIMARY_APP_CONSENT"}]}]
+            if call("POST", "/bundleIdCapabilities", body, soft=True) is not None:
+                print(f"Enabled capability {cap}")
 
     # 3) App Store 배포용 프로비저닝 프로파일
     profile_name = f"FLYON CI {run}"

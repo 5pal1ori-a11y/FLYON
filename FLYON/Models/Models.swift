@@ -64,6 +64,18 @@ struct Airline: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(code) }
 }
 
+enum Cabin: Int, CaseIterable, Identifiable, Hashable {
+    case economy = 0, business = 1, first = 2
+    var id: Int { rawValue }
+    var title: String {
+        switch self {
+        case .economy: return "일반석"
+        case .business: return "비즈니스"
+        case .first: return "일등석"
+        }
+    }
+}
+
 struct FavoriteRoute: Identifiable, Hashable, Codable {
     let originCode: String
     let destinationCode: String
@@ -79,6 +91,7 @@ struct RouteSearch: Hashable {
     let month: Date
     let airlines: Set<Airline>   // 비어 있으면 전체
     var date: Date? = nil        // 처음 선택해 둘 출발일
+    var cabin: Cabin = .economy
 }
 
 struct PriceQuote: Identifiable, Hashable {

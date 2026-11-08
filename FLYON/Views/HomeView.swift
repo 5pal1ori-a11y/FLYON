@@ -6,26 +6,26 @@ struct HomeView: View {
     @State private var deals: [Deal] = []
     @State private var loading = true
     @State private var showOriginPicker = false
+    @State private var planeMoving = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    hero
-                    VStack(alignment: .leading, spacing: 28) {
+                    header
+                    VStack(alignment: .leading, spacing: 32) {
                         carousel
                         if deals.count > 1 { dealList }
                         if !appState.favorites.isEmpty { favorites }
-                        Text("표시되는 가격은 참고용이며, 평균은 앞으로의 출발일 가격의 평균이에요.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
+                    .padding(.horizontal, 20)
+                    .padding(.top, -88)
+                    .padding(.bottom, 40)
                 }
             }
             .background(Theme.screenBackground)
             .toolbar(.hidden, for: .navigationBar)
+            .refreshable { await loadDeals() }
             .task(id: appState.homeOriginCode) { await loadDeals() }
             .sheet(isPresented: $showOriginPicker) {
                 AirportPickerView(title: "출발지", excluded: nil) { appState.setHomeOrigin($0) }
@@ -33,120 +33,120 @@ struct HomeView: View {
         }
     }
 
-    // MARK: Hero
+    // MARK: Header
 
-    private var hero: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 10) {
-                Image("LogoMark")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 30, height: 30)
-                    .foregroundStyle(.white)
-                Text("FLYON")
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .tracking(2)
-                    .foregroundStyle(.white)
-            }
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Text("FLYON")
+                .font(.app(30, .heavy))
+                .tracking(2)
+                .foregroundStyle(.white)
 
-            Button {
-                showOriginPicker = true
-            } label: {
+            Button { showOriginPicker = true } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "location.fill")
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.accent)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("이 지역에서 출발하는 특가 보기")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(appState.homeOrigin.city)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                    }
+                    Text("\(appState.homeOrigin.city) 출발")
+                        .font(.app(17, .semibold))
+                        .foregroundStyle(.primary)
                     Spacer()
                     Image(systemName: "chevron.down")
-                        .font(.footnote.weight(.semibold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 16)
-                .frame(height: 64)
-                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.horizontal, 18)
+                .frame(height: 56)
+                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableStyle())
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("추천 특가")
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
-                Text("출발일 평균 가격보다 저렴한 노선이에요")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.75))
-            }
-            .padding(.top, 6)
+            Text("지금 가장 싼 항공권")
+                .font(.app(22, .bold))
+                .foregroundStyle(.white)
+                .padding(.top, 4)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 84)
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, 112)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Theme.headerGradient
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 28, bottomTrailingRadius: 28))
-                .ignoresSafeArea(edges: .top)
-        )
+        .background {
+            ZStack(alignment: .topLeading) {
+                Theme.headerGradient
+                Image(systemName: "airplane")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.35))
+                    .offset(x: planeMoving ? 460 : -40, y: 26)
+                    .animation(.linear(duration: 16).repeatForever(autoreverses: false), value: planeMoving)
+            }
+            .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 32, bottomTrailingRadius: 32))
+            .ignoresSafeArea(edges: .top)
+            .onAppear { planeMoving = true }
+        }
     }
 
-    // MARK: 추천 특가 (가로 카드)
+    // MARK: 가로 카드
 
     @ViewBuilder
     private var carousel: some View {
-        Group {
-            if loading {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Theme.cardBackground)
-                    .frame(height: 290)
-                    .overlay(ProgressView())
-            } else if deals.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("아직 특가를 모으는 중이에요", systemImage: "hourglass")
-                        .font(.headline)
-                    Text("\(appState.homeOrigin.city) 출발은 가격 데이터가 더 쌓여야 특가를 보여 드릴 수 있어요. 다른 출발지를 고르거나 책정 탭에서 노선을 직접 검색해 보세요.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .card(padding: 20)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(Array(deals.prefix(6).enumerated()), id: \.element.id) { index, deal in
-                            Button { open(deal) } label: {
-                                DealCard(origin: appState.homeOrigin, deal: deal, index: index)
-                                    .frame(width: 280)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                }
-                .padding(.horizontal, -16)
+        if loading {
+            HStack(spacing: 14) {
+                SkeletonBlock(height: 280).frame(width: 250)
+                SkeletonBlock(height: 280).frame(width: 250)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
+        } else if deals.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "airplane.circle")
+                    .font(.system(size: 34))
+                    .foregroundStyle(Theme.accent)
+                Text("\(appState.homeOrigin.city) 출발 가격을 모으고 있어요")
+                    .font(.app(15, .semibold))
+                Button("다른 출발지 선택") { showOriginPicker = true }
+                    .font(.app(14, .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 28)
+            .card()
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(Array(deals.prefix(6).enumerated()), id: \.element.id) { index, deal in
+                        Button { open(deal) } label: {
+                            DealCard(deal: deal, index: index)
+                                .frame(width: 250)
+                        }
+                        .buttonStyle(PressableStyle())
+                        .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                            content
+                                .scaleEffect(phase.isIdentity ? 1 : 0.92)
+                                .opacity(phase.isIdentity ? 1 : 0.75)
+                        }
+                        .appear(delay: Double(index) * 0.06)
+                    }
+                }
+                .scrollTargetLayout()
+                .padding(.horizontal, 20)
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .padding(.horizontal, -20)
         }
-        .padding(.top, -64)
     }
 
-    // MARK: 노선별 최저가 (목록)
+    // MARK: 목록
 
     private var dealList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "노선별 최저가", subtitle: "\(appState.homeOrigin.city) 출발")
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader(title: "노선별 최저가")
             VStack(spacing: 0) {
                 ForEach(Array(deals.enumerated()), id: \.element.id) { index, deal in
                     Button { open(deal) } label: {
                         DealRow(deal: deal, index: index)
                     }
-                    .buttonStyle(.plain)
-                    if index < deals.count - 1 { Divider() }
+                    .buttonStyle(PressableStyle())
+                    .appear(delay: 0.1 + Double(index) * 0.04)
+                    if index < deals.count - 1 { Divider().padding(.leading, 64) }
                 }
             }
             .padding(.horizontal, 16)
@@ -154,10 +154,8 @@ struct HomeView: View {
         }
     }
 
-    // MARK: 관심 노선
-
     private var favorites: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             SectionHeader(title: "관심 노선")
             ForEach(appState.favorites) { route in
                 FavoriteRow(route: route)
@@ -165,85 +163,71 @@ struct HomeView: View {
         }
     }
 
-    // MARK: Actions
-
     private func open(_ deal: Deal) {
-        appState.pendingRoute = FavoriteRoute(originCode: appState.homeOrigin.code, destinationCode: deal.destination.code)
         appState.pendingDate = deal.lowestDate
-        appState.selectedTab = .pricing
+        appState.pendingRoute = FavoriteRoute(originCode: appState.homeOrigin.code, destinationCode: deal.destination.code)
+        appState.selectedTab = .fly
     }
 
     private func loadDeals() async {
-        loading = true
-        deals = (try? await appState.provider.deals(origin: appState.homeOrigin)) ?? []
-        loading = false
+        if deals.isEmpty { loading = true }
+        let result = (try? await appState.provider.deals(origin: appState.homeOrigin, cabin: .economy)) ?? []
+        withAnimation(.easeOut(duration: 0.3)) {
+            deals = result
+            loading = false
+        }
     }
 }
 
-// MARK: - 특가 카드
+// MARK: - 카드
 
 private struct DealCard: View {
-    let origin: Airport
     let deal: Deal
     let index: Int
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack(alignment: .topLeading) {
+            ZStack(alignment: .bottomLeading) {
                 Theme.tileGradient(index)
                 Image(systemName: "airplane")
-                    .font(.system(size: 120, weight: .bold))
+                    .font(.system(size: 110, weight: .bold))
                     .rotationEffect(.degrees(-18))
-                    .foregroundStyle(.white.opacity(0.14))
-                    .offset(x: 130, y: 40)
-                Text(deal.destination.code)
-                    .font(.system(size: 44, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .padding(16)
-
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.right")
-                    Text("평균보다 \(deal.savings.won) 저렴")
+                    .foregroundStyle(.white.opacity(0.13))
+                    .offset(x: 120, y: -30)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(deal.destination.city)
+                        .font(.app(26, .heavy))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(deal.destination.country)
+                        .font(.app(13, .medium))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .padding(12)
+                .padding(18)
             }
-            .frame(height: 150)
+            .frame(height: 160)
             .clipped()
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(deal.destination.city)
-                    .font(.title2.bold())
-                    .foregroundStyle(.primary)
-                Text(deal.destination.country)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                HStack(alignment: .bottom) {
-                    Text("\(deal.lowestDate.dayTitle) 출발")
-                        .font(.footnote)
+            HStack(alignment: .lastTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("최저가")
+                        .font(.app(12, .semibold))
+                        .foregroundStyle(Theme.cheap)
+                    Text(deal.lowestDate.dayTitle)
+                        .font(.app(13))
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("평균 \(deal.average.won)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(deal.lowest.won)
-                            .font(.system(.title3, design: .rounded).weight(.bold))
-                            .foregroundStyle(.primary)
-                    }
                 }
+                Spacer()
+                Text(deal.lowest.won)
+                    .font(.app(20, .bold))
+                    .foregroundStyle(.primary)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
             .background(Theme.cardBackground)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
     }
 }
 
@@ -254,28 +238,24 @@ private struct DealRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Text(deal.destination.code)
-                .font(.system(.subheadline, design: .rounded).weight(.heavy))
+                .font(.app(13, .heavy))
                 .foregroundStyle(.white)
-                .frame(width: 52, height: 52)
+                .frame(width: 48, height: 48)
                 .background(Theme.tileGradient(index), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
             VStack(alignment: .leading, spacing: 3) {
                 Text(deal.destination.city)
-                    .font(.headline)
+                    .font(.app(16, .semibold))
                     .foregroundStyle(.primary)
-                Text("\(deal.destination.country) · \(deal.lowestDate.dayTitle)")
-                    .font(.caption)
+                Text(deal.lowestDate.dayTitle)
+                    .font(.app(13))
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(deal.lowest.won)
-                    .font(.system(.headline, design: .rounded))
-                    .foregroundStyle(.primary)
-                Pill(text: "\(deal.savingsPercent)% 저렴", systemImage: "arrow.down.right", color: Theme.cheap)
-            }
+            Text(deal.lowest.won)
+                .font(.app(16, .bold))
+                .foregroundStyle(.primary)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .contentShape(Rectangle())
     }
 }
@@ -283,42 +263,37 @@ private struct DealRow: View {
 private struct FavoriteRow: View {
     let route: FavoriteRoute
     @Environment(AppState.self) private var appState
-    @State private var history: [PricePoint] = []
+    @State private var price: Int?
     @State private var loaded = false
 
     var body: some View {
         Button {
             appState.pendingRoute = route
-            appState.selectedTab = .pricing
+            appState.selectedTab = .fly
         } label: {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(route.origin?.city ?? route.originCode) → \(route.destination?.city ?? route.destinationCode)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    if let a = PriceAnalysis(history: history) {
-                        Text(a.current.won)
-                            .font(.system(.title3, design: .rounded).weight(.bold))
-                            .foregroundStyle(.primary)
-                    } else if loaded {
-                        Text("가격 데이터 없음")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ProgressView().controlSize(.small)
-                    }
-                }
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(Theme.expensive)
+                Text("\(route.origin?.city ?? route.originCode) → \(route.destination?.city ?? route.destinationCode)")
+                    .font(.app(16, .semibold))
+                    .foregroundStyle(.primary)
                 Spacer()
-                if let a = PriceAnalysis(history: history), a.verdict != .collecting {
-                    Pill(text: a.verdict.title, systemImage: a.verdict.symbol, color: a.verdict.color)
+                if let price {
+                    Text(price.won)
+                        .font(.app(16, .bold))
+                        .foregroundStyle(.primary)
+                        .contentTransition(.numericText())
+                } else if !loaded {
+                    ProgressView().controlSize(.small)
                 }
             }
             .card()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableStyle())
         .task(id: route) {
             guard let o = route.origin, let d = route.destination else { return }
-            history = (try? await appState.provider.history(origin: o, destination: d, days: 30, airlines: [])) ?? []
+            let history = (try? await appState.provider.history(origin: o, destination: d, days: 7, airlines: [], cabin: .economy)) ?? []
+            withAnimation { price = history.max { $0.date < $1.date }?.price }
             loaded = true
         }
     }

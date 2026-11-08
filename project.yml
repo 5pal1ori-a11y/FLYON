@@ -19,6 +19,7 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
+        aps-environment: production
     info:
       path: FLYON/Info.plist
       properties:
@@ -26,6 +27,12 @@ targets:
         ITSAppUsesNonExemptEncryption: false   # HTTPS 표준 암호화만 사용
         SupabaseProjectRef: $(SUPABASE_PROJECT_REF)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        UIAppFonts:
+          - Pretendard-Regular.otf
+          - Pretendard-Medium.otf
+          - Pretendard-SemiBold.otf
+          - Pretendard-Bold.otf
+          - Pretendard-ExtraBold.otf
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:

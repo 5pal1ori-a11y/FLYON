@@ -1,0 +1,92 @@
+name: Deploy backend
+
+# Supabase DB 마이그레이션과 Edge Function을 배포하고, 주요 API를 점검한다.
+# 필요한 저장소 Secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF, SUPABASE_ANON_KEY
+# (선택, 가격 알림) APNS_KEY_ID, APNS_PRIVATE_KEY
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets
+        run: |
+          missing=""
+          [ -z "$SUPABASE_ACCESS_TOKEN" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -z "$SUPABASE_DB_PASSWORD" ] && missing="$missing SUPABASE_DB_PASSWORD"
+          [ -z "$PROJECT_REF" ] && missing="$missing SUPABASE_PROJECT_REF"
+          if [ -n "$missing" ]; then echo "Missing repository secrets:$missing" >&2; exit 1; fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Apply database migrations
+        run: |
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --include-all --yes \
+            || supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --yes \
+            || (echo y | supabase db push --linked --password "$SUPABASE_DB_PASSWORD")
+
+      - name: Deploy functions
+        run: |
+          supabase functions deploy prices --project-ref "$PROJECT_REF"
+          supabase functions deploy alerts --project-ref "$PROJECT_REF"
+          supabase functions deploy collect --project-ref "$PROJECT_REF" --no-verify-jwt
+
+      - name: Sync push notification secrets
+        env:
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APNS_KEY_ID" ] && [ -n "$APNS_PRIVATE_KEY" ]; then
+            supabase secrets set --project-ref "$PROJECT_REF" \
+              APNS_KEY_ID="$APNS_KEY_ID" APNS_TEAM_ID=F5XL8B63NU APNS_BUNDLE_ID=com.flight.flyon \
+              APNS_PRIVATE_KEY="$APNS_PRIVATE_KEY"
+            echo "APNs secrets synced"
+          else
+            echo "APNs secrets not set; price alert pushes stay off"
+          fi
+
+      - name: Smoke test API
+        env:
+          ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          base="https://${PROJECT_REF}.supabase.co/functions/v1"
+          month=$(date -u +%Y-%m)
+          day=$(date -u -d '+10 day' +%Y-%m-%d)
+          fail=0
+          for path in \
+            "prices/history?origin=ICN&destination=CJU&days=30" \
+            "prices/calendar?origin=ICN&destination=CJU&month=$month" \
+            "prices/flights?origin=ICN&destination=CJU&date=$day" \
+            "prices/deals?origin=ICN" \
+            "prices/calendar?origin=ICN&destination=NRT&month=$month&cabin=1" \
+            "alerts?device_token=$(printf '0%.0s' $(seq 64))"; do
+            out=$(curl -sS -o /tmp/body -w "%{http_code}" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" "$base/$path")
+            echo "$out  $(wc -c < /tmp/body) bytes  ${path%%\?*}"
+            [ "$out" = "200" ] || fail=1
+          done
+          exit $fail

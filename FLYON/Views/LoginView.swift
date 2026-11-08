@@ -10,28 +10,27 @@ struct LoginView: View {
 
             VStack(spacing: 0) {
                 Spacer()
-
                 Image("LogoMark")
                     .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 88, height: 88)
+                    .frame(width: 80, height: 80)
                     .foregroundStyle(.white)
-
+                    .appear()
                 Text("FLYON")
-                    .font(.system(size: 36, weight: .heavy, design: .rounded))
-                    .tracking(5)
+                    .font(.app(36, .heavy))
+                    .tracking(4)
                     .foregroundStyle(.white)
                     .padding(.top, 18)
-
-                Text("항공권 가격의 흐름을 읽어 드려요")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.75))
-                    .padding(.top, 6)
-
+                    .appear(delay: 0.08)
+                Text("항공권 가격, 흐름으로 읽다")
+                    .font(.app(15, .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .padding(.top, 8)
+                    .appear(delay: 0.16)
                 Spacer()
 
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     SignInWithAppleButton(.signIn) { request in
                         request.requestedScopes = [.fullName, .email]
                     } onCompletion: { result in
@@ -42,30 +41,25 @@ struct LoginView: View {
                     .clipShape(Capsule())
 
                     if let message = auth.errorMessage {
-                        Label(message, systemImage: "exclamationmark.circle")
-                            .font(.footnote)
+                        Text(message)
+                            .font(.app(13))
                             .foregroundStyle(.yellow)
                     }
 
                     #if DEBUG
                     Button("개발용 둘러보기") { auth.signInForDebug() }
-                        .font(.footnote)
+                        .font(.app(13))
                         .foregroundStyle(.white.opacity(0.7))
                     #endif
 
-                    Text("계속하면 이용약관과 개인정보처리방침에 동의한 것으로 봅니다.")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.55))
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 4)
+                    Text("계속하면 이용약관과 개인정보처리방침에 동의하게 됩니다")
+                        .font(.app(11))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 28)
+                .appear(delay: 0.25)
             }
         }
     }
-}
-
-#Preview {
-    LoginView().environment(AuthManager())
 }
