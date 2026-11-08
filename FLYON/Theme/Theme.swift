@@ -211,7 +211,25 @@ extension Int {
     }
 }
 
+private let shortDayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "ko_KR")
+    f.dateFormat = "M/d"
+    return f
+}()
+
+private let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "ko_KR")
+    f.dateFormat = "E"
+    return f
+}()
+
 extension Date {
     var monthTitle: String { monthFormatter.string(from: self) }
     var dayTitle: String { dayFormatter.string(from: self) }
+    /// "12/5"
+    var shortDay: String { shortDayFormatter.string(from: self) }
+    /// "금"
+    var weekdayShort: String { weekdayFormatter.string(from: self) }
 }

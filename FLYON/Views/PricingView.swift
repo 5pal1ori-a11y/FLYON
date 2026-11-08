@@ -192,8 +192,15 @@ struct PricingView: View {
         guard let route, let o = route.origin, let d = route.destination else { return }
         origin = o
         destination = d
-        result = RouteSearch(origin: o, destination: d, month: month, airlines: airlines)
+        var searchMonth = month
+        if let date = appState.pendingDate {
+            let cal = Calendar.current
+            searchMonth = cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? month
+            month = searchMonth
+        }
+        result = RouteSearch(origin: o, destination: d, month: searchMonth, airlines: airlines, date: appState.pendingDate)
         appState.pendingRoute = nil
+        appState.pendingDate = nil
     }
 }
 

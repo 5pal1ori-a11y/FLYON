@@ -5,6 +5,13 @@ import Foundation
 enum AirlineData {
     static let koreanCodes: Set<String> = ["KE", "OZ", "7C", "LJ", "TW", "BX", "RS", "ZE", "YP", "KJ", "RF"]
 
+    /// 저비용 항공사 (필터용)
+    static let lowCostCodes: Set<String> = [
+        "7C", "LJ", "TW", "BX", "RS", "ZE", "RF", "KJ",
+        "MM", "GK", "IJ", "TR", "3K", "UO", "9C", "FD", "SL", "VZ", "VJ", "AK", "D7", "QZ", "Z2", "5J",
+        "IT", "JT", "DD", "PC", "FR", "U2", "W6", "DY", "VY", "F9", "NK", "WN", "G3", "6E", "SG", "IX", "JQ",
+    ]
+
     static let raw: [(code: String, ko: String, en: String)] = [
         // 한국
         ("KE", "대한항공", "Korean Air"),

@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
         if (rows.length === 0) { empty++; continue; }
         const { error: insErr } = await supabase
           .from("price_snapshots")
-          .upsert(rows, { onConflict: SNAPSHOT_CONFLICT, ignoreDuplicates: true });
+          .upsert(rows, { onConflict: SNAPSHOT_CONFLICT });
         if (insErr) throw new Error(insErr.message);
         inserted += rows.length;
       } catch (e) {

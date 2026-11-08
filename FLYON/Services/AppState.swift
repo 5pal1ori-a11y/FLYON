@@ -20,6 +20,16 @@ final class AppState {
     var selectedTab: AppTab = .home
     /// 홈에서 노선을 누르면 책정 탭에 미리 채워 줄 값
     var pendingRoute: FavoriteRoute?
+    var pendingDate: Date?
+
+    /// 홈에서 특가를 보여 줄 출발지
+    private(set) var homeOriginCode = "ICN"
+    var homeOrigin: Airport { Catalog.airport(homeOriginCode) ?? Catalog.airports[0] }
+
+    func setHomeOrigin(_ airport: Airport) {
+        homeOriginCode = airport.code
+        UserDefaults.standard.set(airport.code, forKey: "flyon.homeOrigin")
+    }
 
     private(set) var favorites: [FavoriteRoute] = []
     private(set) var recents: [RecentSearch] = []
@@ -28,6 +38,7 @@ final class AppState {
     private let recentsKey = "flyon.recents"
 
     init() {
+        homeOriginCode = UserDefaults.standard.string(forKey: "flyon.homeOrigin") ?? "ICN"
         favorites = Self.load([FavoriteRoute].self, key: favoritesKey) ?? []
         recents = Self.load([RecentSearch].self, key: recentsKey) ?? []
     }

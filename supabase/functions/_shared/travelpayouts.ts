@@ -42,5 +42,8 @@ export function toRows(origin: string, destination: string, items: Array<Record<
       flight_number: String(i.flight_number ?? ""),
       price: Math.round(i.price as number),
       transfers: Number(i.transfers ?? 0),
+      // 출발지 현지 시각 "HH:mm" (시간대 변환 없이 문자열 그대로)
+      departure_time: String(i.departure_at).slice(11, 16),
+      duration_min: Number.isFinite(Number(i.duration_to ?? i.duration)) ? Math.round(Number(i.duration_to ?? i.duration)) : null,
     }));
 }

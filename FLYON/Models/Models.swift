@@ -45,6 +45,7 @@ struct Airline: Identifiable, Hashable {
     let searchKey: String
 
     var id: String { code }
+    var isLowCost: Bool { AirlineData.lowCostCodes.contains(code) }
 
     init(code: String, name: String, englishName: String) {
         self.code = code
@@ -77,6 +78,7 @@ struct RouteSearch: Hashable {
     let destination: Airport
     let month: Date
     let airlines: Set<Airline>   // 비어 있으면 전체
+    var date: Date? = nil        // 처음 선택해 둘 출발일
 }
 
 struct PriceQuote: Identifiable, Hashable {
@@ -91,6 +93,44 @@ struct PricePoint: Identifiable, Hashable {
     let id = UUID()
     let date: Date
     let price: Int
+}
+
+struct Flight: Identifiable, Hashable {
+    let id = UUID()
+    let airline: Airline
+    let flightNumber: String
+    let departureTime: String?   // 출발지 현지 시각 "15:20"
+    let durationMinutes: Int?
+    let price: Int
+    let transfers: Int
+
+    var durationText: String? {
+        guard let m = durationMinutes, m > 0 else { return nil }
+        let h = m / 60, rest = m % 60
+        if h == 0 { return "\(rest)분" }
+        return rest == 0 ? "\(h)시간" : "\(h)시간 \(rest)분"
+    }
+
+    /// 도착 시각 (출발 시각 + 소요시간, 현지 시간대 차이는 반영하지 않음)
+    var arrivalTime: (text: String, nextDay: Bool)? {
+        guard let dep = departureTime, let m = durationMinutes else { return nil }
+        let parts = dep.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2 else { return nil }
+        let total = parts[0] * 60 + parts[1] + m
+        return (String(format: "%02d:%02d", (total / 60) % 24, total % 60), total >= 1440)
+    }
+}
+
+/// 출발지별 특가: 앞으로의 출발일 중 최저가와 평균
+struct Deal: Identifiable, Hashable {
+    let destination: Airport
+    let lowest: Int
+    let average: Int
+    let lowestDate: Date
+
+    var id: String { destination.code }
+    var savings: Int { max(average - lowest, 0) }
+    var savingsPercent: Int { average == 0 ? 0 : Int((Double(savings) / Double(average) * 100).rounded()) }
 }
 
 struct CalendarDay: Identifiable, Hashable {
