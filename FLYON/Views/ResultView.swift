@@ -41,6 +41,9 @@ struct ResultView: View {
     }
     private var sortedCalendar: [CalendarDay] { calendar.sorted { $0.date < $1.date } }
     private var cheapestDay: CalendarDay? { calendar.min { $0.price < $1.price } }
+    private var selectedDay: CalendarDay? {
+        selectedDate.flatMap { d in calendar.first { cal.isDate($0.date, inSameDayAs: d) } }
+    }
 
     private var visibleFlights: [Flight] {
         flights
@@ -285,6 +288,21 @@ struct ResultView: View {
                 Button("다시") { Task { await loadFlights() } }.font(.app(14, .semibold))
             }
             .card()
+        } else if flights.isEmpty, let day = selectedDay {
+            HStack(spacing: 14) {
+                Image(systemName: "airplane")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.accentSoft, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(day.date.dayTitle) 최저가").font(.app(16, .bold))
+                    Text("항공편 세부 정보는 수집 중이에요").font(.app(12)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(day.price.won).font(.app(17, .bold)).foregroundStyle(Theme.accent)
+            }
+            .card(padding: 16)
         } else if visibleFlights.isEmpty {
             Text(flights.isEmpty ? "이 날짜의 항공편 정보가 없어요" : "조건에 맞는 항공편이 없어요")
                 .font(.app(14))

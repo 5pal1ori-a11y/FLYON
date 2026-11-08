@@ -23,6 +23,7 @@ struct HomeView: View {
                     .padding(.bottom, 40)
                 }
             }
+            .background(alignment: .top) { Theme.navy.frame(height: 120).ignoresSafeArea(edges: .top) }
             .background(Theme.screenBackground)
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await loadDeals() }

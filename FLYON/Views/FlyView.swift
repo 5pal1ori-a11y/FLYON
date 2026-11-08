@@ -1,24 +1,23 @@
 import SwiftUI
 
-/// FLY 탭: 노선 검색
+/// FLY 탭: 노선 검색 (출발지·도착지를 입력해서 찾는다)
 struct FlyView: View {
     @Environment(AppState.self) private var appState
 
-    @State private var origin: Airport? = Catalog.airport("ICN")
-    @State private var destination: Airport? = Catalog.airport("CJU")
+    private enum Field: Hashable { case origin, destination }
+
+    @State private var origin: Airport?
+    @State private var destination: Airport?
+    @State private var originText = ""
+    @State private var destinationText = ""
+    @FocusState private var focus: Field?
+
     @State private var month: Date = Self.months[0]
     @State private var cabin: Cabin = .economy
     @State private var airlines: Set<Airline> = []
-
-    @State private var pickerTarget: PickerTarget?
     @State private var showAirlinePicker = false
     @State private var result: RouteSearch?
     @State private var swapTurns = 0.0
-
-    private enum PickerTarget: Identifiable {
-        case origin, destination
-        var id: Int { self == .origin ? 0 : 1 }
-    }
 
     /// 서버가 수집하는 기간(이번 달부터 3개월)
     static let months: [Date] = {
@@ -30,6 +29,18 @@ struct FlyView: View {
     private var canSearch: Bool {
         guard let origin, let destination else { return false }
         return origin != destination
+    }
+
+    /// 지금 입력 중인 칸의 검색 결과
+    private var suggestions: [Airport] {
+        switch focus {
+        case .origin where origin == nil:
+            return Catalog.searchAirports(originText, excluding: destination, limit: 8)
+        case .destination where destination == nil:
+            return Catalog.searchAirports(destinationText, excluding: origin, limit: 8)
+        default:
+            return []
+        }
     }
 
     var body: some View {
@@ -49,87 +60,162 @@ struct FlyView: View {
                                 .ignoresSafeArea(edges: .top)
                         )
 
-                    VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 16) {
                         searchCard.appear()
-                        searchButton.appear(delay: 0.06)
-                        popular.appear(delay: 0.12)
+                        if !suggestions.isEmpty {
+                            suggestionList
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        optionsCard.appear(delay: 0.05)
+                        searchButton.appear(delay: 0.1)
                     }
+                    .animation(.snappy, value: suggestions.map(\.code))
                     .padding(.horizontal, 20)
                     .padding(.top, -48)
                     .padding(.bottom, 40)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .background(alignment: .top) { Theme.navy.frame(height: 120).ignoresSafeArea(edges: .top) }
             .background(Theme.screenBackground)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $result) { ResultView(search: $0) }
         }
-        .sheet(item: $pickerTarget) { target in
-            AirportPickerView(title: target == .origin ? "출발지" : "도착지",
-                              excluded: target == .origin ? destination : origin) { airport in
-                withAnimation(.snappy) {
-                    if target == .origin { origin = airport } else { destination = airport }
-                }
-            }
-        }
         .sheet(isPresented: $showAirlinePicker) { AirlinePickerView(selection: $airlines) }
+        .onChange(of: originText) { _, text in
+            if let o = origin, text != label(o) { origin = nil }
+        }
+        .onChange(of: destinationText) { _, text in
+            if let d = destination, text != label(d) { destination = nil }
+        }
         .onChange(of: appState.pendingRoute) { _, route in consume(route) }
-        .onAppear { consume(appState.pendingRoute) }
+        .onAppear {
+            if origin == nil, originText.isEmpty { choose(appState.homeOrigin, for: .origin, moveFocus: false) }
+            consume(appState.pendingRoute)
+        }
     }
 
-    // MARK: 검색 카드
+    // MARK: 입력 카드
 
     private var searchCard: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .trailing) {
-                VStack(spacing: 0) {
-                    AirportRow(label: "출발", airport: origin) { pickerTarget = .origin }
-                    Divider().padding(.leading, 20)
-                    AirportRow(label: "도착", airport: destination) { pickerTarget = .destination }
-                }
-                Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
-                        swap(&origin, &destination)
-                        swapTurns += 1
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 42, height: 42)
-                        .background(Theme.accent, in: Circle())
-                        .rotationEffect(.degrees(swapTurns * 180))
-                        .shadow(color: Theme.accent.opacity(0.35), radius: 8, y: 3)
-                }
-                .buttonStyle(PressableStyle())
-                .sensoryFeedback(.impact(weight: .light), trigger: swapTurns)
-                .accessibilityLabel("출발지와 도착지 바꾸기")
-                .padding(.trailing, 18)
+        ZStack(alignment: .trailing) {
+            VStack(spacing: 0) {
+                inputRow(label: "출발", placeholder: "도시, 공항 또는 코드", text: $originText, field: .origin, selected: origin)
+                Divider().padding(.leading, 20)
+                inputRow(label: "도착", placeholder: "어디로 가시나요?", text: $destinationText, field: .destination, selected: destination)
             }
-
-            Divider()
-
-            HStack(spacing: 0) {
-                Menu {
-                    ForEach(Self.months, id: \.self) { m in Button(m.monthTitle) { month = m } }
-                } label: {
-                    OptionCell(label: "출발", value: month.monthShort)
+            Button {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                    swap(&origin, &destination)
+                    swap(&originText, &destinationText)
+                    swapTurns += 1
                 }
-                Divider().frame(height: 44)
-                Menu {
-                    ForEach(Cabin.allCases) { c in Button(c.title) { cabin = c } }
-                } label: {
-                    OptionCell(label: "좌석", value: cabin.title)
-                }
-                Divider().frame(height: 44)
-                Button { showAirlinePicker = true } label: {
-                    OptionCell(label: "항공사", value: airlineSummary)
-                }
-                .buttonStyle(.plain)
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(Theme.accent, in: Circle())
+                    .rotationEffect(.degrees(swapTurns * 180))
+                    .shadow(color: Theme.accent.opacity(0.35), radius: 8, y: 3)
             }
-            .padding(.vertical, 6)
+            .buttonStyle(PressableStyle())
+            .sensoryFeedback(.impact(weight: .light), trigger: swapTurns)
+            .accessibilityLabel("출발지와 도착지 바꾸기")
+            .padding(.trailing, 18)
         }
         .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 18, y: 8)
+    }
+
+    private func inputRow(label: String, placeholder: String, text: Binding<String>, field: Field, selected: Airport?) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .font(.app(12, .medium))
+                    .foregroundStyle(focus == field ? Theme.accent : .secondary)
+                TextField(placeholder, text: text)
+                    .font(.app(20, .bold))
+                    .focused($focus, equals: field)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.next)
+                    .onSubmit {
+                        let first = suggestions.first
+                        if let first { choose(first, for: field) }
+                    }
+            }
+            if selected != nil {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.cheap)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            Spacer(minLength: 64)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+        .onTapGesture { focus = field }
+    }
+
+    private var suggestionList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, airport in
+                Button {
+                    if let focus { choose(airport, for: focus) }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "airplane")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 30, height: 30)
+                            .background(Theme.accentSoft, in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(airport.city).font(.app(15, .semibold)).foregroundStyle(.primary)
+                            Text("\(airport.name) · \(airport.country)")
+                                .font(.app(12))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Text(airport.code).font(.app(14, .bold)).foregroundStyle(Theme.accent)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                if index < suggestions.count - 1 { Divider().padding(.leading, 58) }
+            }
+        }
+        .padding(.vertical, 6)
+        .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+    }
+
+    // MARK: 조건
+
+    private var optionsCard: some View {
+        HStack(spacing: 0) {
+            Menu {
+                ForEach(Self.months, id: \.self) { m in Button(m.monthTitle) { month = m } }
+            } label: {
+                OptionCell(label: "출발", value: month.monthShort)
+            }
+            Divider().frame(height: 44)
+            Menu {
+                ForEach(Cabin.allCases) { c in Button(c.title) { cabin = c } }
+            } label: {
+                OptionCell(label: "좌석", value: cabin.title)
+            }
+            Divider().frame(height: 44)
+            Button { showAirlinePicker = true } label: {
+                OptionCell(label: "항공사", value: airlineSummary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 6)
+        .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 
     private var airlineSummary: String {
@@ -140,6 +226,7 @@ struct FlyView: View {
     private var searchButton: some View {
         Button {
             guard let origin, let destination else { return }
+            focus = nil
             appState.addRecent(origin: origin, destination: destination)
             result = RouteSearch(origin: origin, destination: destination, month: month, airlines: airlines, cabin: cabin)
         } label: {
@@ -155,37 +242,29 @@ struct FlyView: View {
         .disabled(!canSearch)
     }
 
-    private var popular: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "인기 노선")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(Catalog.popularRoutes.enumerated()), id: \.offset) { _, pair in
-                        if let o = Catalog.airport(pair.0), let d = Catalog.airport(pair.1) {
-                            Button {
-                                withAnimation(.snappy) { origin = o; destination = d }
-                            } label: {
-                                Text("\(o.city) → \(d.city)")
-                                    .font(.app(14, .medium))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(Theme.cardBackground, in: Capsule())
-                                    .foregroundStyle(.primary)
-                            }
-                            .buttonStyle(PressableStyle())
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
+    // MARK: 동작
+
+    private func label(_ a: Airport) -> String { "\(a.city) \(a.code)" }
+
+    private func choose(_ airport: Airport, for field: Field, moveFocus: Bool = true) {
+        withAnimation(.snappy) {
+            switch field {
+            case .origin:
+                origin = airport
+                originText = label(airport)
+                if moveFocus { focus = destination == nil ? .destination : nil }
+            case .destination:
+                destination = airport
+                destinationText = label(airport)
+                if moveFocus { focus = nil }
             }
-            .padding(.horizontal, -20)
         }
     }
 
     private func consume(_ route: FavoriteRoute?) {
         guard let route, let o = route.origin, let d = route.destination else { return }
-        origin = o
-        destination = d
+        choose(o, for: .origin, moveFocus: false)
+        choose(d, for: .destination, moveFocus: false)
         var searchMonth = month
         if let date = appState.pendingDate {
             let cal = Calendar.current
@@ -195,41 +274,6 @@ struct FlyView: View {
         result = RouteSearch(origin: o, destination: d, month: searchMonth, airlines: airlines, date: appState.pendingDate, cabin: cabin)
         appState.pendingRoute = nil
         appState.pendingDate = nil
-    }
-}
-
-private struct AirportRow: View {
-    let label: String
-    let airport: Airport?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(label)
-                        .font(.app(12, .medium))
-                        .foregroundStyle(.secondary)
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(airport?.city ?? "선택")
-                            .font(.app(22, .bold))
-                            .foregroundStyle(airport == nil ? Color.secondary : Color.primary)
-                            .lineLimit(1)
-                            .contentTransition(.opacity)
-                        if let airport {
-                            Text(airport.code)
-                                .font(.app(14, .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                Spacer(minLength: 70)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
