@@ -14,7 +14,7 @@ struct RootView: View {
                 switch tab {
                 case .home: HomeView(onAdd: { adding = true })
                 case .calendar: CalendarView()
-                case .stats: StatsView()
+                case .stats: AnalysisView()
                 case .my: SettingsView()
                 }
             }
@@ -32,7 +32,7 @@ struct RootView: View {
                     .frame(width: 56, height: 56).background(T.blue, in: Circle())
                     .shadow(color: T.blue.opacity(0.35), radius: 10, y: 4)
             }.buttonStyle(Press()).offset(y: -10)
-            item(.stats, "chart.bar.fill", "통계")
+            item(.stats, "chart.bar.fill", "분석")
             item(.my, "person.fill", "마이")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)

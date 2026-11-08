@@ -9,7 +9,6 @@ struct StatsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("통계").font(.system(size: 22, weight: .bold)).padding(.top, 8)
                 Picker("", selection: $mode) { Text("주").tag(0); Text("월").tag(1); Text("연").tag(2) }.pickerStyle(.segmented)
                 Card {
                     VStack(alignment: .leading, spacing: 6) {
