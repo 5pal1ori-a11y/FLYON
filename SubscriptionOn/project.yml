@@ -10,7 +10,7 @@ targets:
     sources: [App]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.subon.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon
         PRODUCT_NAME: SubscriptionOn
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
