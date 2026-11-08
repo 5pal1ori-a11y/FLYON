@@ -87,9 +87,10 @@ struct StatsView: View {
                             SectionTitle(t: "구독 건강도")
                             Text("\(store.health)점").font(.system(size: 28, weight: .heavy)).foregroundStyle(store.health >= 70 ? T.green : store.health >= 40 ? .orange : T.red)
                             if store.saveGoal > 0 {
-                                let r = min(1, Double(store.potentialSave) / Double(store.saveGoal))
-                                ProgressView(value: r).tint(T.green)
-                                Text("절약 목표 \(store.saveGoal.won) 중 \(Int(r * 100))%").font(.system(size: 13)).foregroundStyle(T.sub)
+                                let got = Int(store.savedMonthly.rounded())
+                                let r = min(1, Double(got) / Double(store.saveGoal))
+                                AnimBar(value: r, tint: T.green)
+                                Text("절약 목표 \(store.saveGoal.won) 중 \(got.won) 아꼈어요").font(.system(size: 13)).foregroundStyle(T.sub)
                             }
                         }
                     }

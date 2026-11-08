@@ -8,6 +8,8 @@ struct DetailView: View {
     @State private var editing = false
     @State private var confirmDelete = false
     @State private var askDone = false
+    @State private var celebrate = false
+    @State private var celebrateAmount = 0
 
     // 최신 값
     var s: Subscription { store.subs.first { $0.id == sub.id } ?? sub }
@@ -77,7 +79,10 @@ struct DetailView: View {
                         }
                         if s.status != .cancelled {
                             Button(s.status == .paused ? "다시 시작" : "일시중지") {
+                                let pausing = s.status != .paused
+                                let amt = Int(s.monthly.rounded())
                                 var n = s; n.status = s.status == .paused ? .active : .paused; store.update(n)
+                                if pausing { celebrateAmount = amt; withAnimation { celebrate = true } }
                             }.font(.system(size: 15)).foregroundStyle(T.sub)
                         } else {
                             Button("다시 이용 중으로") { var n = s; n.status = .active; store.update(n) }.foregroundStyle(T.sub)
@@ -99,9 +104,10 @@ struct DetailView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } }
                 ToolbarItem(placement: .primaryAction) { Button { editing = true } label: { Image(systemName: "pencil") } }
             }
+            .overlay { if celebrate { CelebrationView(saved: celebrateAmount) { withAnimation { celebrate = false } }.environmentObject(store).transition(.opacity) } }
             .sheet(isPresented: $editing) { AddView(editing: s).environmentObject(store) }
             .alert("해지를 마쳤나요?", isPresented: $askDone) {
-                Button("마쳤어요") { var n = s; n.status = .cancelled; store.update(n) }
+                Button("마쳤어요") { let amt = Int(s.monthly.rounded()); var n = s; n.status = .cancelled; store.update(n); celebrateAmount = amt; withAnimation { celebrate = true } }
                 Button("아직이에요", role: .cancel) {}
             } message: { Text("해지는 서비스 안에서 직접 눌러야 끝나요") }
             .confirmationDialog("삭제할까요?", isPresented: $confirmDelete, titleVisibility: .visible) {

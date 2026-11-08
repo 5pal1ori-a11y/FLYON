@@ -129,6 +129,8 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         row("faceid", .green, "Face ID 잠금") { Toggle("", isOn: store.$faceLock).labelsHidden().tint(T.blue) }
                         Divider()
+                        NavigationLink { BackupView() } label: { rowLabel("icloud.and.arrow.up.fill", T.blue, "백업·복원", chevron: true) }.buttonStyle(.plain)
+                        Divider()
                         ShareLink(item: store.csv()) { rowLabel("square.and.arrow.up", T.accent2, "CSV로 내보내기", chevron: true) }
                         Divider()
                         Button(role: .destructive) { confirmReset = true } label: { rowLabel("trash", T.red, "모든 데이터 지우기", chevron: false, color: T.red) }

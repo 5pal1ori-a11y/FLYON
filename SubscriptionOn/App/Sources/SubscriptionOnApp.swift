@@ -22,7 +22,7 @@ struct SubscriptionOnApp: App {
             }
             .preferredColorScheme(themeMode == 1 ? .light : themeMode == 2 ? .dark : nil)
             .tint(T.blue)
-            .onChange(of: phase) { _, p in if p == .background, store.faceLock { locked = true } else if p == .active, locked, !splash { unlock() } }
+            .onChange(of: phase) { _, p in if p == .background { store.autoBackup() }; if p == .background, store.faceLock { locked = true } else if p == .active, locked, !splash { unlock() } }
             .onAppear { store.requestNotify() }
         }
     }

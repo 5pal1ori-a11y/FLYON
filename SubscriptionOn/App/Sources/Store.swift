@@ -13,6 +13,7 @@ final class Store: ObservableObject {
     @AppStorage("faceLock") var faceLock = false
     @AppStorage("monthHistory") private var historyRaw = "{}"
     @AppStorage("monthNames") private var namesRaw = "{}"
+    @AppStorage("lastBackup") var lastBackup: Double = 0
 
     private var url: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("subs.json") }
 
@@ -186,5 +187,48 @@ final class Store: ObservableObject {
     func sendTestNotification() {
         let c = UNMutableNotificationContent(); c.title = "구독온"; c.body = "알림이 잘 와요 🎉"; c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "test-\(UUID())", content: c, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)))
+    }
+
+    // MARK: 절약 (해지·일시중지한 구독의 월 금액)
+    var savedMonthly: Double { subs.filter { !$0.isActive }.reduce(0) { $0 + $1.monthly } }
+
+    // MARK: 백업 / 복원
+    struct Backup: Codable {
+        var version = 1
+        var date = Date()
+        var subs: [Subscription]
+        var history: [String: Int]
+        var names: [String: [String]]
+        var budget: Int
+        var saveGoal: Int
+        var userName: String
+    }
+    func makeBackup() -> Data {
+        let b = Backup(subs: subs, history: history, names: monthNames, budget: budget, saveGoal: saveGoal, userName: userName)
+        let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return (try? e.encode(b)) ?? Data()
+    }
+    /// 복원: merge = true 면 같은 id는 그대로 두고 없는 것만 추가
+    @discardableResult
+    func restore(_ data: Data, merge: Bool) -> Int? {
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
+        guard let b = try? d.decode(Backup.self, from: data) else { return nil }
+        if merge {
+            let have = Set(subs.map(\.id))
+            subs += b.subs.filter { !have.contains($0.id) }
+        } else {
+            subs = b.subs
+            budget = b.budget; saveGoal = b.saveGoal; if !b.userName.isEmpty { userName = b.userName }
+            if let h = try? JSONEncoder().encode(b.history), let t = String(data: h, encoding: .utf8) { historyRaw = t }
+            if let n = try? JSONEncoder().encode(b.names), let t = String(data: n, encoding: .utf8) { namesRaw = t }
+        }
+        return b.subs.count
+    }
+    /// 앱 문서 폴더에 자동 백업 (파일 앱 > 구독온 에서 보여요)
+    func autoBackup() {
+        guard !subs.isEmpty else { return }
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("구독온-자동백업.json")
+        try? makeBackup().write(to: url, options: .atomic)
+        lastBackup = Date().timeIntervalSince1970
     }
 }
