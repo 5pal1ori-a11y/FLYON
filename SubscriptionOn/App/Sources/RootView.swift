@@ -7,6 +7,7 @@ struct RootView: View {
     @State private var tab: Tab = .home
     @State private var adding = false
     @State private var plusSpin: Double = 0
+    @Namespace private var pill
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -38,7 +39,7 @@ struct RootView: View {
             item(.my, "person.fill", "마이")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.white, in: Capsule()).shadow(color: .black.opacity(0.08), radius: 16, y: 4)
+        .background(.regularMaterial, in: Capsule()).overlay(Capsule().stroke(.white.opacity(0.6), lineWidth: 1)).shadow(color: Color(hex: 0x1B2A4A).opacity(0.12), radius: 20, y: 8)
         .padding(.horizontal, 16).padding(.bottom, 6)
     }
     func item(_ t: Tab, _ icon: String, _ label: String) -> some View {
@@ -46,7 +47,8 @@ struct RootView: View {
             VStack(spacing: 3) {
                 Image(systemName: icon).font(.system(size: 20)).symbolEffect(.bounce, value: tab == t).scaleEffect(tab == t ? 1.12 : 1)
                 Text(label).font(.system(size: 11, weight: .medium))
-            }.foregroundStyle(tab == t ? T.blue : T.faint).frame(maxWidth: .infinity)
+            }.foregroundStyle(tab == t ? T.blue : T.faint).frame(maxWidth: .infinity).padding(.vertical, 6)
+            .background { if tab == t { Capsule().fill(T.blueSoft).matchedGeometryEffect(id: "pill", in: pill) } }
         }
     }
 }
@@ -74,6 +76,29 @@ struct HomeView: View {
                 }.padding(.top, 8).stagger(0)
 
                 if store.subs.isEmpty { empty } else {
+                    // 이번달 구독료 (히어로)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("이번달 구독료").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
+                        CountingWon(target: store.monthlyTotal).font(.system(size: 38, weight: .heavy)).foregroundStyle(.white)
+                        Group {
+                            if delta > 0 { Text("저번달보다 +\(delta.won)") } else { Text("1년이면 \(store.yearlyTotal.won)") }
+                        }
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6).background(.white.opacity(0.2), in: Capsule())
+                        if store.budget > 0 {
+                            let used = min(1, store.monthlyTotal / Double(store.budget))
+                            AnimBar(value: used, tint: .white, track: .white.opacity(0.25)).padding(.top, 8)
+                            Text(store.overBudget ? "예산을 넘었어요" : "예산까지 \((Double(store.budget) - store.monthlyTotal).won) 남았어요").font(.system(size: 13)).foregroundStyle(.white.opacity(0.85))
+                        }
+                    }
+                    .padding(24).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(T.hero)
+                    .overlay(alignment: .topTrailing) { Circle().fill(.white.opacity(0.09)).frame(width: 150).offset(x: 50, y: -60) }
+                    .overlay(alignment: .bottomTrailing) { Circle().fill(.white.opacity(0.06)).frame(width: 110).offset(x: 20, y: 40) }
+                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+                    .shadow(color: T.blue.opacity(0.35), radius: 22, y: 12)
+                    .stagger(1)
+
                     // 결제일이 가까운 서비스
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -103,26 +128,8 @@ struct HomeView: View {
                         }
                     }
                     .padding(20).background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 14, y: 6)
                     .animation(.spring(response: 0.45, dampingFraction: 0.85), value: showAll)
-
-                    // 이번달 구독료
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("이번달 구독료").font(.system(size: 17, weight: .bold))
-                        CountingWon(target: store.monthlyTotal).font(.system(size: 30, weight: .heavy))
-                        if delta > 0 {
-                            (Text("저번달보다 ").foregroundColor(T.sub) + Text("+\(delta.won)").foregroundColor(T.red).bold() + Text(" 나왔어요").foregroundColor(T.sub)).font(.system(size: 15))
-                        } else {
-                            Text("1년이면 \(store.yearlyTotal.won)").font(.system(size: 15)).foregroundStyle(T.sub)
-                        }
-                        if store.budget > 0 {
-                            let used = min(1, store.monthlyTotal / Double(store.budget))
-                            AnimBar(value: used, tint: store.overBudget ? T.red : T.blue).padding(.top, 6)
-                            Text(store.overBudget ? "예산을 넘었어요" : "예산까지 \((Double(store.budget) - store.monthlyTotal).won) 남았어요").font(.system(size: 13)).foregroundStyle(T.sub)
-                        }
-                    }
-                    .padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .stagger(7)
 
                     if store.potentialSave > 0 {
                         HStack(spacing: 10) {

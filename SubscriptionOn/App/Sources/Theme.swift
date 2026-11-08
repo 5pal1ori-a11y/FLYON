@@ -2,6 +2,7 @@ import SwiftUI
 
 enum T {
     static let bg = Color(hex: 0xF2F4F6)
+    static let hero = LinearGradient(colors: [Color(hex: 0x3182F6), Color(hex: 0x5B6CF2)], startPoint: .topLeading, endPoint: .bottomTrailing)
     static let card = Color.white
     static let blue = Color(hex: 0x3182F6)
     static let blueSoft = Color(hex: 0xE8F3FF)
@@ -17,6 +18,7 @@ struct Card<Content: View>: View {
     var body: some View {
         content.padding(20).frame(maxWidth: .infinity, alignment: .leading)
             .background(T.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 14, y: 6)
     }
 }
 
@@ -103,11 +105,12 @@ struct CountingWon: View {
 struct AnimBar: View {
     let value: Double
     var tint: Color = T.blue
+    var track: Color = T.bg
     @State private var shown: Double = 0
     var body: some View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
-                Capsule().fill(T.bg)
+                Capsule().fill(track)
                 Capsule().fill(tint).frame(width: max(8, g.size.width * shown))
             }
         }
