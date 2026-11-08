@@ -65,6 +65,9 @@ struct Subscription: Identifiable, Codable, Hashable {
     var trialEnd: Date? = nil
     var payCount: Int = 0
     var history: [PricePoint] = []
+    var usage: [Date]? = nil          // 사용 체크 기록
+    var currency: String? = nil       // nil = 원화
+    var foreignAmount: Double? = nil  // 외화 결제 금액
 
     var monthly: Double { Double(price) * cycle.monthlyFactor }
     var yearly: Double { monthly * 12 }
@@ -81,6 +84,12 @@ struct Subscription: Identifiable, Codable, Hashable {
         case .monthly: return "매월 \(c.component(.day, from: nextDate))일"
         case .yearly: return "매년 \(c.component(.month, from: nextDate))월 \(c.component(.day, from: nextDate))일"
         }
+    }
+    var usesThisMonth: Int { (usage ?? []).filter { Calendar.current.isDate($0, equalTo: Date(), toGranularity: .month) }.count }
+    var costPerUse: Int? { let n = usesThisMonth; return n > 0 ? Int(monthly / Double(n)) : nil }
+    var trialDaysLeft: Int? {
+        guard let t = trialEnd, t >= Calendar.current.startOfDay(for: Date()) else { return nil }
+        return Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: t)).day
     }
     var totalPaid: Int { price * payCount }
     var service: Service? { Catalog.find(name) }

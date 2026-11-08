@@ -1,14 +1,24 @@
 import SwiftUI
 
+extension Color {
+    /// 라이트/다크에 따라 바뀌는 색
+    static func dyn(_ light: UInt32, _ dark: UInt32) -> Color {
+        func ui(_ h: UInt32) -> UIColor { UIColor(red: CGFloat((h >> 16) & 0xFF) / 255, green: CGFloat((h >> 8) & 0xFF) / 255, blue: CGFloat(h & 0xFF) / 255, alpha: 1) }
+        return Color(UIColor { $0.userInterfaceStyle == .dark ? ui(dark) : ui(light) })
+    }
+}
+
 enum T {
-    static let bg = Color(hex: 0xF2F4F6)
-    static let hero = LinearGradient(colors: [Color(hex: 0x3182F6), Color(hex: 0x5B6CF2)], startPoint: .topLeading, endPoint: .bottomTrailing)
-    static let card = Color.white
-    static let blue = Color(hex: 0x3182F6)
-    static let blueSoft = Color(hex: 0xE8F3FF)
-    static let text = Color(hex: 0x191F28)
-    static let sub = Color(hex: 0x6B7684)
-    static let faint = Color(hex: 0xB0B8C1)
+    static var accentHex: UInt32 { let v = UserDefaults.standard.integer(forKey: "accentHex"); return v == 0 ? 0x3182F6 : UInt32(v) }
+    static let accents: [(String, UInt32)] = [("파랑", 0x3182F6), ("보라", 0x7C5CFA), ("초록", 0x12B76A), ("주황", 0xF97316), ("핑크", 0xEC4899)]
+    static var blue: Color { Color(hex: accentHex) }
+    static var blueSoft: Color { Color(hex: accentHex).opacity(0.13) }
+    static var hero: LinearGradient { LinearGradient(colors: [Color(hex: accentHex), Color(hex: accentHex).opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing) }
+    static let bg = Color.dyn(0xF2F4F6, 0x0E1014)
+    static let card = Color.dyn(0xFFFFFF, 0x1C1F26)
+    static let text = Color.dyn(0x191F28, 0xF2F4F6)
+    static let sub = Color.dyn(0x6B7684, 0xA3ABB8)
+    static let faint = Color.dyn(0xB0B8C1, 0x5E6572)
     static let red = Color(hex: 0xF04452)
     static let green = Color(hex: 0x1FCB5D)
 }

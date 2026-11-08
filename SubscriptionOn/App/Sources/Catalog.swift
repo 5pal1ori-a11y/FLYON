@@ -10,6 +10,8 @@ struct Service: Hashable {
     let defaultPrice: Int
     /// 2026년 11월 기준 공개 자료로 확인한 요금이면 true
     var verified: Bool = false
+    /// 공개 자료로 확인한 연 결제 요금(월 결제 대비 절약 계산용)
+    var yearlyPrice: Int? = nil
     var assetName: String { "logo_" + name }
     /// 공식 가입 페이지(알려진 곳) 또는 "서비스명 가입" 검색
     var joinURL: URL? {
@@ -140,9 +142,9 @@ enum Catalog {
     static let all: [Service] = [
         Service(name: "넷플릭스", aliases: ["netflix", "넷플"], category: .ott, color: 0x141414, mark: "N", cancelURL: "https://www.netflix.com/cancelplan", defaultPrice: 13500, verified: true),
         Service(name: "유튜브 프리미엄", aliases: ["youtube", "유튜브", "youtube premium"], category: .ott, color: 0xFF0000, mark: "▶", cancelURL: "https://www.youtube.com/paid_memberships", defaultPrice: 14900, verified: true),
-        Service(name: "티빙", aliases: ["tving"], category: .ott, color: 0xFF153C, mark: "T", cancelURL: "https://www.tving.com/account", defaultPrice: 13500, verified: true),
-        Service(name: "웨이브", aliases: ["wavve", "웨에브"], category: .ott, color: 0x1351F9, mark: "W", cancelURL: "https://www.wavve.com/my", defaultPrice: 10900, verified: true),
-        Service(name: "디즈니 플러스", aliases: ["disney", "디즈니", "disney+"], category: .ott, color: 0x0B2A4A, mark: "D+", cancelURL: "https://www.disneyplus.com/account", defaultPrice: 9900, verified: true),
+        Service(name: "티빙", aliases: ["tving"], category: .ott, color: 0xFF153C, mark: "T", cancelURL: "https://www.tving.com/account", defaultPrice: 13500, verified: true, yearlyPrice: 135000),
+        Service(name: "웨이브", aliases: ["wavve", "웨에브"], category: .ott, color: 0x1351F9, mark: "W", cancelURL: "https://www.wavve.com/my", defaultPrice: 10900, verified: true, yearlyPrice: 109000),
+        Service(name: "디즈니 플러스", aliases: ["disney", "디즈니", "disney+"], category: .ott, color: 0x0B2A4A, mark: "D+", cancelURL: "https://www.disneyplus.com/account", defaultPrice: 9900, verified: true, yearlyPrice: 99000),
         Service(name: "쿠팡 와우", aliases: ["coupang", "쿠팡", "와우"], category: .membership, color: 0xE52528, mark: "C", cancelURL: "https://www.coupang.com/np/mypage", defaultPrice: 7890, verified: true),
         Service(name: "스포티파이", aliases: ["spotify"], category: .ott, color: 0x1DB954, mark: "S", cancelURL: "https://www.spotify.com/account/subscription", defaultPrice: 10900),
         Service(name: "멜론", aliases: ["melon"], category: .ott, color: 0x00CD3C, mark: "M", cancelURL: "https://www.melon.com", defaultPrice: 13200),
@@ -152,7 +154,7 @@ enum Catalog {
         Service(name: "Gemini", aliases: ["제미나이", "google one", "구글 원"], category: .ai, color: 0x4285F4, mark: "G", cancelURL: "https://one.google.com/settings", defaultPrice: 29000, verified: true),
         Service(name: "Creative Cloud", aliases: ["adobe", "어도비"], category: .etc, color: 0xFA0F00, mark: "Cc", cancelURL: "https://account.adobe.com/plans", defaultPrice: 78100),
         Service(name: "iCloud+", aliases: ["icloud", "아이클라우드"], category: .etc, color: 0x3693F5, mark: "☁︎", cancelURL: "https://support.apple.com/ko-kr/118428", defaultPrice: 1100),
-        Service(name: "네이버 플러스 멤버십", aliases: ["naver", "네이버"], category: .membership, color: 0x03C75A, mark: "N", cancelURL: "https://nid.naver.com", defaultPrice: 4900, verified: true),
+        Service(name: "네이버 플러스 멤버십", aliases: ["naver", "네이버"], category: .membership, color: 0x03C75A, mark: "N", cancelURL: "https://nid.naver.com", defaultPrice: 4900, verified: true, yearlyPrice: 46800),
         Service(name: "Nintendo Switch Online", aliases: ["닌텐도", "nintendo"], category: .game, color: 0xE60012, mark: "N", cancelURL: "https://accounts.nintendo.com", defaultPrice: 24000),
         Service(name: "PlayStation Plus", aliases: ["ps plus", "플스", "플레이스테이션"], category: .game, color: 0x003791, mark: "PS", cancelURL: "https://www.playstation.com/ko-kr/", defaultPrice: 9900),
         Service(name: "Xbox Game Pass", aliases: ["xbox", "게임패스"], category: .game, color: 0x107C10, mark: "X", cancelURL: "https://account.microsoft.com/services", defaultPrice: 13900),

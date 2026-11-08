@@ -3,7 +3,7 @@ import UserNotifications
 
 @MainActor
 final class Store: ObservableObject {
-    @Published var subs: [Subscription] = [] { didSet { save(); scheduleAll() } }
+    @Published var subs: [Subscription] = [] { didSet { save(); scheduleAll(); recordMonth() } }
     @AppStorage("userName") var userName = ""
     @AppStorage("budget") var budget = 0
     @AppStorage("saveGoal") var saveGoal = 0
@@ -11,12 +11,47 @@ final class Store: ObservableObject {
     @AppStorage("notifyHour") var notifyHour = 9
     @AppStorage("notifyOn") var notifyOn = true
     @AppStorage("faceLock") var faceLock = false
+    @AppStorage("monthHistory") private var historyRaw = "{}"
 
     private var url: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("subs.json") }
 
     init() {
         if let d = try? Data(contentsOf: url), let v = try? JSONDecoder().decode([Subscription].self, from: d) { subs = v }
         rollForward()
+        recordMonth()
+        scheduleAll()
+        Task { await refreshFX() }
+    }
+
+    // MARK: 월별 기록
+    private static func key(_ d: Date) -> String { let c = Calendar.current.dateComponents([.year, .month], from: d); return String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0) }
+    var history: [String: Int] {
+        guard let d = historyRaw.data(using: .utf8), let h = try? JSONDecoder().decode([String: Int].self, from: d) else { return [:] }
+        return h
+    }
+    func recordMonth() {
+        var h = history
+        h[Store.key(Date())] = Int(monthlyTotal.rounded())
+        if let d = try? JSONEncoder().encode(h), let s = String(data: d, encoding: .utf8), s != historyRaw { historyRaw = s }
+    }
+    /// 지난달 기록이 있으면 그 값
+    var prevMonthTotal: Int? {
+        guard let p = Calendar.current.date(byAdding: .month, value: -1, to: Date()) else { return nil }
+        return history[Store.key(p)]
+    }
+    var monthDelta: Int? { prevMonthTotal.map { Int(monthlyTotal.rounded()) - $0 } }
+
+    // MARK: 사용 체크 / 환율
+    func markUsed(_ s: Subscription) {
+        guard let i = subs.firstIndex(where: { $0.id == s.id }) else { return }
+        var u = subs[i].usage ?? []
+        u.append(Date())
+        subs[i].usage = u
+    }
+    func refreshFX() async {
+        guard subs.contains(where: { $0.currency != nil }) else { return }
+        await FX.refresh()
+        for i in subs.indices { if let c = subs[i].currency, let a = subs[i].foreignAmount { subs[i].price = FX.toKRW(a, c) } }
     }
     private func save() { try? JSONEncoder().encode(subs).write(to: url, options: .atomic) }
 
@@ -69,9 +104,14 @@ final class Store: ObservableObject {
             r.append(Insight(icon: "square.on.square", text: "\(cat.rawValue) \(list.count)개 쓰고 있어요. 하나만 남기면?", save: save))
         }
         for s in active { if let h = s.priceHike { r.append(Insight(icon: "arrow.up.right", text: "\(s.name) \(h.from.won) → \(h.to.won) 올랐어요", save: 0)) } }
-        for s in active where s.cycle == .monthly && s.price >= 5000 {
-            let save = Int(s.yearly * 0.15)
-            if s.category == .ai || s.category == .ott { r.append(Insight(icon: "calendar", text: "\(s.name) 연 결제가 있으면 확인해보세요", save: save)); break }
+        for s in active where s.cycle == .monthly {
+            if let y = s.service?.yearlyPrice, s.price * 12 > y {
+                r.append(Insight(icon: "calendar", text: "\(s.name) 연 결제로 바꾸면 1년에 \((s.price * 12 - y).won) 아껴요", save: s.price * 12 - y))
+            }
+        }
+        let day = Calendar.current.component(.day, from: Date())
+        for s in active where s.usage != nil && s.usesThisMonth == 0 && day >= 10 {
+            r.append(Insight(icon: "moon.zzz", text: "\(s.name) 이번 달 한 번도 안 썼어요", save: Int(s.monthly)))
         }
         for s in active { if let t = s.trialEnd, t > Date(), t.timeIntervalSinceNow < 3 * 86400 { r.append(Insight(icon: "clock", text: "\(s.name) 무료 체험이 곧 끝나요", save: s.price)) } }
         return r
@@ -111,6 +151,9 @@ final class Store: ObservableObject {
         let c = UNUserNotificationCenter.current()
         c.removeAllPendingNotificationRequests()
         guard notifyOn else { return }
+        let weekly = UNMutableNotificationContent()
+        weekly.title = "구독온"; weekly.body = "이번 주에 쓴 구독을 체크해볼까요?"; weekly.sound = .default
+        c.add(UNNotificationRequest(identifier: "weekly-use", content: weekly, trigger: UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: 20, weekday: 1), repeats: true)))
         for s in active {
             func add(_ date: Date, _ body: String, _ id: String) {
                 guard date > Date() else { return }
@@ -125,5 +168,11 @@ final class Store: ObservableObject {
             add(s.nextDate, "오늘 \(s.price.won) 결제돼요", "\(s.id)-d")
             if let t = s.trialEnd { add(Calendar.current.date(byAdding: .day, value: -1, to: t)!, "무료 체험이 내일 끝나요", "\(s.id)-t") }
         }
+    }
+
+    /// 알림이 실제로 오는지 5초 뒤 테스트
+    func sendTestNotification() {
+        let c = UNMutableNotificationContent(); c.title = "구독온"; c.body = "알림이 잘 와요 🎉"; c.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "test-\(UUID())", content: c, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)))
     }
 }

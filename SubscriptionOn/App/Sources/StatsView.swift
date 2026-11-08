@@ -47,6 +47,35 @@ struct StatsView: View {
                     }
                     Card {
                         VStack(alignment: .leading, spacing: 14) {
+                            SectionTitle(t: "이번 달 사용 횟수")
+                            ForEach(store.active.sorted { $0.usesThisMonth > $1.usesThisMonth }) { s in
+                                HStack(spacing: 12) {
+                                    LogoView(name: s.name, category: s.category, size: 32)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(s.name).font(.system(size: 15))
+                                        Text(s.usesThisMonth == 0 ? "아직 안 썼어요" : "한 번에 \((s.costPerUse ?? 0).won)").font(.system(size: 12)).foregroundStyle(s.usesThisMonth == 0 ? T.red : T.sub)
+                                    }
+                                    Spacer()
+                                    Text("\(s.usesThisMonth)번").font(.system(size: 15, weight: .semibold))
+                                }
+                            }
+                            Text("다른 앱을 열었는지는 알 수 없어서, 쓴 날 직접 눌러 기록해요").font(.system(size: 12)).foregroundStyle(T.faint)
+                        }
+                    }
+                    if store.history.count >= 1 {
+                        Card {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionTitle(t: "월별 지출 기록")
+                                let items = store.history.sorted { $0.key < $1.key }.suffix(6).map { ($0.key.suffix(2) + "월", Double($0.value)) }
+                                Chart(items, id: \.0) { m, v in
+                                    BarMark(x: .value("월", m), y: .value("금액", grow ? v : 0)).foregroundStyle(T.blue.gradient).cornerRadius(6)
+                                }.frame(height: 150).chartYAxis(.hidden).animation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.2), value: grow)
+                                Text("앱을 쓴 달부터 기록돼요").font(.system(size: 12)).foregroundStyle(T.faint)
+                            }
+                        }
+                    }
+                    Card {
+                        VStack(alignment: .leading, spacing: 14) {
                             SectionTitle(t: "서비스별")
                             ForEach(store.active.sorted { $0.monthly > $1.monthly }) { s in
                                 HStack { LogoView(name: s.name, category: s.category, size: 32); Text(s.name).font(.system(size: 15)); Spacer(); Text(s.monthly.won).font(.system(size: 15)).foregroundStyle(T.sub) }

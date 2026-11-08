@@ -60,8 +60,9 @@ struct HomeView: View {
     @State private var selected: Subscription?
     @State private var showAll = false
 
-    /// 이번 달에 새로 생긴 구독료만큼 지난달보다 늘어난 것으로 계산
+    /// 지난달 기록이 있으면 그 차이, 없으면 이번 달에 새로 생긴 구독료
     var delta: Int {
+        if let d = store.monthDelta { return d }
         let c = Calendar.current
         return Int(store.active.filter { c.isDate($0.startDate, equalTo: Date(), toGranularity: .month) }.reduce(0) { $0 + $1.monthly })
     }
@@ -81,7 +82,7 @@ struct HomeView: View {
                         Text("이번달 구독료").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
                         CountingWon(target: store.monthlyTotal).font(.system(size: 38, weight: .heavy)).foregroundStyle(.white)
                         Group {
-                            if delta > 0 { Text("저번달보다 +\(delta.won)") } else { Text("1년이면 \(store.yearlyTotal.won)") }
+                            if delta > 0 { Text("저번달보다 +\(delta.won)") } else if delta < 0 { Text("저번달보다 -\((-delta).won)") } else { Text("1년이면 \(store.yearlyTotal.won)") }
                         }
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 6).background(.white.opacity(0.2), in: Capsule())
@@ -99,6 +100,40 @@ struct HomeView: View {
                     .shadow(color: T.blue.opacity(0.35), radius: 22, y: 12)
                     .stagger(1)
 
+                    // 오늘 쓴 구독 체크 (월 사용 횟수)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("오늘 쓴 구독을 눌러주세요").font(.system(size: 15, weight: .bold))
+                            Spacer()
+                            Text("이번 달 사용 횟수").font(.system(size: 12)).foregroundStyle(T.faint)
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 14) {
+                                ForEach(store.active) { s in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { store.markUsed(s) }
+                                    } label: {
+                                        VStack(spacing: 6) {
+                                            ZStack(alignment: .topTrailing) {
+                                                LogoView(name: s.name, category: s.category, size: 48)
+                                                if s.usesThisMonth > 0 {
+                                                    Text("\(s.usesThisMonth)").font(.system(size: 11, weight: .heavy)).foregroundStyle(.white)
+                                                        .padding(.horizontal, 6).padding(.vertical, 2).background(T.blue, in: Capsule())
+                                                        .offset(x: 8, y: -6).transition(.scale)
+                                                }
+                                            }
+                                            Text(s.name).font(.system(size: 11)).foregroundStyle(T.sub).lineLimit(1).frame(width: 56)
+                                        }
+                                    }.buttonStyle(PressCard())
+                                }
+                            }.padding(.top, 4).padding(.horizontal, 4)
+                        }
+                    }
+                    .padding(18).background(T.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 14, y: 6)
+                    .stagger(2)
+
                     // 결제일이 가까운 서비스
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -112,7 +147,13 @@ struct HomeView: View {
                                 LogoView(name: s.name, category: s.category, size: 48)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(s.name).font(.system(size: 16)).foregroundStyle(T.text)
-                                    Text(s.price.won).font(.system(size: 17, weight: .semibold)).foregroundStyle(T.text)
+                                    HStack(spacing: 6) {
+                                        Text(s.price.won).font(.system(size: 17, weight: .semibold)).foregroundStyle(T.text)
+                                        if let d = s.trialDaysLeft {
+                                            Text("체험 \(d)일").font(.system(size: 11, weight: .bold)).foregroundStyle(.orange)
+                                                .padding(.horizontal, 7).padding(.vertical, 3).background(Color.orange.opacity(0.15), in: Capsule())
+                                        }
+                                    }
                                 }
                                 Spacer()
                                 DBadge(d: s.dDay)
@@ -127,7 +168,7 @@ struct HomeView: View {
                             }
                         }
                     }
-                    .padding(20).background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .padding(20).background(T.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                     .shadow(color: Color(hex: 0x1B2A4A).opacity(0.05), radius: 14, y: 6)
                     .animation(.spring(response: 0.45, dampingFraction: 0.85), value: showAll)
 
@@ -147,11 +188,19 @@ struct HomeView: View {
 
     var empty: some View {
         VStack(spacing: 14) {
-            Image("AppLogo").resizable().scaledToFit().frame(width: 120).luminanceToAlpha().floating()
+            AppLogoMark().frame(width: 120).floating()
             Text("어떤 구독을 쓰고 있나요?").font(.system(size: 20, weight: .bold))
             Text("+ 버튼으로 추가해보세요").font(.system(size: 15)).foregroundStyle(T.sub)
             BigButton(title: "구독 추가하기", action: onAdd).padding(.horizontal, 40).padding(.top, 10)
         }.frame(maxWidth: .infinity).padding(.top, 100)
+    }
+}
+
+struct AppLogoMark: View {
+    @Environment(\.colorScheme) var scheme
+    var body: some View {
+        let img = Image("AppLogo").resizable().scaledToFit().luminanceToAlpha()
+        if scheme == .dark { img.colorInvert() } else { img }
     }
 }
 

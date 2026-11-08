@@ -14,6 +14,8 @@ struct AddView: View {
     @State private var showAllServices = false
     @State private var aiBusy = false
     @State private var saved = false
+    @State private var showBulk = false
+    @State private var currency = "KRW"
     @State private var method: Method = .manual
     @State private var name = ""
     @State private var priceText = ""
@@ -54,10 +56,11 @@ struct AddView: View {
                 }
             }
             .onAppear { load() }
+            .sheet(isPresented: $showBulk) { BulkScanView().environmentObject(store) }
             .overlay {
                 if saved {
                     ZStack {
-                        Color.white.opacity(0.92).ignoresSafeArea()
+                        T.bg.opacity(0.92).ignoresSafeArea()
                         VStack(spacing: 14) {
                             Image(systemName: "checkmark.circle.fill").font(.system(size: 84)).foregroundStyle(T.green).symbolEffect(.bounce, value: saved)
                             Text(editing == nil ? "추가했어요" : "저장했어요").font(.system(size: 20, weight: .bold))
@@ -81,7 +84,7 @@ struct AddView: View {
                     Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(T.faint) }
                 }
             }
-            .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(16).background(T.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
             if q.isEmpty {
                 Text("많이 쓰는 서비스").font(.system(size: 14, weight: .semibold)).foregroundStyle(T.sub)
@@ -100,6 +103,7 @@ struct AddView: View {
                     quick("photo", "캡처로") { method = .photo; stage = .form }
                     quick("text.bubble", "문자·메일로") { method = .text; stage = .form }
                 }
+                quick("doc.text.magnifyingglass", "여러 장·카드 명세서로 한 번에") { showBulk = true }
                 Button { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showAllServices.toggle() } } label: {
                     HStack(spacing: 4) { Text(showAllServices ? "접기" : "전체 서비스 보기"); Image(systemName: showAllServices ? "chevron.up" : "chevron.down") }
                         .font(.system(size: 15)).foregroundStyle(T.sub).frame(maxWidth: .infinity)
@@ -223,13 +227,43 @@ struct AddView: View {
             }
             Card {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("한 번에 얼마예요?").font(.system(size: 14)).foregroundStyle(T.sub)
+                    HStack {
+                        Text("한 번에 얼마예요?").font(.system(size: 14)).foregroundStyle(T.sub)
+                        Spacer()
+                        Menu {
+                            ForEach(FX.currencies, id: \.self) { c in Button(c) { currency = c } }
+                        } label: {
+                            HStack(spacing: 4) { Text(currency); Image(systemName: "chevron.up.chevron.down").font(.system(size: 10)) }
+                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(T.blue)
+                                .padding(.horizontal, 10).padding(.vertical, 5).background(T.blueSoft, in: Capsule())
+                        }
+                    }
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        TextField("0", text: $priceText).keyboardType(.numberPad).font(.system(size: 34, weight: .heavy))
-                        Text("원").font(.system(size: 20, weight: .bold)).foregroundStyle(T.sub)
+                        TextField("0", text: $priceText).keyboardType(currency == "KRW" ? .numberPad : .decimalPad).font(.system(size: 34, weight: .heavy))
+                        Text(currency == "KRW" ? "원" : currency).font(.system(size: 20, weight: .bold)).foregroundStyle(T.sub)
+                    }
+                    if currency != "KRW", let d = Double(priceText), d > 0 {
+                        Text("≈ \(FX.toKRW(d, currency).won) (오늘 환율)").font(.system(size: 13)).foregroundStyle(T.sub)
                     }
                 }
             }
+            // 무료 체험
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(isOn: $trial.animation(.spring(response: 0.4, dampingFraction: 0.8))) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("무료 체험 중이에요").font(.system(size: 16, weight: .semibold))
+                            Text("끝나기 하루 전에 알려드려요").font(.system(size: 12)).foregroundStyle(T.sub)
+                        }
+                    }.tint(T.blue)
+                    if trial {
+                        DatePicker("체험 종료일", selection: $trialEnd, in: Date()..., displayedComponents: .date).environment(\.locale, Locale(identifier: "ko_KR"))
+                            .onChange(of: trialEnd) { _, d in nextDate = d }
+                        Text("이후 \(priceLabel) 결제돼요").font(.system(size: 13)).foregroundStyle(T.sub)
+                    }
+                }
+            }
+            .onChange(of: trial) { _, on in if on { nextDate = trialEnd } }
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("", selection: $cycle) { ForEach(Cycle.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
@@ -247,9 +281,6 @@ struct AddView: View {
                         Divider()
                         Stepper("인원 \(people)명", value: $people, in: 1...10)
                         Divider()
-                        Toggle("무료 체험 중이에요", isOn: $trial).tint(T.blue)
-                        if trial { DatePicker("체험 종료일", selection: $trialEnd, displayedComponents: .date).environment(\.locale, Locale(identifier: "ko_KR")) }
-                        Divider()
                         TextField("메모", text: $memo)
                     }.padding(.top, 6)
                 } label: { Text("더 적기").font(.system(size: 15, weight: .semibold)).foregroundStyle(T.sub) }
@@ -260,7 +291,8 @@ struct AddView: View {
         }.padding(20)
     }
 
-    var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && (Int(priceText) ?? 0) > 0 }
+    var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && (Double(priceText) ?? 0) > 0 }
+    var priceLabel: String { currency == "KRW" ? (Int(priceText) ?? 0).won : FX.label(Double(priceText) ?? 0, currency) }
 
     func field<C: View>(_ title: String, @ViewBuilder _ c: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -319,19 +351,24 @@ struct AddView: View {
     func autofill(_ v: String, force: Bool = false) {
         if editing != nil && !force { return }
         if !catTouched || force { category = Catalog.classify(v) }
-        if let s = Catalog.find(v), s.defaultPrice > 0, priceText.isEmpty || force { priceText = String(s.defaultPrice) }
+        if let s = Catalog.find(v), s.defaultPrice > 0, currency == "KRW", priceText.isEmpty || force { priceText = String(s.defaultPrice) }
     }
 
     func load() {
         guard let e = editing else { return }
-        name = e.name; priceText = String(e.price); category = e.category; catTouched = true; cycle = e.cycle
+        name = e.name
+        if let c = e.currency, let a = e.foreignAmount { currency = c; priceText = String(a) } else { priceText = String(e.price) }
+         category = e.category; catTouched = true; cycle = e.cycle
         nextDate = e.nextDate; pay = e.payMethod; people = e.people; memo = e.memo
         if let t = e.trialEnd { trial = true; trialEnd = t }
     }
 
     func save() {
         var s = editing ?? Subscription(name: "", price: 0, category: .etc, nextDate: nextDate)
-        s.name = name.trimmingCharacters(in: .whitespaces); s.price = Int(priceText) ?? 0; s.category = category
+        s.name = name.trimmingCharacters(in: .whitespaces); s.category = category
+        let amt = Double(priceText) ?? 0
+        if currency == "KRW" { s.currency = nil; s.foreignAmount = nil; s.price = Int(amt.rounded()) }
+        else { s.currency = currency; s.foreignAmount = amt; s.price = FX.toKRW(amt, currency) }
         s.cycle = cycle; s.nextDate = nextDate; s.payMethod = pay; s.people = people; s.memo = memo
         s.trialEnd = trial ? trialEnd : nil
         if editing == nil { store.add(s) } else { store.update(s) }

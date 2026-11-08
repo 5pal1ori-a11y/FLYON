@@ -20,13 +20,14 @@ struct DetailView: View {
                         if s.isActive, s.dDay <= 7 {
                             Text(s.dDay <= 0 ? "오늘 \(s.price.won) 결제돼요" : "\(s.dDay)일 후 \(s.price.won) 결제 예정이에요")
                                 .font(.system(size: 14)).padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                                .background(T.card, in: RoundedRectangle(cornerRadius: 16))
                         }
                         Card {
                             HStack {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(s.name).font(.system(size: 16)).foregroundStyle(T.sub)
                                     Text(s.price.won).font(.system(size: 28, weight: .heavy))
+                                    if let c = s.currency, let a = s.foreignAmount { Text("\(FX.label(a, c)) · 오늘 환율 기준").font(.system(size: 13)).foregroundStyle(T.sub) }
                                     Text("\(s.cycle.rawValue) · \(s.category.rawValue)").font(.system(size: 14)).foregroundStyle(T.sub)
                                 }
                                 Spacer()
@@ -48,6 +49,24 @@ struct DetailView: View {
                                 row("상태", s.status.rawValue)
                             }
                         }.stagger(1)
+                        Card {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("이번 달 사용").font(.system(size: 17, weight: .bold))
+                                    Spacer()
+                                    Text("\(s.usesThisMonth)번").font(.system(size: 17, weight: .heavy)).foregroundStyle(T.blue).contentTransition(.numericText())
+                                }
+                                if let c = s.costPerUse { Text("한 번 쓸 때 \(c.won)").font(.system(size: 14)).foregroundStyle(T.sub) }
+                                else { Text("아직 안 썼어요. 쓴 날 눌러서 기록해요").font(.system(size: 14)).foregroundStyle(T.sub) }
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { store.markUsed(s) }
+                                } label: {
+                                    Label("오늘 썼어요", systemImage: "checkmark.circle.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(T.blue)
+                                        .frame(maxWidth: .infinity).frame(height: 46).background(T.blueSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                }.buttonStyle(PressCard())
+                            }
+                        }.stagger(2)
                         if s.history.count > 1 {
                             Card {
                                 VStack(alignment: .leading, spacing: 12) {
@@ -72,7 +91,7 @@ struct DetailView: View {
                         Image(systemName: "trash").foregroundStyle(T.sub).frame(width: 56, height: 56).background(T.bg, in: RoundedRectangle(cornerRadius: 18))
                     }
                     BigButton(title: "해지하기", color: Color(hex: 0xFFD6D9), fg: T.red) { cancel() }
-                }.padding(12).background(.white, in: RoundedRectangle(cornerRadius: 28)).padding(.horizontal, 16)
+                }.padding(12).background(T.card, in: RoundedRectangle(cornerRadius: 28)).padding(.horizontal, 16)
             }
             .background(T.bg)
             .navigationBarTitleDisplayMode(.inline).navigationTitle("구독 정보")

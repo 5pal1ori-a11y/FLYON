@@ -5,20 +5,23 @@ import LocalAuthentication
 struct SubscriptionOnApp: App {
     @StateObject private var store = Store()
     @State private var splash = true
+    @AppStorage("themeMode") private var themeMode = 0
+    @AppStorage("accentHex") private var accentHex = 0
     @State private var locked = false
     @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if !splash { RootView().environmentObject(store).transition(.opacity) }
+                if !splash { RootView().environmentObject(store).id(accentHex).transition(.opacity) }
                 if locked { LockView { unlock() }.transition(.opacity) }
                 if splash {
                     SplashView { withAnimation(.easeInOut(duration: 0.4)) { splash = false }; if store.faceLock { locked = true; unlock() } }
                         .transition(.opacity).zIndex(1)
                 }
             }
-            .preferredColorScheme(.light)
+            .preferredColorScheme(themeMode == 1 ? .light : themeMode == 2 ? .dark : nil)
+            .tint(T.blue)
             .onChange(of: phase) { _, p in if p == .background, store.faceLock { locked = true } else if p == .active, locked, !splash { unlock() } }
             .onAppear { store.requestNotify() }
         }
@@ -62,8 +65,8 @@ struct SplashView: View {
                 }
                 .animation(.spring(response: 0.5, dampingFraction: 0.78), value: on)
                 HStack(spacing: 0) {
-                    Text("구독").foregroundStyle(on ? T.text : T.faint)
-                    Text("온").foregroundStyle(on ? T.green : T.faint)
+                    Text("구독").foregroundStyle(on ? Color(hex: 0x191F28) : Color(hex: 0xB0B8C1))
+                    Text("온").foregroundStyle(on ? T.green : Color(hex: 0xB0B8C1))
                 }
                 .font(.system(size: 34, weight: .heavy)).opacity(showText ? 1 : 0)
             }
