@@ -12,6 +12,8 @@ protocol PriceProvider {
     func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint]
     /// 선택일 앞뒤 며칠의 날짜별 최저가 (서버가 그 날짜들의 항공편도 함께 채운다)
     func range(origin: Airport, destination: Airport, date: Date, days: Int, airlines: Set<Airline>, cabin: Cabin) async throws -> [CalendarDay]
+    /// 그날 운항하는 모든 편 (가격 없음). 서버 설정이 없으면 PriceError.http(503)
+    func schedule(origin: Airport, destination: Airport, date: Date) async throws -> [Flight]
     /// 실시간 가격 (Duffel). 서버 설정이 없으면 PriceError.http(503)
     func liveFlights(origin: Airport, destination: Airport, date: Date, cabin: Cabin) async throws -> [Flight]
     /// 그 날짜의 특정 항공권(편명) 가격 기록
@@ -117,6 +119,18 @@ struct MockPriceProvider: PriceProvider {
             let d = cal.dateComponents([.day], from: date, to: $0.date).day ?? 99
             return abs(d) <= days && $0.date >= today
         }
+    }
+
+    func schedule(origin: Airport, destination: Airport, date: Date) async throws -> [Flight] {
+        let priced = try await flights(origin: origin, destination: destination, date: date, airlines: [], cabin: .economy)
+        let extra = priced.prefix(3).map { f in
+            Flight(airline: f.airline, flightNumber: f.flightNumber + "9", departureTime: "21:30",
+                   durationMinutes: f.durationMinutes, price: 0, transfers: 0)
+        }
+        return priced.filter { $0.transfers == 0 }.map {
+            Flight(airline: $0.airline, flightNumber: $0.flightNumber, departureTime: $0.departureTime,
+                   durationMinutes: $0.durationMinutes, price: 0, transfers: 0)
+        } + extra
     }
 
     func liveFlights(origin: Airport, destination: Airport, date: Date, cabin: Cabin) async throws -> [Flight] {
@@ -229,6 +243,29 @@ struct ServerPriceProvider: PriceProvider {
             "date": Self.dayParser.string(from: date), "days": "\(days)",
         ]))
         return res.days.compactMap { d in Self.dayParser.date(from: d.date).map { CalendarDay(date: $0, price: d.price) } }
+    }
+
+    private struct ScheduleResponse: Decodable {
+        struct Item: Decodable {
+            let airline: String
+            let flight_number: String
+            let departure_time: String?
+            let arrival_time: String?
+            let duration_min: Int?
+        }
+        let flights: [Item]
+    }
+
+    func schedule(origin: Airport, destination: Airport, date: Date) async throws -> [Flight] {
+        let url = baseURL.deletingLastPathComponent().appendingPathComponent("schedule")
+        let res: ScheduleResponse = try await get("", [
+            "origin": origin.code, "destination": destination.code, "date": Self.dayParser.string(from: date),
+        ], base: url)
+        return res.flights.map { f in
+            Flight(airline: Catalog.airlineOrUnknown(f.airline), flightNumber: f.flight_number,
+                   departureTime: f.departure_time, durationMinutes: f.duration_min,
+                   price: 0, transfers: 0, arrivalOverride: f.arrival_time)
+        }
     }
 
     private struct LiveResponse: Decodable {

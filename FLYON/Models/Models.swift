@@ -119,6 +119,17 @@ struct Flight: Identifiable, Hashable {
     var currency: String = "KRW"
     /// Duffel 실시간 조회 결과인지
     var isLive: Bool = false
+    /// 운항 스케줄에서 온 편 (가격 정보 없음이면 price == 0)
+    var arrivalOverride: String? = nil
+
+    var hasPrice: Bool { price > 0 }
+
+    /// 편명 비교용 키 (항공사 코드 + 숫자, 앞의 0 제거): "7C0113" -> "7C113"
+    var matchKey: String {
+        let digits = flightNumber.filter(\.isNumber)
+        let trimmed = String(digits.drop { $0 == "0" })
+        return airline.code + (trimmed.isEmpty ? digits : trimmed)
+    }
 
     /// 원화가 아니면 통화 코드와 함께 표시
     var priceText: String {
@@ -134,6 +145,7 @@ struct Flight: Identifiable, Hashable {
 
     /// 도착 시각 (출발 시각 + 소요시간, 현지 시간대 차이는 반영하지 않음)
     var arrivalTime: (text: String, nextDay: Bool)? {
+        if let arrivalOverride, let dep = departureTime { return (arrivalOverride, arrivalOverride < dep) }
         guard let dep = departureTime, let m = durationMinutes else { return nil }
         let parts = dep.split(separator: ":").compactMap { Int($0) }
         guard parts.count == 2 else { return nil }

@@ -38,6 +38,8 @@ struct ResultView: View {
     @State private var liveLoading = false
     @State private var liveMessage: String?
     @State private var liveURL: URL?
+    /// 그날 운항하는 모든 직항편 (스케줄, 가격 없음)
+    @State private var scheduled: [Flight] = []
 
     init(search: RouteSearch) {
         self.search = search
@@ -56,10 +58,23 @@ struct ResultView: View {
         selectedDate.flatMap { d in (rangeDays + calendar).first { cal.isDate($0.date, inSameDayAs: d) } }
     }
 
+    /// 가격 데이터 + 스케줄을 합친 목록. 가격이 없는 편은 price == 0
+    private var mergedFlights: [Flight] {
+        let priced = liveMode ? liveFlights : flights
+        let pricedKeys = Set(priced.map(\.matchKey))
+        let extra = scheduled.filter { !pricedKeys.contains($0.matchKey) }
+        return priced + extra
+    }
+
     private var visibleFlights: [Flight] {
-        (liveMode ? liveFlights : flights)
+        mergedFlights
             .filter { (!directOnly || $0.transfers == 0) && (!excludeLowCost || !$0.airline.isLowCost) }
-            .sorted { $0.price < $1.price }
+            .sorted { a, b in
+                // 가격 있는 편을 싼 순으로 먼저, 가격 없는 편은 출발 시각 순으로 뒤에
+                if a.hasPrice != b.hasPrice { return a.hasPrice }
+                if a.hasPrice { return a.price < b.price }
+                return (a.departureTime ?? "") < (b.departureTime ?? "")
+            }
     }
 
     private var recentHistory: [PricePoint] {
@@ -355,7 +370,7 @@ struct ResultView: View {
                 Button("다시") { Task { await loadFlights() } }.font(.app(14, .semibold))
             }
             .card()
-        } else if flights.isEmpty, let day = selectedDay {
+        } else if visibleFlights.isEmpty, let day = selectedDay {
             HStack(spacing: 14) {
                 Image(systemName: "airplane")
                     .font(.system(size: 16, weight: .semibold))
@@ -378,7 +393,7 @@ struct ResultView: View {
                 .padding(.vertical, 28)
                 .card()
         } else {
-            let lowest = visibleFlights.first?.price
+            let lowest = visibleFlights.filter(\.hasPrice).first?.price
             let direct = visibleFlights.filter { $0.transfers == 0 }
             let connecting = visibleFlights.filter { $0.transfers > 0 }
             VStack(alignment: .leading, spacing: 10) {
@@ -407,7 +422,13 @@ struct ResultView: View {
     }
 
     private func flightButton(_ flight: Flight, isCheapest: Bool, index: Int) -> some View {
-        Button { detailFlight = flight } label: {
+        Button {
+            if flight.hasPrice {
+                detailFlight = flight
+            } else if let date = selectedDate {
+                liveURL = LivePriceLink.url(origin: search.origin, destination: search.destination, date: date)
+            }
+        } label: {
             FlightCard(flight: flight, isCheapest: isCheapest)
         }
         .buttonStyle(PressableStyle())
@@ -655,6 +676,8 @@ struct ResultView: View {
         }
         flightsLoading = true
         flightsFailed = false
+        async let schedulePoints = try? appState.provider.schedule(
+            origin: search.origin, destination: search.destination, date: date)
         async let dayPoints = try? appState.provider.dayHistory(
             origin: search.origin, destination: search.destination, date: date, airlines: search.airlines, cabin: search.cabin)
         do {
@@ -666,6 +689,9 @@ struct ResultView: View {
             // 항공편 상세가 없어도 그날 최저가가 있으면 실패로 보이지 않게 한다
             flightsFailed = selectedDay == nil
         }
+        let schedule = await schedulePoints ?? []
+        withAnimation(.easeOut(duration: 0.25)) { scheduled = schedule }
+        if !schedule.isEmpty { flightsFailed = false }
         let points = await dayPoints ?? []
         withAnimation(.easeOut(duration: 0.25)) { dayHistory = points }
         flightsLoading = false
@@ -725,10 +751,16 @@ private struct FlightCard: View {
             Spacer(minLength: 6)
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text(flight.priceText)
-                    .font(.app(17, .bold))
-                    .foregroundStyle(isCheapest ? Theme.accent : .primary)
-                if isCheapest { Pill(text: "최저가", color: Theme.cheap) }
+                if flight.hasPrice {
+                    Text(flight.priceText)
+                        .font(.app(17, .bold))
+                        .foregroundStyle(isCheapest ? Theme.accent : .primary)
+                } else {
+                    Label("가격 확인", systemImage: "bolt.fill")
+                        .font(.app(13, .semibold))
+                        .foregroundStyle(Theme.mid)
+                }
+                if isCheapest && flight.hasPrice { Pill(text: "최저가", color: Theme.cheap) }
                 else if flight.isLive { Pill(text: "실시간", systemImage: "bolt.fill", color: Theme.mid) }
             }
         }
