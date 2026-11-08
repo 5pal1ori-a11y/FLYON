@@ -26,10 +26,13 @@ Deno.serve(async (req) => {
     if (!TOKEN.test(token)) return bad("invalid token");
     const { data, error } = await supabase.rpc("alert_current_prices", { p_device_token: token });
     if (error) return Response.json({ error: "server error" }, { status: 500 });
+    const { data: extra } = await supabase.from("alerts").select("id,flight_number").eq("device_token", token);
+    const flightById = new Map((extra ?? []).map((r: { id: string; flight_number: string | null }) => [r.id, r.flight_number]));
+    for (const a of data ?? []) (a as Record<string, unknown>).flight_number = flightById.get((a as { id: string }).id) ?? null;
     return Response.json({
       alerts: (data ?? []).map((a: Record<string, unknown>) => ({
         id: a.id, origin: a.origin, destination: a.destination,
-        depart_date: a.depart_date, depart_month: a.depart_month, airlines: a.airlines,
+        depart_date: a.depart_date, depart_month: a.depart_month, airlines: a.airlines, flight_number: a.flight_number ?? null,
         cabin: a.cabin, target_price: a.target_price, baseline_price: a.baseline_price,
         active: a.active, current_price: a.current_price, found_date: a.found_date,
       })),
@@ -46,6 +49,8 @@ Deno.serve(async (req) => {
     const target = Number(b.target_price);
     const departDate = b.depart_date ? String(b.depart_date) : null;
     const departMonth = b.depart_month ? String(b.depart_month) : null;
+    const flightNumber = b.flight_number ? String(b.flight_number) : null;
+    if (flightNumber && !/^[A-Z0-9]{1,8}$/i.test(flightNumber)) return bad("invalid flight");
     const airlines = Array.isArray(b.airlines) && b.airlines.length > 0 ? (b.airlines as unknown[]).map(String) : null;
 
     if (!TOKEN.test(token)) return bad("invalid token");
@@ -62,7 +67,7 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabase.from("alerts").insert({
       device_token: token, origin, destination, depart_date: departDate, depart_month: departMonth,
-      airlines, cabin, target_price: target,
+      airlines, cabin, target_price: target, flight_number: flightNumber,
       baseline_price: Number.isInteger(Number(b.baseline_price)) ? Number(b.baseline_price) : null,
     }).select("id").single();
     if (error) return Response.json({ error: "server error" }, { status: 500 });

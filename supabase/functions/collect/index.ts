@@ -66,7 +66,14 @@ Deno.serve(async (req) => {
     jobs.push({ origin: r.origin, destination: r.destination, cabin: 2 });
   }
 
+  // 가격 알림이 걸린 출발일은 그 날짜로 따로 조회해서 같은 날짜 가격 변동을 놓치지 않는다
+  const { data: alertDates } = await supabase.rpc("alert_dates");
+  for (const d of alertDates ?? []) {
+    if (d.cabin === 0) jobs.push({ origin: d.origin, destination: d.destination, cabin: 0, month: String(d.depart_date) });
+  }
+
   let inserted = 0, failed = 0, empty = 0;
+  const errorSamples: string[] = [];
 
   async function worker() {
     while (jobs.length > 0) {
@@ -90,6 +97,7 @@ Deno.serve(async (req) => {
         inserted += rows.length;
       } catch (e) {
         failed++;
+        if (errorSamples.length < 5) errorSamples.push(`${job.origin}-${job.destination} c${job.cabin} ${job.month ?? "latest"}: ${(e as Error).message}`);
         console.error(`${job.origin}-${job.destination} c${job.cabin} ${job.month ?? ""}:`, (e as Error).message);
       }
       await new Promise((r) => setTimeout(r, 250));
@@ -99,5 +107,5 @@ Deno.serve(async (req) => {
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   const alerts = await notifyAlerts();
 
-  return Response.json({ routes: routes?.length ?? 0, inserted, empty, failed, alerts });
+  return Response.json({ routes: routes?.length ?? 0, inserted, empty, failed, errorSamples, alerts });
 });

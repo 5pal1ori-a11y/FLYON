@@ -11,9 +11,20 @@ export function monthString(offset: number): string {
 
 type Item = Record<string, unknown>;
 
-/** 일반석: 월 단위 항공편 (출발 시각·항공사 포함) */
+/** 한국 시장 데이터를 먼저 쓰고, 없으면 기본 시장 데이터를 쓴다.
+ *  (기본 시장은 다른 나라 검색 기준이라 한국에서 보는 가격과 차이가 날 수 있다) */
+const PREFERRED_MARKET = "kr";
+
+/** 일반석: 월(YYYY-MM) 또는 날짜(YYYY-MM-DD) 단위 항공편 (출발 시각·항공사 포함) */
 export async function fetchMonth(origin: string, destination: string, month: string, token: string): Promise<Item[]> {
+  const local = await fetchMonthMarket(origin, destination, month, token, PREFERRED_MARKET).catch(() => []);
+  if (local.length > 0) return local;
+  return fetchMonthMarket(origin, destination, month, token, null);
+}
+
+async function fetchMonthMarket(origin: string, destination: string, month: string, token: string, market: string | null): Promise<Item[]> {
   const url = new URL("https://api.travelpayouts.com/aviasales/v3/prices_for_dates");
+  if (market) url.searchParams.set("market", market);
   url.searchParams.set("origin", origin);
   url.searchParams.set("destination", destination);
   url.searchParams.set("departure_at", month);
@@ -31,7 +42,14 @@ export async function fetchMonth(origin: string, destination: string, month: str
 /** 최근 발견된 가격 기록 (일반석 0, 비즈니스 1, 일등석 2). 항공사·시각 정보는 없지만
  *  found_at(발견 시각)이 있어 지난 며칠의 가격 이력을 채우는 데 쓴다. */
 export async function fetchLatestByClass(origin: string, destination: string, tripClass: number, token: string): Promise<Item[]> {
+  const local = await fetchLatestMarket(origin, destination, tripClass, token, PREFERRED_MARKET).catch(() => []);
+  if (local.length > 0) return local;
+  return fetchLatestMarket(origin, destination, tripClass, token, null);
+}
+
+async function fetchLatestMarket(origin: string, destination: string, tripClass: number, token: string, market: string | null): Promise<Item[]> {
   const url = new URL("https://api.travelpayouts.com/v2/prices/latest");
+  if (market) url.searchParams.set("market", market);
   url.searchParams.set("origin", origin);
   url.searchParams.set("destination", destination);
   url.searchParams.set("currency", "krw");

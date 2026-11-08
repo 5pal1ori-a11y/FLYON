@@ -7,6 +7,7 @@ struct PriceAlert: Identifiable, Hashable, Decodable {
     let departDate: String?
     let departMonth: String?
     let airlines: [String]?
+    let flightNumber: String?
     let cabin: Int
     let targetPrice: Int
     let baselinePrice: Int?
@@ -26,6 +27,9 @@ struct PriceAlert: Identifiable, Hashable, Decodable {
 
     var airlineText: String {
         guard let airlines, !airlines.isEmpty else { return "전체 항공사" }
+        if let flightNumber, !flightNumber.isEmpty, airlines.count == 1 {
+            return "\(Catalog.airlineOrUnknown(airlines[0]).name) \(flightNumber)"
+        }
         let names = airlines.map { Catalog.airlineOrUnknown($0).name }
         return names.count == 1 ? names[0] : "\(names[0]) 외 \(names.count - 1)곳"
     }
@@ -38,6 +42,7 @@ struct NewAlert: Encodable {
     let departDate: String?
     let departMonth: String?
     let airlines: [String]?
+    let flightNumber: String?
     let cabin: Int
     let targetPrice: Int
     let baselinePrice: Int?

@@ -30,6 +30,7 @@ struct ResultView: View {
     @State private var showCalendar = false
     @State private var showAlertSheet = false
     @State private var chartReveal: CGFloat = 0
+    @State private var detailFlight: Flight?
 
     init(search: RouteSearch) {
         self.search = search
@@ -134,6 +135,11 @@ struct ResultView: View {
         .sheet(isPresented: $showCalendar) { calendarSheet }
         .sheet(isPresented: $showAlertSheet) {
             CreateAlertView(search: search, selectedDate: selectedDate, month: month, currentPrice: currentLowest)
+        }
+        .sheet(item: $detailFlight) { flight in
+            if let date = selectedDate {
+                FlightDetailView(search: search, date: date, flight: flight)
+            }
         }
         .task { await load() }
     }
@@ -313,13 +319,39 @@ struct ResultView: View {
                 .card()
         } else {
             let lowest = visibleFlights.first?.price
-            VStack(spacing: 10) {
-                ForEach(Array(visibleFlights.enumerated()), id: \.element.id) { index, flight in
-                    FlightCard(flight: flight, isCheapest: flight.price == lowest)
-                        .appear(delay: Double(index) * 0.04)
+            let direct = visibleFlights.filter { $0.transfers == 0 }
+            let connecting = visibleFlights.filter { $0.transfers > 0 }
+            VStack(alignment: .leading, spacing: 10) {
+                if !direct.isEmpty {
+                    sectionLabel("직항", count: direct.count)
+                    ForEach(Array(direct.enumerated()), id: \.element.id) { index, flight in
+                        flightButton(flight, isCheapest: flight.price == lowest, index: index)
+                    }
+                }
+                if !connecting.isEmpty {
+                    sectionLabel("경유", count: connecting.count)
+                        .padding(.top, direct.isEmpty ? 0 : 12)
+                    ForEach(Array(connecting.enumerated()), id: \.element.id) { index, flight in
+                        flightButton(flight, isCheapest: flight.price == lowest, index: direct.count + index)
+                    }
                 }
             }
         }
+    }
+
+    private func sectionLabel(_ title: String, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Text(title).font(.app(15, .bold))
+            Text("\(count)").font(.app(13, .semibold)).foregroundStyle(.secondary)
+        }
+    }
+
+    private func flightButton(_ flight: Flight, isCheapest: Bool, index: Int) -> some View {
+        Button { detailFlight = flight } label: {
+            FlightCard(flight: flight, isCheapest: isCheapest)
+        }
+        .buttonStyle(PressableStyle())
+        .appear(delay: Double(index) * 0.04)
     }
 
     // MARK: 가격 흐름

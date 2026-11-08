@@ -4,10 +4,11 @@
 //   GET /prices/quotes?origin=ICN&destination=CJU&month=2026-12[&airlines=KE][&cabin=0]
 //   GET /prices/flights?origin=ICN&destination=CJU&date=2026-12-05[&airlines=KE][&cabin=0]
 //   GET /prices/deals?origin=ICN[&cabin=0]
+//   GET /prices/flight?origin=ICN&destination=CJU&date=2026-12-05&airline=KE&flight_number=1201[&cabin=0]  항공권 하나의 가격 기록
 //   GET /prices/day?origin=ICN&destination=CJU&date=2026-12-05[&airlines=KE][&cabin=0]  선택한 출발일의 가격 변화
 // cabin: 0 일반석, 1 비즈니스, 2 일등석
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { fetchRoute, SNAPSHOT_CONFLICT } from "../_shared/travelpayouts.ts";
+import { fetchMonth, fetchRoute, SNAPSHOT_CONFLICT, toRows } from "../_shared/travelpayouts.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -47,6 +48,24 @@ async function ensureData(origin: string, destination: string, cabin: number) {
     }
   } catch (e) {
     console.error("ensureData", origin, destination, cabin, (e as Error).message);
+  }
+}
+
+/** 특정 출발일의 항공편을 그 날짜로 직접 조회해 채운다 (월 단위 조회보다 항공사가 많이 나온다).
+ *  오늘 이미 그 날짜를 조회했으면 다시 하지 않는다. */
+async function ensureDay(origin: string, destination: string, date: string) {
+  const token = Deno.env.get("TRAVELPAYOUTS_TOKEN");
+  if (!token) return;
+  const { data: claimed } = await supabase.rpc("try_claim_route_fetch", {
+    p_origin: origin, p_destination: destination, p_cooldown_minutes: 180,
+    p_cabin: 1000 + Number(date.replaceAll("-", "").slice(2)) % 30000, // 날짜별 쿨다운 키
+  });
+  if (!claimed) return;
+  try {
+    const rows = toRows(origin, destination, await fetchMonth(origin, destination, date, token));
+    if (rows.length > 0) await supabase.from("price_snapshots").upsert(rows, { onConflict: SNAPSHOT_CONFLICT });
+  } catch (e) {
+    console.error("ensureDay", origin, destination, date, (e as Error).message);
   }
 }
 
@@ -106,10 +125,27 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (path.endsWith("/flight")) {
+    const date = url.searchParams.get("date") ?? "";
+    const airline = (url.searchParams.get("airline") ?? "").toUpperCase();
+    const flightNumber = url.searchParams.get("flight_number") ?? "";
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(date)) return bad("invalid date");
+    if (!AIRLINE.test(airline) || !/^[A-Z0-9]{0,8}$/i.test(flightNumber)) return bad("invalid flight");
+    const { data, error } = await supabase.rpc("get_flight_history", {
+      p_origin: origin, p_destination: destination, p_date: date,
+      p_airline: airline, p_flight_number: flightNumber, p_cabin: cabin,
+    });
+    if (error) return fail();
+    return Response.json({
+      points: (data ?? []).map((r: { day: string; price: number }) => ({ date: r.day, price: r.price })),
+    });
+  }
+
   if (path.endsWith("/flights")) {
     const date = url.searchParams.get("date") ?? "";
     if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(date)) return bad("invalid date");
     await ensureData(origin, destination, cabin);
+    if (cabin === 0) await ensureDay(origin, destination, date);
     const { data, error } = await supabase.rpc("get_price_flights", { ...base, p_date: date });
     if (error) return fail();
     return Response.json({

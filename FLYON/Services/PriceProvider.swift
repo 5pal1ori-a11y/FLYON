@@ -10,6 +10,8 @@ protocol PriceProvider {
     func deals(origin: Airport, cabin: Cabin) async throws -> [Deal]
     /// 선택한 출발일 하루의 수집일별 가격
     func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint]
+    /// 그 날짜의 특정 항공권(편명) 가격 기록
+    func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint]
 }
 
 enum PriceError: LocalizedError {
@@ -101,6 +103,12 @@ struct MockPriceProvider: PriceProvider {
         return points.map { PricePoint(date: $0.date, price: $0.price + shift * 1_000) }
     }
 
+    func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint] {
+        let points = try await history(origin: origin, destination: destination, days: 10, airlines: [], cabin: cabin)
+        guard let last = points.last else { return [] }
+        return points.map { PricePoint(date: $0.date, price: flight.price + ($0.price - last.price)) }
+    }
+
     private static func basePrice(_ a: Airport, _ b: Airport, seed: Int, cabin: Cabin) -> Int {
         let multiplier: Double = cabin == .economy ? 1 : (cabin == .business ? 3.2 : 6)
         let base = (a.isDomestic && b.isDomestic) ? 55_000 + (seed % 40) * 1_000 : 150_000 + (seed % 450) * 1_000
@@ -189,6 +197,15 @@ struct ServerPriceProvider: PriceProvider {
 
     func dayHistory(origin: Airport, destination: Airport, date: Date, airlines: Set<Airline>, cabin: Cabin) async throws -> [PricePoint] {
         let res: HistoryResponse = try await get("day", query(origin, destination, airlines, cabin, ["date": Self.dayParser.string(from: date)]))
+        return res.points.compactMap { p in Self.dayParser.date(from: p.date).map { PricePoint(date: $0, price: p.price) } }
+    }
+
+    func flightHistory(origin: Airport, destination: Airport, date: Date, flight: Flight, cabin: Cabin) async throws -> [PricePoint] {
+        let res: HistoryResponse = try await get("flight", [
+            "origin": origin.code, "destination": destination.code, "cabin": "\(cabin.rawValue)",
+            "date": Self.dayParser.string(from: date), "airline": flight.airline.code,
+            "flight_number": flight.flightNumber.filter { $0.isLetter || $0.isNumber },
+        ])
         return res.points.compactMap { p in Self.dayParser.date(from: p.date).map { PricePoint(date: $0, price: p.price) } }
     }
 
