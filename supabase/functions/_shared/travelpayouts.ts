@@ -60,7 +60,19 @@ async function fetchLatestMarket(origin: string, destination: string, tripClass:
   url.searchParams.set("limit", "100");
   url.searchParams.set("trip_class", String(tripClass));
   url.searchParams.set("token", token);
-  const res = await fetch(url);
+  let res = await fetch(url);
+  if (res.status === 400 && tripClass > 0) {
+    // 비즈니스·일등석은 일부 조건 조합을 받지 않아 최소 조건으로 다시 묻는다
+    const simple = new URL("https://api.travelpayouts.com/v2/prices/latest");
+    simple.searchParams.set("origin", origin);
+    simple.searchParams.set("destination", destination);
+    simple.searchParams.set("currency", "krw");
+    simple.searchParams.set("trip_class", String(tripClass));
+    simple.searchParams.set("limit", "100");
+    simple.searchParams.set("token", token);
+    if (market) simple.searchParams.set("market", market);
+    res = await fetch(simple);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = await res.json();
   return (body?.data ?? []) as Item[];
