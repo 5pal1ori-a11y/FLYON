@@ -1,19 +1,66 @@
 import Foundation
 import SwiftUI
 
-struct Airport: Identifiable, Hashable, Codable {
-    let code: String      // IATA
-    let city: String
-    let name: String
-    let country: String
+private let koLocale = Locale(identifier: "ko_KR")
+
+struct Airport: Identifiable, Hashable {
+    let code: String        // IATA
+    let name: String        // 공항명(영문)
+    let city: String        // 화면 표시용 도시명 (한글 우선)
+    let englishCity: String
+    let countryCode: String
+    let country: String     // 한글 국가명
+    let searchKey: String
+
     var id: String { code }
-    var isDomestic: Bool { country == "대한민국" }
+    var isDomestic: Bool { countryCode == "KR" }
+
+    init(code: String, name: String, englishCity: String, countryCode: String) {
+        // "Paris (Roissy-en-France)", "Honolulu, Oahu" 처럼 지저분한 영문 도시명을 정리
+        let cleaned = englishCity
+            .components(separatedBy: " (")[0]
+            .components(separatedBy: ",")[0]
+            .trimmingCharacters(in: .whitespaces)
+        let ko = KoreanNames.city[code]
+        self.code = code
+        self.name = name
+        self.englishCity = cleaned
+        self.city = ko ?? cleaned
+        self.countryCode = countryCode
+        self.country = koLocale.localizedString(forRegionCode: countryCode) ?? countryCode
+        self.searchKey = [code, name, cleaned, ko ?? "", self.country, KoreanNames.aliases[code] ?? ""]
+            .joined(separator: " ")
+            .lowercased()
+    }
+
+    static func == (lhs: Airport, rhs: Airport) -> Bool { lhs.code == rhs.code }
+    func hash(into hasher: inout Hasher) { hasher.combine(code) }
 }
 
-struct Airline: Identifiable, Hashable, Codable {
-    let code: String      // IATA
+struct Airline: Identifiable, Hashable {
+    let code: String
     let name: String
+    let englishName: String
+    let isKorean: Bool
+    let searchKey: String
+
     var id: String { code }
+
+    init(code: String, name: String, englishName: String) {
+        self.code = code
+        self.name = name
+        self.englishName = englishName
+        self.isKorean = AirlineData.koreanCodes.contains(code)
+        self.searchKey = [code, name, englishName].joined(separator: " ").lowercased()
+    }
+
+    /// 목록에 없는 항공사는 코드 그대로 보여 준다
+    static func unknown(_ code: String) -> Airline {
+        Airline(code: code, name: code.isEmpty ? "항공사 미상" : code, englishName: code)
+    }
+
+    static func == (lhs: Airline, rhs: Airline) -> Bool { lhs.code == rhs.code }
+    func hash(into hasher: inout Hasher) { hasher.combine(code) }
 }
 
 struct FavoriteRoute: Identifiable, Hashable, Codable {
@@ -46,15 +93,22 @@ struct PricePoint: Identifiable, Hashable {
     let price: Int
 }
 
+struct CalendarDay: Identifiable, Hashable {
+    let date: Date
+    let price: Int
+    var id: Date { date }
+}
+
 struct PriceAnalysis {
     enum Verdict {
-        case cheap, normal, expensive
+        case cheap, normal, expensive, collecting
 
         var title: String {
             switch self {
             case .cheap: return "평소보다 저렴해요"
             case .normal: return "평소 수준이에요"
             case .expensive: return "평소보다 비싸요"
+            case .collecting: return "가격 이력을 모으는 중"
             }
         }
         var symbol: String {
@@ -62,30 +116,39 @@ struct PriceAnalysis {
             case .cheap: return "arrow.down.right"
             case .normal: return "equal"
             case .expensive: return "arrow.up.right"
+            case .collecting: return "hourglass"
             }
         }
         var color: Color {
             switch self {
             case .cheap: return Theme.cheap
-            case .normal: return Theme.normal
+            case .normal: return Theme.mid
             case .expensive: return Theme.expensive
+            case .collecting: return Theme.normal
             }
         }
     }
+
+    /// 판정에 필요한 최소 데이터 일수
+    static let minimumSamples = 7
 
     let current: Int
     let average: Int
     let lowest: Int
     let highest: Int
+    let sampleCount: Int
+    let lastDate: Date
 
     init?(history: [PricePoint]) {
-        let prices = history.map(\.price)
-        guard let last = history.sorted(by: { $0.date < $1.date }).last,
-              let lo = prices.min(), let hi = prices.max(), !prices.isEmpty else { return nil }
+        let sorted = history.sorted { $0.date < $1.date }
+        guard let last = sorted.last else { return nil }
+        let prices = sorted.map(\.price)
         current = last.price
-        lowest = lo
-        highest = hi
+        lastDate = last.date
+        lowest = prices.min() ?? last.price
+        highest = prices.max() ?? last.price
         average = prices.reduce(0, +) / prices.count
+        sampleCount = prices.count
     }
 
     /// 평균 대비 현재가 편차 (-0.09 = 9% 저렴)
@@ -94,63 +157,82 @@ struct PriceAnalysis {
     }
 
     var verdict: Verdict {
+        if sampleCount < Self.minimumSamples { return .collecting }
         if deviation <= -0.07 { return .cheap }
         if deviation >= 0.07 { return .expensive }
         return .normal
     }
 
     var deviationText: String {
+        if verdict == .collecting { return "\(sampleCount)일치 데이터" }
         let pct = Int((abs(deviation) * 100).rounded())
         if pct == 0 { return "평균과 비슷" }
-        return deviation < 0 ? "평균 대비 \(pct)% 낮음" : "평균 대비 \(pct)% 높음"
+        return deviation < 0 ? "평균보다 \(pct)% 낮음" : "평균보다 \(pct)% 높음"
     }
 }
 
 // MARK: - Catalog
 
 enum Catalog {
-    static let airports: [Airport] = [
-        Airport(code: "ICN", city: "인천", name: "인천국제공항", country: "대한민국"),
-        Airport(code: "GMP", city: "서울(김포)", name: "김포국제공항", country: "대한민국"),
-        Airport(code: "CJU", city: "제주", name: "제주국제공항", country: "대한민국"),
-        Airport(code: "PUS", city: "부산", name: "김해국제공항", country: "대한민국"),
-        Airport(code: "TAE", city: "대구", name: "대구국제공항", country: "대한민국"),
-        Airport(code: "CJJ", city: "청주", name: "청주국제공항", country: "대한민국"),
-        Airport(code: "KWJ", city: "광주", name: "광주공항", country: "대한민국"),
-        Airport(code: "NRT", city: "도쿄(나리타)", name: "나리타국제공항", country: "일본"),
-        Airport(code: "HND", city: "도쿄(하네다)", name: "하네다공항", country: "일본"),
-        Airport(code: "KIX", city: "오사카", name: "간사이국제공항", country: "일본"),
-        Airport(code: "FUK", city: "후쿠오카", name: "후쿠오카공항", country: "일본"),
-        Airport(code: "CTS", city: "삿포로", name: "신치토세공항", country: "일본"),
-        Airport(code: "BKK", city: "방콕", name: "수완나품공항", country: "태국"),
-        Airport(code: "SGN", city: "호치민", name: "탄손낫국제공항", country: "베트남"),
-        Airport(code: "DAD", city: "다낭", name: "다낭국제공항", country: "베트남"),
-        Airport(code: "TPE", city: "타이베이", name: "타오위안국제공항", country: "대만"),
-        Airport(code: "HKG", city: "홍콩", name: "홍콩국제공항", country: "홍콩"),
-        Airport(code: "SIN", city: "싱가포르", name: "창이공항", country: "싱가포르"),
-        Airport(code: "GUM", city: "괌", name: "안토니오 B. 원 팻 공항", country: "미국"),
-        Airport(code: "LAX", city: "로스앤젤레스", name: "로스앤젤레스국제공항", country: "미국"),
-        Airport(code: "JFK", city: "뉴욕", name: "존 F. 케네디국제공항", country: "미국"),
-        Airport(code: "CDG", city: "파리", name: "샤를 드 골 공항", country: "프랑스"),
-        Airport(code: "LHR", city: "런던", name: "히스로공항", country: "영국"),
+    static let airports: [Airport] = loadAirports()
+    static let airlines: [Airline] = AirlineData.raw.map { Airline(code: $0.code, name: $0.ko, englishName: $0.en) }
+
+    private static let airportsByCode: [String: Airport] =
+        Dictionary(airports.map { ($0.code, $0) }, uniquingKeysWith: { first, _ in first })
+    private static let airlinesByCode: [String: Airline] =
+        Dictionary(airlines.map { ($0.code, $0) }, uniquingKeysWith: { first, _ in first })
+
+    static func airport(_ code: String) -> Airport? { airportsByCode[code] }
+    static func airline(_ code: String) -> Airline? { airlinesByCode[code] }
+    static func airlineOrUnknown(_ code: String) -> Airline { airlinesByCode[code] ?? .unknown(code) }
+
+    static let popularAirportCodes = [
+        "ICN", "GMP", "CJU", "PUS", "NRT", "HND", "KIX", "FUK", "CTS", "OKA", "BKK", "DAD", "SGN", "HAN",
+        "TPE", "HKG", "SIN", "MNL", "CEB", "GUM", "HNL", "LAX", "JFK", "SFO", "CDG", "LHR", "FCO", "BCN",
     ]
+    static var popularAirports: [Airport] { popularAirportCodes.compactMap(airport) }
+    static var domesticAirports: [Airport] { airports.filter(\.isDomestic) }
 
-    static let airlines: [Airline] = [
-        Airline(code: "KE", name: "대한항공"),
-        Airline(code: "OZ", name: "아시아나항공"),
-        Airline(code: "7C", name: "제주항공"),
-        Airline(code: "LJ", name: "진에어"),
-        Airline(code: "TW", name: "티웨이항공"),
-        Airline(code: "BX", name: "에어부산"),
-        Airline(code: "RS", name: "에어서울"),
-        Airline(code: "ZE", name: "이스타항공"),
-    ]
-
-    static func airport(_ code: String) -> Airport? { airports.first { $0.code == code } }
-    static func airline(_ code: String) -> Airline? { airlines.first { $0.code == code } }
-
+    /// 서버가 수집하는 기본 노선 (인기 노선 타일)
     static let popularRoutes: [(String, String)] = [
         ("ICN", "CJU"), ("GMP", "CJU"), ("PUS", "CJU"),
-        ("ICN", "NRT"), ("ICN", "KIX"), ("ICN", "BKK"),
+        ("ICN", "NRT"), ("ICN", "KIX"), ("ICN", "FUK"),
+        ("ICN", "BKK"), ("ICN", "DAD"), ("ICN", "TPE"),
     ]
+
+    /// 코드, 한글/영문 도시명, 공항명, 국가로 검색. 코드 일치와 이름 앞부분 일치를 위로 올린다.
+    static func searchAirports(_ query: String, excluding: Airport? = nil, limit: Int = 80) -> [Airport] {
+        let tokens = query.lowercased().split(separator: " ").map(String.init).filter { !$0.isEmpty }
+        guard !tokens.isEmpty else { return [] }
+        let q = tokens.joined(separator: " ")
+
+        func rank(_ a: Airport) -> Int {
+            if a.code.lowercased() == q { return 0 }
+            if a.city.lowercased().hasPrefix(q) || a.englishCity.lowercased().hasPrefix(q) { return 1 }
+            if a.code.lowercased().hasPrefix(q) { return 2 }
+            return 3
+        }
+
+        return airports
+            .filter { a in a != excluding && tokens.allSatisfy { a.searchKey.contains($0) } }
+            .sorted { (rank($0), $0.city) < (rank($1), $1.city) }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private static func loadAirports() -> [Airport] {
+        guard let url = Bundle.main.url(forResource: "airports", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let rows = try? JSONDecoder().decode([[String]].self, from: data) else {
+            return [
+                Airport(code: "ICN", name: "Incheon International Airport", englishCity: "Incheon", countryCode: "KR"),
+                Airport(code: "GMP", name: "Gimpo International Airport", englishCity: "Seoul", countryCode: "KR"),
+                Airport(code: "CJU", name: "Jeju International Airport", englishCity: "Jeju", countryCode: "KR"),
+            ]
+        }
+        return rows.compactMap { r in
+            guard r.count >= 4 else { return nil }
+            return Airport(code: r[0], name: r[1], englishCity: r[2], countryCode: r[3])
+        }
+    }
 }

@@ -3,64 +3,66 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(AuthManager.self) private var auth
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ZStack {
+            Theme.headerGradient.ignoresSafeArea()
 
-            Image("LogoMark")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 84, height: 84)
-                .foregroundStyle(.primary)
+            VStack(spacing: 0) {
+                Spacer()
 
-            Text("FLYON")
-                .font(.system(size: 34, weight: .heavy, design: .rounded))
-                .tracking(4)
-                .padding(.top, 16)
+                Image("LogoMark")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 88, height: 88)
+                    .foregroundStyle(.white)
 
-            Text("항공권 가격의 흐름을 읽어 드려요")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.top, 6)
+                Text("FLYON")
+                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .tracking(5)
+                    .foregroundStyle(.white)
+                    .padding(.top, 18)
 
-            Spacer()
+                Text("항공권 가격의 흐름을 읽어 드려요")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.75))
+                    .padding(.top, 6)
 
-            VStack(spacing: 12) {
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.fullName, .email]
-                } onCompletion: { result in
-                    auth.handle(result)
-                }
-                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                .frame(height: 54)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Spacer()
 
-                if let message = auth.errorMessage {
-                    Label(message, systemImage: "exclamationmark.circle")
+                VStack(spacing: 12) {
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        auth.handle(result)
+                    }
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 54)
+                    .clipShape(Capsule())
+
+                    if let message = auth.errorMessage {
+                        Label(message, systemImage: "exclamationmark.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.yellow)
+                    }
+
+                    #if DEBUG
+                    Button("개발용 둘러보기") { auth.signInForDebug() }
                         .font(.footnote)
-                        .foregroundStyle(Theme.expensive)
+                        .foregroundStyle(.white.opacity(0.7))
+                    #endif
+
+                    Text("계속하면 이용약관과 개인정보처리방침에 동의한 것으로 봅니다.")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
                 }
-
-                #if DEBUG
-                Button("개발용 둘러보기") { auth.signInForDebug() }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                #endif
-
-                Text("계속하면 이용약관과 개인정보처리방침에 동의한 것으로 봅니다.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 4)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 28)
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 28)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.screenBackground.ignoresSafeArea())
     }
 }
 

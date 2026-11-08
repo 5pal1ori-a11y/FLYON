@@ -17,10 +17,11 @@ struct PricingView: View {
         var id: Int { self == .origin ? 0 : 1 }
     }
 
+    /// 서버가 수집하는 기간(이번 달부터 3개월)에 맞춘다
     static let months: [Date] = {
         let cal = Calendar.current
         let start = cal.date(from: cal.dateComponents([.year, .month], from: .now)) ?? .now
-        return (0..<12).compactMap { cal.date(byAdding: .month, value: $0, to: start) }
+        return (0..<3).compactMap { cal.date(byAdding: .month, value: $0, to: start) }
     }()
 
     private var canSearch: Bool {
@@ -31,17 +32,18 @@ struct PricingView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("어디로 갈까요?")
-                        .font(.largeTitle.bold())
-                        .padding(.top, 8)
-
-                    searchCard
-                    searchButton
-                    popularRoutes
+                VStack(spacing: 0) {
+                    header
+                    VStack(alignment: .leading, spacing: 24) {
+                        searchCard
+                        searchButton
+                        popularRoutes
+                        footer
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, -34)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
             .background(Theme.screenBackground)
             .toolbar(.hidden, for: .navigationBar)
@@ -64,19 +66,39 @@ struct PricingView: View {
         .onAppear { consume(appState.pendingRoute) }
     }
 
+    // MARK: Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("어디로 갈까요?")
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text("출발지와 도착지를 고르면 가격 흐름을 분석해 드려요")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.75))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 64)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Theme.headerGradient
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 28, bottomTrailingRadius: 28))
+                .ignoresSafeArea(edges: .top)
+        )
+    }
+
     // MARK: Search card
 
     private var searchCard: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .trailing) {
                 VStack(spacing: 0) {
-                    FieldRow(icon: "airplane.departure", label: "출발",
-                             value: origin.map { "\($0.city) (\($0.code))" }, placeholder: "출발지 선택") {
+                    AirportRow(label: "출발", icon: "airplane.departure", airport: origin, placeholder: "출발지 선택") {
                         pickerTarget = .origin
                     }
-                    Divider().padding(.leading, 44)
-                    FieldRow(icon: "airplane.arrival", label: "도착",
-                             value: destination.map { "\($0.city) (\($0.code))" }, placeholder: "도착지 선택") {
+                    Divider().padding(.leading, 16)
+                    AirportRow(label: "도착", icon: "airplane.arrival", airport: destination, placeholder: "도착지 선택") {
                         pickerTarget = .destination
                     }
                 }
@@ -84,46 +106,42 @@ struct PricingView: View {
                     swap(&origin, &destination)
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(Theme.accent)
-                        .frame(width: 38, height: 38)
-                        .background(Theme.cardBackground, in: Circle())
+                        .frame(width: 40, height: 40)
+                        .background(Color(.systemBackground), in: Circle())
                         .overlay(Circle().stroke(Color(.separator), lineWidth: 0.5))
+                        .shadow(color: .black.opacity(0.06), radius: 4, y: 1)
                 }
                 .accessibilityLabel("출발지와 도착지 바꾸기")
-                .padding(.trailing, 4)
+                .padding(.trailing, 14)
             }
 
-            Divider().padding(.leading, 44)
+            Divider()
 
-            HStack(spacing: 14) {
-                Image(systemName: "calendar")
-                    .frame(width: 30)
-                    .foregroundStyle(Theme.accent)
-                Text("출발 월").font(.footnote).foregroundStyle(.secondary)
-                Spacer()
-                Picker("출발 월", selection: $month) {
-                    ForEach(Self.months, id: \.self) { Text($0.monthTitle).tag($0) }
+            HStack(spacing: 0) {
+                Menu {
+                    ForEach(Self.months, id: \.self) { m in
+                        Button(m.monthTitle) { month = m }
+                    }
+                } label: {
+                    OptionCell(label: "출발 월", icon: "calendar", value: month.monthTitle)
                 }
-                .pickerStyle(.menu)
-                .tint(.primary)
-            }
-            .padding(.vertical, 6)
-
-            Divider().padding(.leading, 44)
-
-            FieldRow(icon: "airplane.circle", label: "항공사",
-                     value: airlineSummary, placeholder: "전체") {
-                showAirlinePicker = true
+                Divider().frame(height: 52)
+                Button {
+                    showAirlinePicker = true
+                } label: {
+                    OptionCell(label: "항공사", icon: "airplane.circle", value: airlineSummary)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
         .background(Theme.cardBackground, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 14, y: 6)
     }
 
-    private var airlineSummary: String? {
-        guard !airlines.isEmpty else { return nil }
+    private var airlineSummary: String {
+        guard !airlines.isEmpty else { return "전체" }
         let names = airlines.map(\.name).sorted()
         return names.count == 1 ? names[0] : "\(names[0]) 외 \(names.count - 1)곳"
     }
@@ -134,39 +152,49 @@ struct PricingView: View {
             appState.addRecent(origin: origin, destination: destination)
             result = RouteSearch(origin: origin, destination: destination, month: month, airlines: airlines)
         } label: {
-            Label("가격 분석하기", systemImage: "chart.xyaxis.line")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+            HStack(spacing: 8) {
+                Image(systemName: "chart.xyaxis.line")
+                Text("가격 분석하기")
+            }
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(canSearch ? Theme.accent : Color.gray.opacity(0.4), in: Capsule())
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Theme.accent)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .disabled(!canSearch)
     }
 
+    // MARK: Popular
+
     private var popularRoutes: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionTitle("인기 노선", systemImage: "flame")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(Catalog.popularRoutes.enumerated()), id: \.offset) { _, pair in
-                        if let o = Catalog.airport(pair.0), let d = Catalog.airport(pair.1) {
-                            Button {
-                                origin = o
-                                destination = d
-                            } label: {
-                                Text("\(o.city) – \(d.city)")
-                                    .font(.subheadline)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 9)
-                                    .background(Theme.cardBackground, in: Capsule())
-                                    .foregroundStyle(.primary)
-                            }
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "인기 노선")
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ForEach(Array(Catalog.popularRoutes.enumerated()), id: \.offset) { index, pair in
+                    if let o = Catalog.airport(pair.0), let d = Catalog.airport(pair.1) {
+                        Button {
+                            origin = o
+                            destination = d
+                            appState.addRecent(origin: o, destination: d)
+                            result = RouteSearch(origin: o, destination: d, month: month, airlines: airlines)
+                        } label: {
+                            RouteTile(origin: o, destination: d, index: index)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
+        }
+    }
+
+    private var footer: some View {
+        Label {
+            Text("전 세계 \(Catalog.airports.count.formatted())개 공항, \(Catalog.airlines.count)개 항공사를 고를 수 있어요. 노선에 따라 가격 데이터가 없을 수 있고, 처음 조회하는 노선은 불러오는 데 몇 초 걸려요.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        } icon: {
+            Image(systemName: "globe.asia.australia").foregroundStyle(.secondary)
         }
     }
 
@@ -179,10 +207,12 @@ struct PricingView: View {
     }
 }
 
-private struct FieldRow: View {
-    let icon: String
+// MARK: - Rows
+
+private struct AirportRow: View {
     let label: String
-    let value: String?
+    let icon: String
+    let airport: Airport?
     let placeholder: String
     let action: () -> Void
 
@@ -190,20 +220,61 @@ private struct FieldRow: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .frame(width: 30)
+                    .font(.title3)
                     .foregroundStyle(Theme.accent)
-                VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 3) {
                     Text(label).font(.caption).foregroundStyle(.secondary)
-                    Text(value ?? placeholder)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(value == nil ? .secondary : .primary)
+                    if let airport {
+                        HStack(spacing: 8) {
+                            Text(airport.city)
+                                .font(.system(.title3, design: .rounded).weight(.bold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            IATABadge(code: airport.code)
+                        }
+                        Text("\(airport.name) · \(airport.country)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text(placeholder)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-                Spacer()
+                Spacer(minLength: 56)
             }
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct OptionCell: View {
+    let label: String
+    let icon: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
@@ -217,35 +288,31 @@ struct AirportPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
 
-    private var filtered: [Airport] {
-        let base = Catalog.airports.filter { $0 != excluded }
-        let q = query.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return base }
-        return base.filter {
-            $0.city.localizedCaseInsensitiveContains(q) ||
-            $0.name.localizedCaseInsensitiveContains(q) ||
-            $0.code.localizedCaseInsensitiveContains(q) ||
-            $0.country.localizedCaseInsensitiveContains(q)
-        }
-    }
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
         NavigationStack {
             List {
-                let domestic = filtered.filter(\.isDomestic)
-                let overseas = filtered.filter { !$0.isDomestic }
-
-                if !domestic.isEmpty {
-                    Section("국내") { rows(domestic) }
-                }
-                if !overseas.isEmpty {
-                    Section("해외") { rows(overseas) }
-                }
-                if filtered.isEmpty {
-                    ContentUnavailableView.search(text: query)
+                if trimmed.isEmpty {
+                    Section("인기 도시") { rows(Catalog.popularAirports.filter { $0 != excluded }) }
+                    Section("국내 공항") { rows(Catalog.domesticAirports.filter { $0 != excluded }) }
+                    Section {
+                        Text("그 밖의 \(Catalog.airports.count.formatted())개 공항은 도시명, 공항명, 코드로 검색하세요.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    let results = Catalog.searchAirports(trimmed, excluding: excluded)
+                    if results.isEmpty {
+                        ContentUnavailableView.search(text: trimmed)
+                    } else {
+                        Section("검색 결과 \(results.count)") { rows(results) }
+                    }
                 }
             }
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "도시, 공항, 코드 검색")
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "도시, 공항, 코드 (예: 도쿄, NRT)")
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -262,17 +329,16 @@ struct AirportPickerView: View {
                 onSelect(airport)
                 dismiss()
             } label: {
-                HStack {
+                HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(airport.city).foregroundStyle(.primary)
                         Text("\(airport.name) · \(airport.country)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     Spacer()
-                    Text(airport.code)
-                        .font(.subheadline.monospaced())
-                        .foregroundStyle(.secondary)
+                    IATABadge(code: airport.code)
                 }
             }
         }
@@ -284,48 +350,78 @@ struct AirportPickerView: View {
 struct AirlinePickerView: View {
     @Binding var selection: Set<Airline>
     @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces).lowercased() }
+
+    private var filtered: [Airline] {
+        guard !trimmed.isEmpty else { return Catalog.airlines }
+        return Catalog.airlines.filter { $0.searchKey.contains(trimmed) }
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Button {
-                        selection = []
-                    } label: {
-                        row("전체 항공사", checked: selection.isEmpty)
-                    }
-                }
-                Section {
-                    ForEach(Catalog.airlines) { airline in
-                        Button {
-                            if selection.contains(airline) { selection.remove(airline) } else { selection.insert(airline) }
-                        } label: {
-                            row(airline.name, checked: selection.contains(airline))
+                if trimmed.isEmpty {
+                    Section {
+                        Button { selection = [] } label: {
+                            row(code: nil, title: "전체 항공사", subtitle: "\(Catalog.airlines.count)개", checked: selection.isEmpty)
                         }
                     }
-                } footer: {
-                    Text("항공사별 가격은 데이터 제공 범위에 따라 일부 항공사만 표시될 수 있어요.")
                 }
+                let korean = filtered.filter(\.isKorean)
+                let foreign = filtered.filter { !$0.isKorean }.sorted { $0.name < $1.name }
+                if !korean.isEmpty { Section("국내 항공사") { airlineRows(korean) } }
+                if !foreign.isEmpty { Section("해외 항공사") { airlineRows(foreign) } }
+                if filtered.isEmpty { ContentUnavailableView.search(text: query) }
             }
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "항공사 이름 또는 코드")
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .navigationTitle("항공사 선택")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("초기화") { selection = [] }
+                        .disabled(selection.isEmpty)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("완료") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
-    private func row(_ title: String, checked: Bool) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.primary)
+    private func airlineRows(_ airlines: [Airline]) -> some View {
+        ForEach(airlines) { airline in
+            Button {
+                if selection.contains(airline) { selection.remove(airline) } else { selection.insert(airline) }
+            } label: {
+                row(code: airline.code, title: airline.name, subtitle: airline.englishName, checked: selection.contains(airline))
+            }
+        }
+    }
+
+    private func row(code: String?, title: String, subtitle: String, checked: Bool) -> some View {
+        HStack(spacing: 12) {
+            if let code {
+                AirlineBadge(code: code, size: 34)
+            } else {
+                Image(systemName: "airplane")
+                    .frame(width: 34, height: 34)
+                    .background(Theme.accentSoft, in: Circle())
+                    .foregroundStyle(Theme.accent)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(.primary)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
             Spacer()
             if checked {
-                Image(systemName: "checkmark")
+                Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(Theme.accent)
-                    .fontWeight(.semibold)
             }
         }
     }

@@ -6,51 +6,86 @@ struct ResultView: View {
 
     @Environment(AppState.self) private var appState
 
-    private enum Phase {
-        case loading
-        case loaded(analysis: PriceAnalysis, history: [PricePoint], quotes: [PriceQuote])
-        case failed
+    private struct Loaded {
+        var history: [PricePoint]
+        var calendar: [CalendarDay]
+        var quotes: [PriceQuote]
+    }
+
+    private enum Phase { case loading, loaded, failed }
+    private enum RangeOption: Int, CaseIterable, Identifiable {
+        case week = 7, month = 30, quarter = 90
+        var id: Int { rawValue }
+        var title: String {
+            switch self {
+            case .week: return "7일"
+            case .month: return "30일"
+            case .quarter: return "90일"
+            }
+        }
     }
 
     @State private var phase: Phase = .loading
+    @State private var data = Loaded(history: [], calendar: [], quotes: [])
+    @State private var range: RangeOption = .month
+    @State private var month: Date
+    @State private var monthLoading = false
+    @State private var showAllQuotes = false
+
+    init(search: RouteSearch) {
+        self.search = search
+        _month = State(initialValue: search.month)
+    }
 
     private var route: FavoriteRoute {
         FavoriteRoute(originCode: search.origin.code, destinationCode: search.destination.code)
     }
 
+    private var rangeHistory: [PricePoint] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -(range.rawValue - 1), to: Calendar.current.startOfDay(for: .now)) ?? .distantPast
+        return data.history.filter { $0.date >= cutoff }
+    }
+
+    private var analysis: PriceAnalysis? { PriceAnalysis(history: rangeHistory) }
+
+    private var hasAnyData: Bool {
+        !(data.history.isEmpty && data.calendar.isEmpty && data.quotes.isEmpty)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                header
-
                 switch phase {
                 case .loading:
-                    ProgressView("가격을 불러오는 중")
-                        .frame(maxWidth: .infinity, minHeight: 240)
+                    hero(placeholder: true)
+                    ProgressView("가격을 불러오는 중이에요")
+                        .frame(maxWidth: .infinity, minHeight: 200)
                 case .failed:
+                    hero(placeholder: true)
                     ContentUnavailableView {
                         Label("가격을 불러오지 못했어요", systemImage: "wifi.exclamationmark")
                     } description: {
                         Text("네트워크 상태를 확인하고 다시 시도해 주세요.")
                     } actions: {
                         Button("다시 시도") { Task { await load() } }
+                            .buttonStyle(.borderedProminent)
                     }
-                case let .loaded(analysis, history, quotes):
-                    summaryCard(analysis)
-                    chartCard(analysis, history)
-                    if quotes.isEmpty {
-                        Text("선택한 조건에 맞는 항공사 가격이 없어요.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                case .loaded:
+                    if hasAnyData {
+                        hero(placeholder: false)
+                        rangePicker
+                        chartCard
+                        calendarCard
+                        quotesCard
                     } else {
-                        quotesCard(quotes)
+                        hero(placeholder: true)
+                        emptyState
                     }
                 }
-
                 disclaimer
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 24)
+            .padding(.bottom, 32)
         }
         .background(Theme.screenBackground)
         .navigationTitle("\(search.origin.city) → \(search.destination.city)")
@@ -69,89 +104,126 @@ struct ResultView: View {
         .task { await load() }
     }
 
-    // MARK: Pieces
+    // MARK: Hero
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Label(search.month.monthTitle, systemImage: "calendar")
-            if !search.airlines.isEmpty {
-                Label("\(search.airlines.count)개 항공사", systemImage: "airplane.circle")
+    private func hero(placeholder: Bool) -> some View {
+        let price = analysis?.current ?? data.quotes.first?.price ?? data.calendar.map(\.price).min()
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                IATABadge(code: search.origin.code, onDark: true)
+                Image(systemName: "airplane").font(.caption).foregroundStyle(.white.opacity(0.8))
+                IATABadge(code: search.destination.code, onDark: true)
+                Spacer()
+                if appState.provider.isSample {
+                    Pill(text: "샘플 데이터", systemImage: "testtube.2", color: .orange)
+                }
             }
-            Spacer()
-            if appState.provider.isSample {
-                Label("샘플 데이터", systemImage: "testtube.2")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.orange.opacity(0.18), in: Capsule())
-                    .foregroundStyle(.orange)
-            }
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-    }
 
-    private func summaryCard(_ a: PriceAnalysis) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("현재 참고 가격").font(.footnote).foregroundStyle(.secondary)
-            Text(a.current.won).font(.system(size: 38, weight: .bold, design: .rounded))
-            HStack(spacing: 10) {
-                Label(a.verdict.title, systemImage: a.verdict.symbol)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(a.verdict.color)
-                Text(a.deviationText)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(analysis.map { "\($0.lastDate.dayTitle) 기준 최저가" } ?? "현재 참고 최저가")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.7))
+                if let price, !placeholder {
+                    Text(price.won)
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                } else {
+                    Text("––––")
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+            }
+
+            if let a = analysis, !placeholder {
+                HStack(spacing: 10) {
+                    Pill(text: a.verdict.title, systemImage: a.verdict.symbol, color: a.verdict.color == Theme.mid ? .yellow : a.verdict.color)
+                    Text(a.deviationText)
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.75))
+                }
             }
         }
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
+        .background(Theme.headerGradient, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    private func chartCard(_ a: PriceAnalysis, _ history: [PricePoint]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("최근 30일 가격 흐름", systemImage: "chart.xyaxis.line")
+    private var rangePicker: some View {
+        Picker("기간", selection: $range) {
+            ForEach(RangeOption.allCases) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+    }
 
-            Chart {
-                ForEach(history) { p in
-                    AreaMark(x: .value("날짜", p.date), y: .value("가격", p.price))
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(LinearGradient(
-                            colors: [Theme.accent.opacity(0.25), Theme.accent.opacity(0)],
-                            startPoint: .top, endPoint: .bottom))
-                    LineMark(x: .value("날짜", p.date), y: .value("가격", p.price))
-                        .interpolationMethod(.catmullRom)
+    // MARK: Chart
+
+    private var chartCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader(title: "가격 흐름", subtitle: "수집일별 최저가")
+
+            if let a = analysis, rangeHistory.count >= 2 {
+                Chart {
+                    ForEach(rangeHistory) { p in
+                        AreaMark(x: .value("날짜", p.date), y: .value("가격", p.price))
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(LinearGradient(
+                                colors: [Theme.accent.opacity(0.28), Theme.accent.opacity(0)],
+                                startPoint: .top, endPoint: .bottom))
+                        LineMark(x: .value("날짜", p.date), y: .value("가격", p.price))
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    RuleMark(y: .value("평균", a.average))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .foregroundStyle(.secondary)
+                        .annotation(position: .top, alignment: .trailing) {
+                            Text("평균 \(a.average.shortWon)").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    if let low = rangeHistory.min(by: { $0.price < $1.price }) {
+                        PointMark(x: .value("날짜", low.date), y: .value("가격", low.price))
+                            .foregroundStyle(Theme.cheap)
+                            .symbolSize(70)
+                    }
+                    if let last = rangeHistory.max(by: { $0.date < $1.date }) {
+                        PointMark(x: .value("날짜", last.date), y: .value("가격", last.price))
+                            .foregroundStyle(Theme.accent)
+                            .symbolSize(90)
+                    }
+                }
+                .chartYScale(domain: .automatic(includesZero: false))
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let v = value.as(Int.self) { Text(v.shortWon) }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                        AxisValueLabel(format: .dateTime.month().day())
+                    }
+                }
+                .frame(height: 200)
+
+                HStack {
+                    stat("최저", a.lowest.won, Theme.cheap)
+                    Divider().frame(height: 30)
+                    stat("평균", a.average.won, .primary)
+                    Divider().frame(height: 30)
+                    stat("최고", a.highest.won, Theme.expensive)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "hourglass")
+                        .font(.title2)
                         .foregroundStyle(Theme.accent)
+                    Text("이 노선의 가격 이력을 모으기 시작했어요. 며칠 지나면 가격 흐름 그래프가 나타나요.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                RuleMark(y: .value("평균", a.average))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(.secondary)
-                    .annotation(position: .top, alignment: .trailing) {
-                        Text("평균").font(.caption2).foregroundStyle(.secondary)
-                    }
-            }
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let v = value.as(Int.self) { Text(v.shortWon) }
-                    }
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-                    AxisValueLabel(format: .dateTime.month().day())
-                }
-            }
-            .frame(height: 200)
-
-            HStack {
-                stat("최저", a.lowest.won, Theme.cheap)
-                Divider().frame(height: 28)
-                stat("평균", a.average.won, .primary)
-                Divider().frame(height: 28)
-                stat("최고", a.highest.won, Theme.expensive)
+                .padding(.vertical, 8)
             }
         }
         .card()
@@ -160,37 +232,137 @@ struct ResultView: View {
     private func stat(_ title: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 2) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(color)
+            Text(value).font(.subheadline.weight(.bold)).foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func quotesCard(_ quotes: [PriceQuote]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            SectionTitle("항공사별 최저가", systemImage: "airplane")
-                .padding(.bottom, 8)
-            ForEach(Array(quotes.enumerated()), id: \.element.id) { index, q in
-                HStack(spacing: 12) {
-                    Image(systemName: "airplane")
-                        .font(.footnote)
-                        .foregroundStyle(index == 0 ? Theme.accent : .secondary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(q.airline.name).font(.subheadline.weight(.medium))
-                        Text("\(q.departureDate.dayTitle) · \(q.transfers == 0 ? "직항" : "경유 \(q.transfers)회")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(q.price.won)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(index == 0 ? Theme.accent : .primary)
+    // MARK: Calendar
+
+    private var canGoBack: Bool { month > (PricingView.months.first ?? month) }
+    private var canGoForward: Bool { month < (PricingView.months.last ?? month) }
+
+    private var calendarCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                SectionHeader(title: "출발일별 최저가", subtitle: "싼 날을 한눈에 확인해요")
+                Spacer()
+                HStack(spacing: 4) {
+                    Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
+                        .disabled(!canGoBack || monthLoading)
+                    Text(month.monthTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minWidth: 84)
+                    Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
+                        .disabled(!canGoForward || monthLoading)
                 }
-                .padding(.vertical, 8)
-                if index < quotes.count - 1 { Divider() }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.accent)
+            }
+
+            if data.calendar.isEmpty {
+                Text(monthLoading ? "불러오는 중..." : "이 달의 출발일별 가격 데이터가 아직 없어요.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                if let cheapest = data.calendar.min(by: { $0.price < $1.price }) {
+                    HStack(spacing: 8) {
+                        Pill(text: "가장 싼 날", systemImage: "arrow.down.right", color: Theme.cheap)
+                        Text("\(cheapest.date.dayTitle)  \(cheapest.price.won)")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+                CalendarGrid(month: month, days: data.calendar)
+                HStack(spacing: 14) {
+                    legendDot(Theme.cheap, "저렴")
+                    legendDot(Theme.mid, "보통")
+                    legendDot(Theme.expensive, "비쌈")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .card()
+        .opacity(monthLoading ? 0.6 : 1)
+    }
+
+    private func legendDot(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 5) {
+            RoundedRectangle(cornerRadius: 3).fill(color.opacity(0.4)).frame(width: 12, height: 12)
+            Text(text)
+        }
+    }
+
+    private func shiftMonth(_ delta: Int) {
+        guard let next = Calendar.current.date(byAdding: .month, value: delta, to: month) else { return }
+        month = next
+        Task { await loadMonth() }
+    }
+
+    // MARK: Quotes
+
+    private var quotesCard: some View {
+        let quotes = data.quotes
+        let shown = showAllQuotes ? quotes : Array(quotes.prefix(6))
+        return VStack(alignment: .leading, spacing: 6) {
+            SectionHeader(title: "항공사별 최저가", subtitle: "\(month.monthTitle) 출발 기준")
+                .padding(.bottom, 8)
+
+            if quotes.isEmpty {
+                Text(monthLoading ? "불러오는 중..." : "선택한 조건에 맞는 항공사 가격이 없어요.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, q in
+                    HStack(spacing: 12) {
+                        AirlineBadge(code: q.airline.code)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(q.airline.name).font(.subheadline.weight(.semibold))
+                            HStack(spacing: 6) {
+                                Text(q.departureDate.dayTitle)
+                                Text(q.transfers == 0 ? "직항" : "경유 \(q.transfers)회")
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(Color(.tertiarySystemFill), in: Capsule())
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(q.price.won)
+                                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                .foregroundStyle(index == 0 ? Theme.accent : .primary)
+                            if index == 0 { Pill(text: "최저", color: Theme.cheap) }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    if index < shown.count - 1 { Divider() }
+                }
+                if quotes.count > 6 {
+                    Button(showAllQuotes ? "접기" : "항공사 \(quotes.count)곳 모두 보기") {
+                        withAnimation { showAllQuotes.toggle() }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 6)
+                }
+            }
+        }
+        .card()
+    }
+
+    // MARK: Empty / disclaimer
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("이 노선의 가격 데이터가 아직 없어요", systemImage: "tray")
+        } description: {
+            Text("제공처에 검색 기록이 거의 없는 노선일 수 있어요. 인기 노선이나 다른 달을 선택해 보세요.")
+        } actions: {
+            Button("다시 시도") { Task { await load() } }
+        }
     }
 
     private var disclaimer: some View {
@@ -209,17 +381,108 @@ struct ResultView: View {
     private func load() async {
         phase = .loading
         do {
-            async let history = appState.provider.history(origin: search.origin, destination: search.destination, days: 30)
-            async let quotes = appState.provider.quotes(origin: search.origin, destination: search.destination,
-                                                       month: search.month, airlines: search.airlines)
-            let (h, q) = try await (history, quotes)
-            guard let analysis = PriceAnalysis(history: h) else {
-                phase = .failed
-                return
-            }
-            phase = .loaded(analysis: analysis, history: h, quotes: q)
+            // 처음 조회하는 노선은 서버가 이 호출에서 수집을 시작하므로 이력을 먼저 기다린다
+            let history = try await appState.provider.history(
+                origin: search.origin, destination: search.destination, days: 90, airlines: search.airlines)
+            async let calendar = appState.provider.calendar(
+                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
+            async let quotes = appState.provider.quotes(
+                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
+            let (c, q) = try await (calendar, quotes)
+            data = Loaded(history: history, calendar: c, quotes: q)
+            phase = .loaded
         } catch {
             phase = .failed
+        }
+    }
+
+    private func loadMonth() async {
+        monthLoading = true
+        defer { monthLoading = false }
+        do {
+            async let calendar = appState.provider.calendar(
+                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
+            async let quotes = appState.provider.quotes(
+                origin: search.origin, destination: search.destination, month: month, airlines: search.airlines)
+            let (c, q) = try await (calendar, quotes)
+            data.calendar = c
+            data.quotes = q
+        } catch {
+            data.calendar = []
+            data.quotes = []
+        }
+    }
+}
+
+// MARK: - 달력 히트맵
+
+private struct CalendarGrid: View {
+    let month: Date
+    let days: [CalendarDay]
+
+    private let cal = Calendar(identifier: .gregorian)
+    private let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
+
+    private var pricesByDay: [Int: Int] {
+        Dictionary(days.map { (cal.component(.day, from: $0.date), $0.price) }, uniquingKeysWith: { Swift.min($0, $1) })
+    }
+
+    private var thresholds: (low: Int, high: Int) {
+        let sorted = days.map(\.price).sorted()
+        guard sorted.count >= 3 else { return (sorted.first ?? 0, sorted.last ?? 0) }
+        return (sorted[sorted.count / 4], sorted[(sorted.count * 3) / 4])
+    }
+
+    var body: some View {
+        let start = cal.date(from: cal.dateComponents([.year, .month], from: month)) ?? month
+        let dayCount = cal.range(of: .day, in: .month, for: start)?.count ?? 30
+        let leading = cal.component(.weekday, from: start) - 1
+        let prices = pricesByDay
+        let t = thresholds
+        let cheapest = days.map(\.price).min()
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
+        return VStack(spacing: 6) {
+            HStack(spacing: 4) {
+                ForEach(weekdays, id: \.self) { w in
+                    Text(w)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(w == "일" ? Theme.expensive : .secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 46) }
+                ForEach(1...dayCount, id: \.self) { day in
+                    cell(day: day, price: prices[day], low: t.low, high: t.high, cheapest: cheapest)
+                }
+            }
+        }
+    }
+
+    private func cell(day: Int, price: Int?, low: Int, high: Int, cheapest: Int?) -> some View {
+        let tone: Color = {
+            guard let price else { return .clear }
+            if price <= low { return Theme.cheap }
+            if price >= high { return Theme.expensive }
+            return Theme.mid
+        }()
+        return VStack(spacing: 1) {
+            Text("\(day)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(price.map { $0.shortWon } ?? "–")
+                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .foregroundStyle(price == nil ? Color.secondary.opacity(0.5) : tone)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 46)
+        .background(tone.opacity(price == nil ? 0 : 0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            if let price, price == cheapest {
+                RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Theme.cheap, lineWidth: 1.5)
+            }
         }
     }
 }
