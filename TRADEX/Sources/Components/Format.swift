@@ -43,6 +43,11 @@ enum Fmt {
 
     static func qty(_ v: Double) -> String { qtyFmt.string(from: NSNumber(value: v)) ?? "0" }
 
+    /// 만 원 단위 금액: 1,000,000 → "100만", 50,000 → "5만"
+    static func man(_ v: Double) -> String {
+        v >= 10_000 ? "\(number((v / 10_000).rounded(.down)))만" : number(v)
+    }
+
     /// 거래소 목록식 거래대금 (백만 원 단위)
     static func millions(_ v: Double) -> String {
         v >= 1_000_000 ? "\(number((v / 1_000_000).rounded(.down)))백만" : number(v)
