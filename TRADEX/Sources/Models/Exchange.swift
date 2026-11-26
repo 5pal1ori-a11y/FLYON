@@ -26,9 +26,10 @@ struct ExchangeBadge: View {
     var body: some View {
         Text(exchange.initial)
             .font(.system(size: size * 0.55, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .frame(width: size, height: size)
-            .background(exchange.tint, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .strokeBorder(Color.primary, lineWidth: 1.2))
             .accessibilityHidden(true)
     }
 }

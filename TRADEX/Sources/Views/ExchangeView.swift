@@ -155,7 +155,7 @@ struct ExchangeView: View {
         } label: {
             HStack(spacing: 2) {
                 Text(title)
-                Image(systemName: column == c ? (ascending ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill") : "arrow.up.arrow.down")
+                Image(systemName: column == c ? (ascending ? "chevron.up" : "chevron.down") : "arrow.up.arrow.down")
                     .font(.system(size: 7))
             }
             .font(.caption2.weight(column == c ? .bold : .regular))

@@ -74,7 +74,7 @@ struct PredictionGameView: View {
         VStack(spacing: 18) {
             ZStack(alignment: .bottomTrailing) {
                 CoinIcon(symbol: coin.symbol, size: 84)
-                Image(systemName: "clock.fill")
+                Image(systemName: "clock")
                     .font(.system(size: 18))
                     .foregroundStyle(.secondary)
                     .padding(5)
@@ -134,8 +134,8 @@ struct PredictionGameView: View {
         let locked = myPick != nil || serverOffset == nil || submitting
         return VStack(spacing: 10) {
             Image(systemName: choice == .up ? "chart.line.uptrend.xyaxis" : "chart.line.downtrend.xyaxis")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(color)
+                .font(.system(size: 28, weight: .regular))
+                .foregroundStyle(.primary)
             Text(choice.title).font(.headline).foregroundStyle(color)
             Button {
                 errorText = nil

@@ -46,13 +46,13 @@ struct MainTabView: View {
         @Bindable var session = session
         TabView {
             ExchangeView()
-                .tabItem { Label("거래소", systemImage: "chart.bar.fill") }
+                .tabItem { Label("거래소", systemImage: "chart.bar").environment(\.symbolVariants, .none) }
             AssetsView()
-                .tabItem { Label("자산", systemImage: "wallet.pass.fill") }
+                .tabItem { Label("자산", systemImage: "wallet.pass").environment(\.symbolVariants, .none) }
             RewardsView()
-                .tabItem { Label("혜택", systemImage: "gift.fill") }
+                .tabItem { Label("혜택", systemImage: "gift").environment(\.symbolVariants, .none) }
             SettingsView()
-                .tabItem { Label("설정", systemImage: "gearshape.fill") }
+                .tabItem { Label("설정", systemImage: "gearshape").environment(\.symbolVariants, .none) }
         }
         // 선물 청산 감시: 앱을 연 동안은 1초마다 현재가로, 거래소를 바꾸거나 앱을 열 때는 꺼져 있던 동안의 고가·저가로 확인
         .task(id: market.exchange) {

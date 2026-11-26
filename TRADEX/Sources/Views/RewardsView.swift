@@ -17,18 +17,18 @@ struct RewardsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
-                    heroCard
-                    checkInSection
-                    gamesSection
-                    missionsSection
-                    Text("보상은 지금 선택한 거래소(\(store.exchange.name))의 현물 지갑으로 들어가요. 모든 보상은 앱 안에서만 쓰는 모의투자금이며 현금·상품으로 바꿀 수 없어요.")
+                VStack(spacing: 16) {
+                    checkInCard
+                    predictionCard
+                    missionsCard
+                    quizCard
+                    Text("보상은 지금 선택한 거래소(\(store.exchange.name))의 현물 지갑으로 들어가요. 모든 보상은 앱 안에서만 쓰는 모의투자금이며, 현금·상품으로 바꿀 수 없어요.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(20)
             }
             .background(Theme.background)
             .navigationTitle("혜택")
@@ -50,206 +50,131 @@ struct RewardsView: View {
         }
     }
 
-    // MARK: - 오늘의 진행 (요약)
-
-    /// 오늘 할 수 있는 일: 출석 1 + 미션 4 + 퀴즈 3 + 예측 1
-    private var todayProgress: (done: Int, total: Int) {
-        let quiz = QuizQuestion.today(today).filter { wallet.quizAnswer($0, today: today) != nil }.count
-        let missions = Mission.all.filter { wallet.missionClaimed($0, today: today) }.count
-        let predicted = wallet.prediction(for: PredictionRound.upcoming(at: serverNow ?? Date()).key) != nil ? 1 : 0
-        let checked = wallet.checkedIn(on: today) ? 1 : 0
-        return (checked + missions + quiz + predicted, 1 + Mission.all.count + DailyRules.quizPerDay + 1)
-    }
-
-    private var heroCard: some View {
-        let p = todayProgress
-        let ratio = Double(p.done) / Double(max(p.total, 1))
-        return HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("오늘의 혜택").font(.subheadline).opacity(0.7)
-                Text(p.done == p.total ? "오늘 혜택을 모두 받았어요" : "\(p.total - p.done)개 남았어요")
-                    .font(.title2.weight(.bold))
-                Text("출석 · 미션 · 퀴즈 · 오를까 내릴까").font(.caption).opacity(0.6)
-            }
-            Spacer()
-            ZStack {
-                Circle().stroke(Color(.systemBackground).opacity(0.2), lineWidth: 7)
-                Circle().trim(from: 0, to: ratio)
-                    .stroke(Color(.systemBackground), style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.snappy, value: ratio)
-                Text("\(p.done)/\(p.total)").font(.subheadline.weight(.bold)).monospacedDigit()
-            }
-            .frame(width: 66, height: 66)
-        }
-        .foregroundStyle(Color(.systemBackground))
-        .padding(20)
-        .background(Color.primary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
     // MARK: - 출석체크
 
-    private var checkInSection: some View {
+    private var checkInCard: some View {
         let done = wallet.checkedIn(on: today)
         let streak = wallet.currentStreak(today: today)
         let inWeek = streak == 0 ? 0 : ((streak - 1) % DailyRules.streakBonusEvery) + 1
-        return VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("출석체크") {
-                Label("\(streak)일 연속", systemImage: "flame.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(streak > 0 ? .orange : .secondary)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("출석체크", systemImage: "calendar.badge.checkmark").font(.headline)
+                Spacer()
+                Text("\(streak)일 연속").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             }
-            VStack(spacing: 16) {
-                HStack(spacing: 0) {
-                    ForEach(1...DailyRules.streakBonusEvery, id: \.self) { i in
-                        let filled = i <= inWeek
-                        let isBonus = i == DailyRules.streakBonusEvery
-                        VStack(spacing: 6) {
-                            ZStack {
-                                Circle()
-                                    .fill(filled ? (isBonus ? Color.orange : Color.primary) : Color.primary.opacity(0.06))
-                                Image(systemName: isBonus ? "gift.fill" : (filled ? "checkmark" : "circle.fill"))
-                                    .font(.system(size: isBonus ? 14 : (filled ? 13 : 5), weight: .bold))
-                                    .foregroundStyle(filled ? Color(.systemBackground) : (isBonus ? .orange : Color.primary.opacity(0.2)))
+            HStack(spacing: 6) {
+                ForEach(1...DailyRules.streakBonusEvery, id: \.self) { i in
+                    VStack(spacing: 4) {
+                        ZStack {
+                            Circle().fill(i <= inWeek ? Color.primary : Theme.background)
+                            if i == DailyRules.streakBonusEvery {
+                                Image(systemName: "gift").font(.caption)
+                                    .foregroundStyle(i <= inWeek ? Color(.systemBackground) : .secondary)
+                            } else if i <= inWeek {
+                                Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(Color(.systemBackground))
                             }
-                            .frame(width: 36, height: 36)
-                            Text(isBonus ? "보너스" : "\(i)일")
-                                .font(.caption2.weight(i == inWeek ? .bold : .regular))
-                                .foregroundStyle(isBonus ? .orange : .secondary)
                         }
-                        .frame(maxWidth: .infinity)
+                        .frame(width: 32, height: 32)
+                        Text("\(i)일").font(.caption2).foregroundStyle(.secondary)
                     }
-                }
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("매일 \(Fmt.krw(DailyRules.checkInReward))").font(.subheadline.weight(.semibold))
-                        Text("\(DailyRules.streakBonusEvery)일 연속이면 \(Fmt.krw(DailyRules.streakBonus)) 더")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(done ? "출석 완료" : "출석하기") { Task { await checkIn() } }
-                        .buttonStyle(PillButtonStyle(filled: !done))
-                        .disabled(done || busy || serverOffset == nil)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding(16)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+            Text("매일 \(Fmt.krw(DailyRules.checkInReward)), \(DailyRules.streakBonusEvery)일 연속이면 \(Fmt.krw(DailyRules.streakBonus)) 추가")
+                .font(.caption).foregroundStyle(.secondary)
+            Button(done ? "오늘 출석 완료" : "출석하고 \(Fmt.krw(DailyRules.checkInReward)) 받기") {
+                Task { await checkIn() }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(done || busy || serverOffset == nil)
+            .opacity(done ? 0.4 : 1)
         }
+        .card()
     }
 
-    // MARK: - 게임 타일 (오를까 내릴까 · 퀴즈)
+    // MARK: - 오를까 내릴까
 
-    private var gamesSection: some View {
+    private var predictionCard: some View {
         let round = PredictionRound.upcoming(at: serverNow ?? Date())
         let coin = round.market(from: store.markets)
         let mine = wallet.prediction(for: round.key)
-        let questions = QuizQuestion.today(today)
-        let answered = questions.filter { wallet.quizAnswer($0, today: today) != nil }.count
-        return VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("미니게임")
-            HStack(spacing: 12) {
-                NavigationLink {
-                    PredictionGameView()
-                } label: {
-                    gameTile(
-                        icon: AnyView(coin.map { AnyView(CoinIcon(symbol: $0.symbol, size: 34)) }
-                                      ?? AnyView(IconTile(systemName: "chart.line.uptrend.xyaxis", tint: Theme.rise))),
-                        title: "오를까 내릴까",
-                        subtitle: mine.map { "\($0.choice.title) 참여 완료" } ?? "\(coin?.koreanName ?? "오늘의 코인") 맞히기",
-                        reward: "적중 \(Fmt.man(TradexRules.predictionRewardKRW)) 원",
-                        done: mine != nil)
+        return NavigationLink {
+            PredictionGameView()
+        } label: {
+            HStack(spacing: 14) {
+                if let coin { CoinIcon(symbol: coin.symbol, size: 44) }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("내일 오를까? 내릴까?").font(.headline)
+                    Text(mine.map { "\($0.koreanName) · \($0.choice.title) 참여 완료" }
+                         ?? "\(coin?.koreanName ?? "오늘의 코인") 맞히면 \(Fmt.krw(TradexRules.predictionRewardKRW))")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    QuizView()
-                } label: {
-                    gameTile(
-                        icon: AnyView(IconTile(systemName: "graduationcap.fill", tint: .indigo)),
-                        title: "오늘의 퀴즈",
-                        subtitle: "\(answered)/\(questions.count) 풀었어요",
-                        reward: "문제당 \(Fmt.man(DailyRules.quizReward)) 원",
-                        done: answered == questions.count)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func gameTile(icon: AnyView, title: String, subtitle: String, reward: String, done: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                icon
                 Spacer()
-                if done {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                }
+                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Text(reward)
-                .font(.caption2.weight(.bold))
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Color.primary.opacity(0.06), in: Capsule())
+            .card()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .buttonStyle(.plain)
     }
 
     // MARK: - 미션
 
-    private var missionsSection: some View {
+    private var missionsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("오늘의 미션") {
-                Text("\(Mission.all.filter { wallet.missionClaimed($0, today: today) }.count)/\(Mission.all.count)")
-                    .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
-            }
-            VStack(spacing: 0) {
-                ForEach(Mission.all) { m in
-                    missionRow(m)
-                    if m.id != Mission.all.last?.id { Divider().padding(.leading, 50) }
+            Label("오늘의 미션", systemImage: "target").font(.headline)
+            ForEach(Mission.all) { m in
+                let progress = wallet.missionProgress(m, today: today)
+                let claimed = wallet.missionClaimed(m, today: today)
+                HStack(spacing: 12) {
+                    Image(systemName: m.icon)
+                        .frame(width: 32, height: 32)
+                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(m.title).font(.subheadline.weight(.medium))
+                        Text("\(progress)/\(m.goal) · \(Fmt.krw(m.reward))").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    Spacer()
+                    Button {
+                        Task { await claim(m) }
+                    } label: {
+                        Text(claimed ? "완료" : "받기")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .foregroundStyle(progress >= m.goal && !claimed ? Color(.systemBackground) : .secondary)
+                            .background(progress >= m.goal && !claimed ? Color.primary : Theme.background, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(claimed || progress < m.goal || busy || serverOffset == nil)
                 }
             }
-            .padding(.horizontal, 16)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
+        .card()
     }
 
-    private func missionRow(_ m: Mission) -> some View {
-        let progress = wallet.missionProgress(m, today: today)
-        let claimed = wallet.missionClaimed(m, today: today)
-        let ready = progress >= m.goal && !claimed
-        let tint: Color = switch m.id {
-        case "buy": .orange
-        case "predict": Theme.rise
-        case "chart": .teal
-        default: .indigo
-        }
-        return HStack(spacing: 14) {
-            IconTile(systemName: m.icon, tint: claimed ? .gray : tint)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(m.title).font(.subheadline.weight(.semibold))
-                        .strikethrough(claimed, color: .secondary)
-                        .foregroundStyle(claimed ? .secondary : .primary)
-                    Spacer()
-                    Text("+\(Fmt.man(m.reward))").font(.caption.weight(.bold))
-                        .foregroundStyle(claimed ? .secondary : .primary)
+    // MARK: - 퀴즈
+
+    private var quizCard: some View {
+        let questions = QuizQuestion.today(today)
+        let answered = questions.filter { wallet.quizAnswer($0, today: today) != nil }.count
+        return NavigationLink {
+            QuizView()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "graduationcap")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("오늘의 투자 퀴즈").font(.headline)
+                    Text("\(answered)/\(questions.count) 풀었어요 · 맞히면 문제당 \(Fmt.krw(DailyRules.quizReward))")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                HStack(spacing: 8) {
-                    ProgressBar(value: Double(progress) / Double(m.goal), tint: claimed ? .gray : tint)
-                    Text("\(progress)/\(m.goal)").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
-                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
             }
-            Button(claimed ? "완료" : "받기") { Task { await claim(m) } }
-                .buttonStyle(PillButtonStyle(filled: ready))
-                .disabled(!ready || busy || serverOffset == nil)
-                .opacity(ready || claimed ? 1 : 0.4)
+            .card()
         }
-        .padding(.vertical, 14)
+        .buttonStyle(.plain)
     }
 
     // MARK: - 동작
@@ -337,8 +262,8 @@ struct QuizView: View {
                         Text(choice).font(.subheadline).multilineTextAlignment(.leading)
                         Spacer()
                         if let picked {
-                            if i == q.answer { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
-                            else if i == picked { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.rise) }
+                            if i == q.answer { Image(systemName: "checkmark.circle").foregroundStyle(.primary) }
+                            else if i == picked { Image(systemName: "xmark.circle").foregroundStyle(.primary) }
                         }
                     }
                     .padding(12)

@@ -26,10 +26,10 @@ struct LoginView: View {
             Spacer()
 
             VStack(alignment: .leading, spacing: 14) {
-                benefit("gift.fill", "가입하면 \(TradexRules.signupBonus) TRADEX 지급",
+                benefit("gift", "가입하면 \(TradexRules.signupBonus) TRADEX 지급",
                         "1 TRADEX = 모의투자금 \(Fmt.krw(TradexRules.krwPerTradex))")
-                benefit("bolt.fill", "실제 거래소 실시간 시세", "가격·등락률이 실제와 똑같이 움직여요")
-                benefit("shield.fill", "실제 돈은 전혀 쓰지 않아요", "가상 자산으로만 거래하는 연습용 앱이에요")
+                benefit("bolt", "실제 거래소 실시간 시세", "가격·등락률이 실제와 똑같이 움직여요")
+                benefit("shield", "실제 돈은 전혀 쓰지 않아요", "가상 자산으로만 거래하는 연습용 앱이에요")
             }
             .card()
             .padding(.horizontal, 20)

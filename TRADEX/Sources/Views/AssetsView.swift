@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 자산 탭 — 총 자산과 구성, 거래소 지갑, 내 코인, 선물 포지션
+/// 자산 탭 — 전체 자산, 거래소별 현물·선물 지갑, 보유 코인, 선물 포지션
 struct AssetsView: View {
     @Environment(MarketStore.self) private var store
     @Environment(Wallet.self) private var wallet
@@ -8,18 +8,136 @@ struct AssetsView: View {
     @State private var transferTarget: ExchangeID?
 
     var body: some View {
+        let total = wallet.totalValuation { store.prices(for: $0) }
+        let pnl = total.total - wallet.baseValue
+        let rate = wallet.baseValue > 0 ? pnl / wallet.baseValue : 0
+        let ex = store.exchange
+        let account = wallet.account(ex)
+        let prices = store.tickers
+
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
-                    header
-                    walletSection
-                    coinsSection
-                    positionsSection
-                    tilesSection
-                    historyRow
+                VStack(alignment: .leading, spacing: 22) {
+                    // 총 자산 (모든 거래소 + TRADEX)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("총 자산").font(.subheadline).foregroundStyle(.secondary)
+                        Text(Fmt.krw(total.total))
+                            .font(.system(size: 32, weight: .bold))
+                            .monospacedDigit()
+                            .contentTransition(.numericText(value: total.total))
+                            .animation(.snappy, value: total.total)
+                        Text("\(Fmt.signedKRW(pnl))원 (\(Fmt.rate(rate)))")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.color(for: pnl))
+                            .monospacedDigit()
+                        Divider().padding(.vertical, 8)
+                        HStack(alignment: .top) {
+                            summary("코인 평가", "≈ \(Fmt.krw(total.coinValue))")
+                            summary("선물 평가", "≈ \(Fmt.krw(total.futuresKRW + total.positionValue))")
+                            summary("TRADEX", "\(wallet.state.tradex)개")
+                        }
+                    }
+                    .card()
+
+                    // 거래소별 지갑 (사용 가능 잔액)
+                    ForEach(ExchangeID.allCases) { e in
+                        exchangeCard(e)
+                    }
+
+                    // TRADEX
+                    section("TRADEX") {
+                        HStack(spacing: 14) {
+                            Image("Logo")
+                                .resizable().scaledToFit()
+                                .frame(width: 26, height: 26)
+                                .padding(8)
+                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(wallet.state.tradex) TRADEX").font(.headline).monospacedDigit()
+                                Text("1 TRADEX = \(Fmt.krw(TradexRules.krwPerTradex)) · 거래소 지갑에 충전해 사용해요")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .card()
+                    }
+
+                    // AI 분석
+                    NavigationLink {
+                        PortfolioAnalysisView()
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "sparkles")
+                                .font(.title3)
+                                .frame(width: 42, height: 42)
+                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("AI 투자 분석").font(.headline)
+                                Text("Apple Intelligence가 내 투자 습관을 분석해요").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        }
+                        .card()
+                    }
+                    .buttonStyle(.plain)
+
+                    // 선택한 거래소의 보유 코인 · 포지션
+                    HStack {
+                        Text("\(ex.name) 보유 현황").font(.headline)
+                        Spacer()
+                        ExchangePicker(selection: Binding(get: { store.exchange }, set: { new in Task { await store.select(new) } }))
+                    }
+
+                    section("보유 코인") {
+                        if account.holdings.isEmpty {
+                            Text(account.krw > 0 ? "거래소 탭에서 첫 코인을 사 보세요." : "\(ex.name) 현물 지갑을 충전한 뒤 거래할 수 있어요.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .card()
+                        } else {
+                            VStack(spacing: 0) {
+                                let rows = account.holdings.sorted { a, b in
+                                    (prices[a.key]?.tradePrice ?? 0) * a.value.quantity > (prices[b.key]?.tradePrice ?? 0) * b.value.quantity
+                                }
+                                ForEach(rows, id: \.key) { code, h in
+                                    if let m = store.market(code) {
+                                        NavigationLink(value: m) { holdingRow(m, h) }.buttonStyle(.plain)
+                                        if code != rows.last?.key { Divider().padding(.leading, 56) }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                        }
+                    }
+
+                    section("선물 포지션 \(account.positions.count)") {
+                        if account.positions.isEmpty {
+                            Text("열린 포지션이 없어요. 코인 화면의 ‘선물’에서 롱·숏을 연습해 보세요.")
+                                .font(.subheadline).foregroundStyle(.secondary).card()
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(account.positions) { p in
+                                    PositionRow(position: p, price: prices[p.market]?.tradePrice, exchange: ex)
+                                }
+                            }
+                        }
+                    }
+
+                    NavigationLink {
+                        TradeHistoryView()
+                    } label: {
+                        HStack {
+                            Text("\(ex.name) 거래 내역").font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text("\(account.trades.count + account.futuresHistory.count)건").font(.subheadline).foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        }
+                        .card()
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(20)
             }
             .background(Theme.background)
             .navigationTitle("자산")
@@ -41,272 +159,98 @@ struct AssetsView: View {
         }
     }
 
-    // MARK: - 총 자산
+    // MARK: - 거래소 카드 (현물 / 선물 + 충전하기)
 
-    private var header: some View {
-        let t = wallet.totalValuation { store.prices(for: $0) }
-        let pnl = t.total - wallet.baseValue
-        let rate = wallet.baseValue > 0 ? pnl / wallet.baseValue : 0
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("총 자산").font(.subheadline).foregroundStyle(.secondary)
-            Text(Fmt.krw(t.total))
-                .font(.system(size: 36, weight: .bold))
-                .monospacedDigit()
-                .lineLimit(1).minimumScaleFactor(0.6)
-                .contentTransition(.numericText(value: t.total))
-                .animation(.snappy, value: t.total)
-            HStack(spacing: 6) {
-                Image(systemName: pnl >= 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill").font(.caption2)
-                Text("\(Fmt.signedKRW(pnl))원 (\(Fmt.rate(rate)))")
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Theme.color(for: pnl))
-            .monospacedDigit()
-
-            AllocationBar(segments: [
-                .init(label: "코인", value: t.coinValue, color: .orange),
-                .init(label: "선물", value: t.futuresKRW + t.positionValue, color: .purple),
-                .init(label: "원화", value: t.krw, color: .teal),
-                .init(label: "TRADEX", value: t.tradexValue, color: .primary),
-            ])
-            .padding(.top, 10)
-        }
-    }
-
-    // MARK: - 거래소 지갑
-
-    private var walletSection: some View {
-        let ex = store.exchange
-        let a = wallet.account(ex)
-        return VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("거래소 지갑")
-            ExchangeSegment(selection: ex) { new in Task { await store.select(new) } }
-            VStack(spacing: 0) {
-                walletRow(icon: "bitcoinsign.circle.fill", tint: .orange, title: "현물", amount: a.krw) {
-                    chargeTarget = ChargeTarget(exchange: ex, futures: false)
-                }
-                Divider().padding(.leading, 52)
-                walletRow(icon: "chart.line.uptrend.xyaxis.circle.fill", tint: .purple, title: "선물", amount: a.futuresKRW) {
-                    chargeTarget = ChargeTarget(exchange: ex, futures: true)
-                }
-                Divider().padding(.leading, 52)
+    private func exchangeCard(_ e: ExchangeID) -> some View {
+        let a = wallet.account(e)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                ExchangeBadge(exchange: e)
+                Text(e.name).font(.headline)
+                Text("(사용 가능 잔액)").font(.caption).foregroundStyle(.secondary)
+                Spacer()
                 Button {
-                    transferTarget = ex
+                    transferTarget = e
                 } label: {
-                    HStack {
-                        Image(systemName: "arrow.left.arrow.right")
-                        Text("현물 ↔ 선물 이동")
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .padding(.vertical, 14)
-                    .contentShape(Rectangle())
+                    Label("이동", systemImage: "arrow.left.arrow.right").font(.caption.weight(.semibold))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .padding(.horizontal, 16)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+            .padding(.bottom, 10)
+            Divider()
+            walletRow("현물", a.krw, inUse: store.exchange == e && !a.holdings.isEmpty) {
+                chargeTarget = ChargeTarget(exchange: e, futures: false)
+            }
+            Divider()
+            walletRow("선물", a.futuresKRW, inUse: store.exchange == e && !a.positions.isEmpty) {
+                chargeTarget = ChargeTarget(exchange: e, futures: true)
+            }
         }
+        .card()
     }
 
-    private func walletRow(icon: String, tint: Color, title: String, amount: Double, charge: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 28)).foregroundStyle(tint)
-                .frame(width: 36)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(title) 주문가능").font(.caption).foregroundStyle(.secondary)
-                Text(Fmt.krw(amount)).font(.headline).monospacedDigit()
-                    .lineLimit(1).minimumScaleFactor(0.7)
+    private func walletRow(_ title: String, _ amount: Double, inUse: Bool, charge: @escaping () -> Void) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(title).font(.caption).foregroundStyle(.secondary)
+                    if inUse {
+                        Text("현재 사용").font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.4), lineWidth: 1))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                Text(Fmt.krw(amount)).font(.title3.weight(.bold)).monospacedDigit()
             }
             Spacer()
-            Button("충전", action: charge)
-                .buttonStyle(PillButtonStyle())
+            Button("충전하기", action: charge)
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.borderedProminent)
+                .tint(.primary)
                 .disabled(wallet.state.tradex == 0)
-                .opacity(wallet.state.tradex == 0 ? 0.35 : 1)
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
     }
 
-    // MARK: - 내 코인
-
-    private var coinsSection: some View {
-        let a = wallet.account(store.exchange)
-        let prices = store.tickers
-        let rows = a.holdings.sorted { x, y in
-            (prices[x.key]?.tradePrice ?? x.value.averagePrice) * x.value.quantity >
-                (prices[y.key]?.tradePrice ?? y.value.averagePrice) * y.value.quantity
+    private func summary(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.6)
         }
-        return VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("내 코인") {
-                Text("\(rows.count)개").font(.subheadline).foregroundStyle(.secondary)
-            }
-            if rows.isEmpty {
-                emptyState("bitcoinsign.circle", a.krw > 0 ? "거래소 탭에서 첫 코인을 사 보세요" : "현물 지갑을 충전하면 거래할 수 있어요")
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(rows, id: \.key) { code, h in
-                        if let m = store.market(code) {
-                            NavigationLink(value: m) { holdingRow(m, h) }.buttonStyle(.plain)
-                            if code != rows.last?.key { Divider().padding(.leading, 56) }
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary).padding(.leading, 4)
+            content()
         }
     }
 
     private func holdingRow(_ m: Market, _ h: Holding) -> some View {
         let price = store.tickers[m.market]?.tradePrice ?? h.averagePrice
-        let value = price * h.quantity
         let pnl = (price - h.averagePrice) * h.quantity
         let rate = h.averagePrice > 0 ? price / h.averagePrice - 1 : 0
         return HStack(spacing: 12) {
-            CoinIcon(symbol: m.symbol, size: 40)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(m.koreanName).font(.body.weight(.semibold)).lineLimit(1)
-                Text("\(Fmt.qty(h.quantity)) \(m.symbol)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            CoinIcon(symbol: m.symbol)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(Fmt.qty(h.quantity)) \(m.symbol)").font(.body.weight(.semibold)).monospacedDigit()
+                Text("≈ \(Fmt.krw(price * h.quantity))").font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(Fmt.krw(value)).font(.body.weight(.semibold)).monospacedDigit()
-                Text("\(Fmt.signedKRW(pnl)) (\(Fmt.rate(rate)))")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.color(for: pnl))
-                    .monospacedDigit()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(Fmt.signedKRW(pnl)).font(.subheadline.weight(.semibold))
+                Text("(\(Fmt.rate(rate)))").font(.caption.weight(.semibold))
             }
-        }
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-    }
-
-    // MARK: - 선물 포지션
-
-    private var positionsSection: some View {
-        let positions = wallet.account(store.exchange).positions
-        return VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("선물 포지션") {
-                Text("\(positions.count)개").font(.subheadline).foregroundStyle(.secondary)
-            }
-            if positions.isEmpty {
-                emptyState("chart.line.uptrend.xyaxis", "코인 화면의 ‘선물’에서 롱·숏을 연습해 보세요")
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(positions) { p in
-                        if let m = store.market(p.market) {
-                            NavigationLink(value: m) { positionRow(p) }.buttonStyle(.plain)
-                        } else {
-                            positionRow(p)
-                        }
-                        if p.id != positions.last?.id { Divider().padding(.leading, 56) }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            }
-        }
-    }
-
-    private func positionRow(_ p: FuturesPosition) -> some View {
-        let price = store.tickers[p.market]?.tradePrice ?? p.entryPrice
-        let pnl = p.pnl(at: price)
-        let color: Color = pnl > 0 ? .green : (pnl < 0 ? Theme.rise : .secondary)
-        return HStack(spacing: 12) {
-            CoinIcon(symbol: p.symbol, size: 40)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(p.koreanName).font(.body.weight(.semibold)).lineLimit(1)
-                HStack(spacing: 4) {
-                    Text(p.side.title).foregroundStyle(p.side == .long ? .green : Theme.rise)
-                    Text("·").foregroundStyle(.tertiary)
-                    Text("\(p.leverage)×")
-                    Text("·").foregroundStyle(.tertiary)
-                    Text("청산 \(Fmt.price(p.liquidationPrice))").foregroundStyle(.secondary)
-                }
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(Fmt.signedKRW(pnl))원").font(.body.weight(.semibold))
-                Text(Fmt.rate(p.roe(at: price))).font(.caption.weight(.semibold))
-            }
-            .foregroundStyle(color)
+            .foregroundStyle(Theme.color(for: pnl))
             .monospacedDigit()
+            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.tertiary)
         }
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-    }
-
-    // MARK: - TRADEX · AI 타일
-
-    private var tilesSection: some View {
-        HStack(spacing: 12) {
-            tile {
-                Image("Logo").resizable().scaledToFit().frame(height: 22)
-            } title: {
-                "\(wallet.state.tradex) TRADEX"
-            } subtitle: {
-                "1개 = \(Fmt.man(TradexRules.krwPerTradex)) 원"
-            }
-
-            NavigationLink {
-                PortfolioAnalysisView()
-            } label: {
-                tile {
-                    Image(systemName: "sparkles").font(.title2)
-                } title: {
-                    "AI 투자 분석"
-                } subtitle: {
-                    "Apple Intelligence"
-                }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func tile<Icon: View>(@ViewBuilder icon: () -> Icon, title: () -> String, subtitle: () -> String) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            icon().frame(height: 26, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title()).font(.headline).monospacedDigit()
-                Text(subtitle()).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-    }
-
-    // MARK: - 거래 내역
-
-    private var historyRow: some View {
-        let a = wallet.account(store.exchange)
-        return NavigationLink {
-            TradeHistoryView()
-        } label: {
-            HStack(spacing: 12) {
-                IconTile(systemName: "list.bullet.rectangle", tint: .gray, size: 30)
-                Text("\(store.exchange.name) 거래 내역").font(.subheadline.weight(.semibold))
-                Spacer()
-                Text("\(a.trades.count + a.futuresHistory.count)건").font(.subheadline).foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-            }
-            .padding(14)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func emptyState(_ icon: String, _ text: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.title2).foregroundStyle(.tertiary)
-            Text(text).font(.subheadline).foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     }
 }
 

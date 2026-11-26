@@ -283,9 +283,9 @@ struct DoneOverlay: View {
     let color: Color
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(color)
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 56, weight: .light))
+                .foregroundStyle(.primary)
                 .symbolEffect(.bounce, value: true)
             Text(text).font(.title3.bold())
         }
