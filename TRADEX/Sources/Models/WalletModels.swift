@@ -9,6 +9,8 @@ enum TradexRules {
     static let feeRate: Double = 0.0005
     /// 최소 주문 금액
     static let minOrderKRW: Double = 5_000
+    /// 미니게임 적중 보상 (모의투자 원화)
+    static let predictionRewardKRW: Double = 10_000
 }
 
 struct Holding: Codable, Equatable {
@@ -48,6 +50,22 @@ struct WalletState: Codable {
     var tradexHistory: [TradexRecord] = []
     /// 지금까지 지급된 TRADEX 총량 (수익률 기준)
     var grantedTradex: Int = 0
+    /// 미니게임 예측 기록
+    var predictions: [Prediction] = []
+}
+
+extension WalletState {
+    /// 예전 버전에서 저장한 파일(새 필드 없음)도 그대로 읽히도록 모든 필드를 선택적으로 디코딩
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tradex = try c.decodeIfPresent(Int.self, forKey: .tradex) ?? 0
+        krw = try c.decodeIfPresent(Double.self, forKey: .krw) ?? 0
+        holdings = try c.decodeIfPresent([String: Holding].self, forKey: .holdings) ?? [:]
+        trades = try c.decodeIfPresent([TradeRecord].self, forKey: .trades) ?? []
+        tradexHistory = try c.decodeIfPresent([TradexRecord].self, forKey: .tradexHistory) ?? []
+        grantedTradex = try c.decodeIfPresent(Int.self, forKey: .grantedTradex) ?? 0
+        predictions = try c.decodeIfPresent([Prediction].self, forKey: .predictions) ?? []
+    }
 }
 
 struct AppUser: Codable, Equatable {

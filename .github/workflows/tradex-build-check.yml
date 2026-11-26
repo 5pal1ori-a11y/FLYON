@@ -27,7 +27,7 @@ jobs:
 
       - name: Decode live Upbit data with app models
         run: |
-          swiftc -parse-as-library TRADEX/Sources/Models/MarketModels.swift TRADEX/ci/DecodeCheck.swift -o "$RUNNER_TEMP/decodecheck"
+          swiftc -parse-as-library TRADEX/Sources/Models/MarketModels.swift TRADEX/Sources/Models/PredictionModels.swift TRADEX/ci/DecodeCheck.swift -o "$RUNNER_TEMP/decodecheck"
           "$RUNNER_TEMP/decodecheck"
 
       - name: Generate Xcode project

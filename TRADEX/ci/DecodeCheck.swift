@@ -21,7 +21,11 @@ struct DecodeCheck {
         print("시세:", tickers.count, "예:", tickers[0].market, tickers[0].tradePrice, tickers[0].accTradePrice24h)
         let candles = try dec.decode([Candle].self, from: try await fetch("https://api.upbit.com/v1/candles/minutes/10?market=KRW-BTC&count=5"))
         print("캔들:", candles.count, candles[0].date)
-        precondition(!markets.isEmpty && !tickers.isEmpty && !candles.isEmpty)
+        let days = try dec.decode([DayCandle].self, from: try await fetch("https://api.upbit.com/v1/candles/days?market=KRW-BTC&count=3"))
+        print("일봉:", days.map { "\($0.candleDateTimeKst) \(String(format: "%+.2f%%", $0.changeRate * 100))" })
+        let round = PredictionRound.upcoming(at: Date())
+        print("다음 라운드:", round.key, round.candleTimeKST, "마감", round.start, "결과", round.end)
+        precondition(!markets.isEmpty && !tickers.isEmpty && !candles.isEmpty && !days.isEmpty)
         print("디코딩 확인 OK")
     }
 }

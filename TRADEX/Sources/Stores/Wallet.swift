@@ -136,10 +136,73 @@ final class Wallet {
     /// 처음 상태로 되돌리기 (보너스는 다시 지급하지 않고 지급 총량으로 복원)
     func reset() {
         let granted = state.grantedTradex
+        // 미니게임 기록은 유지 (같은 라운드에 다시 참여하지 못하게)
         state = WalletState(tradex: granted, krw: 0, holdings: [:], trades: [],
                             tradexHistory: [TradexRecord(kind: .signupBonus, amount: granted, date: .now)],
-                            grantedTradex: granted)
+                            grantedTradex: granted, predictions: state.predictions)
         save()
+    }
+
+    // MARK: - 미니게임
+
+    enum PredictionError: LocalizedError {
+        case closed, already, noServerTime
+        var errorDescription: String? {
+            switch self {
+            case .closed: return "참여 시간이 지났어요. 다음 라운드에 참여해 주세요."
+            case .already: return "이번 라운드에는 이미 참여했어요."
+            case .noServerTime: return "서버 시간을 확인하지 못했어요. 네트워크를 확인해 주세요."
+            }
+        }
+    }
+
+    func prediction(for roundKey: String) -> Prediction? {
+        state.predictions.first { $0.roundKey == roundKey }
+    }
+
+    /// 예측 참여. serverNow는 기기 시계가 아니라 업비트 서버 시간을 쓴다 (시계 조작 방지).
+    func placePrediction(round: PredictionRound, market: Market, choice: PredictionChoice, serverNow: Date) throws {
+        guard serverNow < round.start else { throw PredictionError.closed }
+        guard prediction(for: round.key) == nil else { throw PredictionError.already }
+        state.predictions.insert(Prediction(roundKey: round.key, market: market.market, koreanName: market.koreanName,
+                                            choice: choice, createdAt: serverNow), at: 0)
+        save()
+    }
+
+    /// 결과가 나온 예측을 판정하고 적중 시 모의 원화 지급. 새로 판정된 예측을 돌려준다.
+    func settlePendingPredictions() async -> [Prediction] {
+        let pending = state.predictions.filter { $0.status == .pending }
+        guard !pending.isEmpty, let now = try? await UpbitAPI.serverNow() else { return [] }
+        var settled: [Prediction] = []
+        for p in pending {
+            guard let round = PredictionRound(key: p.roundKey), now >= round.end else { continue }
+            let days = Int(now.timeIntervalSince(round.start) / 86_400) + 2
+            guard days <= 200,
+                  let candles = try? await UpbitAPI.dayCandles(market: p.market, count: days),
+                  let candle = candles.first(where: { $0.candleDateTimeKst == round.candleTimeKST })
+            else { continue }
+            if let result = settle(id: p.id, changeRate: candle.changeRate) { settled.append(result) }
+        }
+        return settled
+    }
+
+    private func settle(id: UUID, changeRate: Double) -> Prediction? {
+        guard let i = state.predictions.firstIndex(where: { $0.id == id }),
+              state.predictions[i].status == .pending else { return nil }
+        var p = state.predictions[i]
+        p.changeRate = changeRate
+        if changeRate == 0 {
+            p.status = .draw
+        } else if (changeRate > 0) == (p.choice == .up) {
+            p.status = .won
+            p.reward = TradexRules.predictionRewardKRW
+            state.krw += p.reward
+        } else {
+            p.status = .lost
+        }
+        state.predictions[i] = p
+        save()
+        return p
     }
 
     func deleteFile() {

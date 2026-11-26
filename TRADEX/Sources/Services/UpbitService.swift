@@ -49,6 +49,35 @@ enum UpbitAPI {
         return result
     }
 
+    /// 업비트 서버 시간 (응답의 Date 헤더) — 미니게임 마감 판정용
+    static func serverNow() async throws -> Date {
+        var comps = URLComponents(url: baseURL.appendingPathComponent("ticker"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "markets", value: "KRW-BTC")]
+        var req = URLRequest(url: comps.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard let header = (resp as? HTTPURLResponse)?.value(forHTTPHeaderField: "Date"),
+              let date = httpDate.date(from: header) else { throw URLError(.badServerResponse) }
+        return date
+    }
+
+    private static let httpDate: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "GMT")
+        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return f
+    }()
+
+    /// 일봉 (최신순)
+    static func dayCandles(market: String, count: Int) async throws -> [DayCandle] {
+        let rows: [Lossy<DayCandle>] = try await get("candles/days", query: [
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "count", value: String(min(max(count, 1), 200))),
+        ])
+        return rows.compactMap(\.value)
+    }
+
     /// 차트용 캔들 (오래된 순으로 정렬해서 반환)
     static func candles(market: String, range: ChartRange) async throws -> [ChartPoint] {
         let (path, count) = range.request
