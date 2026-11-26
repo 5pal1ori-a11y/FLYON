@@ -52,6 +52,8 @@ struct WalletState: Codable {
     var grantedTradex: Int = 0
     /// 미니게임 예측 기록
     var predictions: [Prediction] = []
+    /// 출석·미션·퀴즈
+    var daily = DailyState()
 }
 
 extension WalletState {
@@ -65,6 +67,7 @@ extension WalletState {
         tradexHistory = try c.decodeIfPresent([TradexRecord].self, forKey: .tradexHistory) ?? []
         grantedTradex = try c.decodeIfPresent(Int.self, forKey: .grantedTradex) ?? 0
         predictions = try c.decodeIfPresent([Prediction].self, forKey: .predictions) ?? []
+        daily = try c.decodeIfPresent(DailyState.self, forKey: .daily) ?? DailyState()
     }
 }
 

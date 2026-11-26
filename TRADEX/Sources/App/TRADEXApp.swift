@@ -48,8 +48,8 @@ struct MainTabView: View {
                 .tabItem { Label("거래소", systemImage: "chart.bar.fill") }
             AssetsView()
                 .tabItem { Label("자산", systemImage: "wallet.pass.fill") }
-            MiniGameView()
-                .tabItem { Label("미니게임", systemImage: "gamecontroller.fill") }
+            RewardsView()
+                .tabItem { Label("혜택", systemImage: "gift.fill") }
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape.fill") }
         }

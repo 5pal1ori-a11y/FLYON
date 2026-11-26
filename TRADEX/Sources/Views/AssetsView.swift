@@ -33,6 +33,26 @@ struct AssetsView: View {
                     }
                     .card()
 
+                    // AI 분석
+                    NavigationLink {
+                        PortfolioAnalysisView()
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "sparkles")
+                                .font(.title3)
+                                .frame(width: 42, height: 42)
+                                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("AI 투자 분석").font(.headline)
+                                Text("Apple Intelligence가 내 투자 습관을 분석해요").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        }
+                        .card()
+                    }
+                    .buttonStyle(.plain)
+
                     // TRADEX
                     section("TRADEX") {
                         Button { showExchange = true } label: {

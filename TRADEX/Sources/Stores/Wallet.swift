@@ -85,6 +85,7 @@ final class Wallet {
         state.krw = max(0, state.krw - cost - fee)
         state.trades.insert(TradeRecord(side: .buy, market: market.market, koreanName: market.koreanName,
                                         price: price, quantity: qty, fee: fee, date: .now), at: 0)
+        recordEvent("buy")
         save()
     }
 
@@ -139,7 +140,7 @@ final class Wallet {
         // 미니게임 기록은 유지 (같은 라운드에 다시 참여하지 못하게)
         state = WalletState(tradex: granted, krw: 0, holdings: [:], trades: [],
                             tradexHistory: [TradexRecord(kind: .signupBonus, amount: granted, date: .now)],
-                            grantedTradex: granted, predictions: state.predictions)
+                            grantedTradex: granted, predictions: state.predictions, daily: state.daily)
         save()
     }
 
@@ -166,6 +167,7 @@ final class Wallet {
         guard prediction(for: round.key) == nil else { throw PredictionError.already }
         state.predictions.insert(Prediction(roundKey: round.key, market: market.market, koreanName: market.koreanName,
                                             choice: choice, createdAt: serverNow), at: 0)
+        recordEvent("predict", day: KST.dayKey(serverNow))
         save()
     }
 
@@ -203,6 +205,100 @@ final class Wallet {
         state.predictions[i] = p
         save()
         return p
+    }
+
+    // MARK: - 출석 · 미션 · 퀴즈
+
+    enum DailyError: LocalizedError {
+        case alreadyCheckedIn, notComplete, alreadyClaimed, alreadyAnswered
+        var errorDescription: String? {
+            switch self {
+            case .alreadyCheckedIn: return "오늘은 이미 출석했어요."
+            case .notComplete: return "아직 미션을 완료하지 않았어요."
+            case .alreadyClaimed: return "이미 보상을 받았어요."
+            case .alreadyAnswered: return "이미 푼 문제예요."
+            }
+        }
+    }
+
+    /// 미션 진행 기록. 날짜가 바뀌면 새로 시작.
+    func recordEvent(_ event: String, day: String = KST.dayKey(.now)) {
+        if state.daily.eventsDay != day {
+            state.daily.eventsDay = day
+            state.daily.events = []
+        }
+        if !state.daily.events.contains(event) { state.daily.events.append(event) }
+        save()
+    }
+
+    func checkedIn(on day: String) -> Bool { state.daily.checkInDays.first == day }
+
+    /// 출석 (서버 시간 기준 날짜). 지급액(기본 + 연속 보너스)을 돌려준다.
+    func checkIn(serverNow: Date) throws -> (reward: Double, bonus: Double, streak: Int) {
+        let today = KST.dayKey(serverNow)
+        guard !checkedIn(on: today) else { throw DailyError.alreadyCheckedIn }
+        let continued = state.daily.checkInDays.first == KST.previousDayKey(today)
+        state.daily.streak = continued ? state.daily.streak + 1 : 1
+        state.daily.checkInDays.insert(today, at: 0)
+        state.daily.checkInDays = Array(state.daily.checkInDays.prefix(60))
+        let bonus = state.daily.streak % DailyRules.streakBonusEvery == 0 ? DailyRules.streakBonus : 0
+        state.krw += DailyRules.checkInReward + bonus
+        save()
+        return (DailyRules.checkInReward, bonus, state.daily.streak)
+    }
+
+    /// 출석이 끊겼는지 반영한 현재 연속 출석일
+    func currentStreak(today: String) -> Int {
+        guard let last = state.daily.checkInDays.first else { return 0 }
+        return (last == today || last == KST.previousDayKey(today)) ? state.daily.streak : 0
+    }
+
+    func missionProgress(_ m: Mission, today: String) -> Int {
+        let events = state.daily.eventsDay == today ? state.daily.events : []
+        let count: Int
+        switch m.id {
+        case "chart": count = events.filter { $0.hasPrefix("chart:") }.count
+        case "quiz": count = state.daily.quizDay == today ? state.daily.quizAnswers.count : 0
+        default: count = events.contains(m.id) ? 1 : 0
+        }
+        return min(count, m.goal)
+    }
+
+    func missionClaimed(_ m: Mission, today: String) -> Bool {
+        state.daily.claimedDay == today && state.daily.claimedMissions.contains(m.id)
+    }
+
+    func claimMission(_ m: Mission, serverNow: Date) throws {
+        let today = KST.dayKey(serverNow)
+        guard !missionClaimed(m, today: today) else { throw DailyError.alreadyClaimed }
+        guard missionProgress(m, today: today) >= m.goal else { throw DailyError.notComplete }
+        if state.daily.claimedDay != today {
+            state.daily.claimedDay = today
+            state.daily.claimedMissions = []
+        }
+        state.daily.claimedMissions.append(m.id)
+        state.krw += m.reward
+        save()
+    }
+
+    func quizAnswer(_ q: QuizQuestion, today: String) -> Int? {
+        state.daily.quizDay == today ? state.daily.quizAnswers[q.id] : nil
+    }
+
+    /// 퀴즈 답 제출. 맞히면 보상 지급 후 true.
+    func answerQuiz(_ q: QuizQuestion, choice: Int, serverNow: Date) throws -> Bool {
+        let today = KST.dayKey(serverNow)
+        guard QuizQuestion.today(today).contains(q) else { throw DailyError.alreadyAnswered }
+        if state.daily.quizDay != today {
+            state.daily.quizDay = today
+            state.daily.quizAnswers = [:]
+        }
+        guard state.daily.quizAnswers[q.id] == nil else { throw DailyError.alreadyAnswered }
+        state.daily.quizAnswers[q.id] = choice
+        let correct = choice == q.answer
+        if correct { state.krw += DailyRules.quizReward }
+        save()
+        return correct
     }
 
     func deleteFile() {

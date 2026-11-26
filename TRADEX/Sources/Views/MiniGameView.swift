@@ -1,6 +1,7 @@
 import SwiftUI
 
-struct MiniGameView: View {
+/// "내일 오를까? 내릴까?" 게임 화면 (혜택 탭에서 진입)
+struct PredictionGameView: View {
     @Environment(MarketStore.self) private var store
     @Environment(Wallet.self) private var wallet
 
@@ -23,7 +24,6 @@ struct MiniGameView: View {
     }
 
     var body: some View {
-        NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     if let coin {
@@ -37,7 +37,7 @@ struct MiniGameView: View {
                 .padding(20)
             }
             .background(Theme.background)
-            .navigationTitle("미니게임")
+            .navigationTitle("오를까 내릴까")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink("이전 내역") { PredictionHistoryView() }
@@ -66,7 +66,6 @@ struct MiniGameView: View {
             } message: {
                 Text(resultMessage)
             }
-        }
     }
 
     // MARK: - 문제 카드

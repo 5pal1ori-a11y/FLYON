@@ -52,6 +52,7 @@ struct CoinDetailView: View {
         }
         .safeAreaInset(edge: .bottom) { orderButtons }
         .task(id: range) { await loadChart() }
+        .onAppear { wallet.recordEvent("chart:\(market.market)") }
         .sheet(item: $orderSide) { side in
             OrderSheet(market: market, side: side)
                 .presentationDetents([.large])
