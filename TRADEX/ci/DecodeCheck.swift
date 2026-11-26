@@ -11,13 +11,13 @@ struct DecodeCheck {
     }
 
     static func main() async throws {
-        print("참고: \\"24h\\".capitalized =", "24h".capitalized, "(convertFromSnakeCase를 쓰면 안 되는 이유)")
+        print("참고: \"24h\".capitalized =", "24h".capitalized, "(convertFromSnakeCase를 쓰면 안 되는 이유)")
         let dec = JSONDecoder()
         let markets = try dec.decode([Market].self, from: try await fetch("https://api.upbit.com/v1/market/all?isDetails=false"))
             .filter { $0.market.hasPrefix("KRW-") }
         print("원화마켓:", markets.count)
-        let codes = markets.prefix(100).map(\\.market).joined(separator: ",")
-        let tickers = try dec.decode([RestTicker].self, from: try await fetch("https://api.upbit.com/v1/ticker?markets=\\(codes)"))
+        let codes = markets.prefix(100).map(\.market).joined(separator: ",")
+        let tickers = try dec.decode([RestTicker].self, from: try await fetch("https://api.upbit.com/v1/ticker?markets=\(codes)"))
         print("시세:", tickers.count, "예:", tickers[0].market, tickers[0].tradePrice, tickers[0].accTradePrice24h)
         let candles = try dec.decode([Candle].self, from: try await fetch("https://api.upbit.com/v1/candles/minutes/10?market=KRW-BTC&count=5"))
         print("캔들:", candles.count, candles[0].date)
