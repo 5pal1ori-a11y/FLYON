@@ -37,6 +37,10 @@ struct DailyState: Codable, Equatable {
     var claimedMissions: [String] = []
     var quizDay: String = ""
     var quizAnswers: [String: Int] = [:]  // 문제 id → 고른 보기
+    var tradeXPDay: String = ""
+    var tradeXP: Int = 0                  // 오늘 거래로 얻은 경험치 (상한 있음)
+    var chartGameDay: String = ""
+    var chartGamePlays: Int = 0           // 오늘 보상 받은 차트 맞히기 판 수
 
     init() {}
 
@@ -50,6 +54,10 @@ struct DailyState: Codable, Equatable {
         claimedMissions = try c.decodeIfPresent([String].self, forKey: .claimedMissions) ?? []
         quizDay = try c.decodeIfPresent(String.self, forKey: .quizDay) ?? ""
         quizAnswers = try c.decodeIfPresent([String: Int].self, forKey: .quizAnswers) ?? [:]
+        tradeXPDay = try c.decodeIfPresent(String.self, forKey: .tradeXPDay) ?? ""
+        tradeXP = try c.decodeIfPresent(Int.self, forKey: .tradeXP) ?? 0
+        chartGameDay = try c.decodeIfPresent(String.self, forKey: .chartGameDay) ?? ""
+        chartGamePlays = try c.decodeIfPresent(Int.self, forKey: .chartGamePlays) ?? 0
     }
 }
 

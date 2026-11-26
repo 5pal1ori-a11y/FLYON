@@ -20,6 +20,8 @@ struct SettingsView: View {
                             Text(session.user?.displayName ?? "-").font(.headline)
                             Text(session.user?.provider == "apple" ? "Apple로 로그인" : "개발용 계정")
                                 .font(.caption).foregroundStyle(.secondary)
+                            Text("\(wallet.level.name) · \(Fmt.number(Double(wallet.state.xp))) XP")
+                                .font(.caption.weight(.semibold))
                         }
                     }
                     .padding(.vertical, 4)

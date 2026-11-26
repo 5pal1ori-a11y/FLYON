@@ -18,7 +18,12 @@ struct RewardsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    summarySection.appear(0)
+                    LevelSummaryView()
+                        .padding(.top, 8)
+                        .padding(.bottom, 20)
+                        .appear(0)
+                    band
+                    summarySection.appear(0.03)
                     band
                     attendanceSection.appear(0.05)
                     band
@@ -96,7 +101,7 @@ struct RewardsView: View {
                 Text("\(done)/\(total) 완료").font(.caption.weight(.semibold)).monospacedDigit()
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 22)
         .padding(.bottom, 22)
     }
 
@@ -178,6 +183,19 @@ struct RewardsView: View {
                         subtitle: "맞히면 문제당 \(Fmt.krw(DailyRules.quizReward))",
                         status: "\(answered)/\(questions.count)",
                         done: answered == questions.count)
+            }
+            .buttonStyle(.plain)
+            Divider().padding(.leading, 54)
+            NavigationLink {
+                ChartGameView()
+            } label: {
+                let left = wallet.chartGameRewardedLeft(today: today)
+                gameRow(icon: AnyView(Image(systemName: "chart.xyaxis.line").font(.title3).frame(width: 40, height: 40)
+                                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1))),
+                        title: "과거 차트 맞히기",
+                        subtitle: "지난 차트의 다음 10시간 맞히면 \(Fmt.krw(ChartGameRules.reward))",
+                        status: left > 0 ? "\(left)판 남음" : "연습",
+                        done: left == 0)
             }
             .buttonStyle(.plain)
             .padding(.bottom, 12)

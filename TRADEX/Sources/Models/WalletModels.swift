@@ -39,7 +39,7 @@ struct TradeRecord: Codable, Identifiable, Equatable {
 }
 
 struct TradexRecord: Codable, Identifiable, Equatable {
-    enum Kind: String, Codable { case signupBonus, exchange }
+    enum Kind: String, Codable { case signupBonus, exchange, levelReward }
     var id = UUID()
     let kind: Kind
     let amount: Int   // +지급 / -교환
@@ -216,11 +216,14 @@ struct WalletState: Codable {
     var predictions: [Prediction] = []
     /// 출석·미션·퀴즈
     var daily = DailyState()
+    /// 경험치와 보상을 받은 최고 등급
+    var xp = 0
+    var rewardedLevel = 0
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case tradex, accounts, tradexHistory, grantedTradex, predictions, daily
+        case tradex, accounts, tradexHistory, grantedTradex, predictions, daily, xp, rewardedLevel
         case krw, holdings, trades   // 예전 버전(거래소 구분 없음) 필드
     }
 
@@ -234,6 +237,8 @@ struct WalletState: Codable {
         grantedTradex = try c.decodeIfPresent(Int.self, forKey: .grantedTradex) ?? 0
         predictions = try c.decodeIfPresent([Prediction].self, forKey: .predictions) ?? []
         daily = try c.decodeIfPresent(DailyState.self, forKey: .daily) ?? DailyState()
+        xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? 0
+        rewardedLevel = try c.decodeIfPresent(Int.self, forKey: .rewardedLevel) ?? 0
         if accounts.isEmpty {
             var legacy = ExchangeAccount()
             legacy.krw = try c.decodeIfPresent(Double.self, forKey: .krw) ?? 0
@@ -251,6 +256,8 @@ struct WalletState: Codable {
         try c.encode(grantedTradex, forKey: .grantedTradex)
         try c.encode(predictions, forKey: .predictions)
         try c.encode(daily, forKey: .daily)
+        try c.encode(xp, forKey: .xp)
+        try c.encode(rewardedLevel, forKey: .rewardedLevel)
     }
 }
 

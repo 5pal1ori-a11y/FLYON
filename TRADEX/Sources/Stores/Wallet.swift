@@ -8,6 +8,8 @@ import Observation
 final class Wallet {
     private(set) var state: WalletState
     @ObservationIgnored private let fileURL: URL
+    /// 방금 오른 등급 (축하 화면 표시 후 nil로)
+    var pendingLevelUp: TraderLevel?
 
     enum WalletError: LocalizedError {
         case minOrder, insufficientKRW, insufficientQty, insufficientTradex, invalid
@@ -112,6 +114,7 @@ final class Wallet {
                                         price: price, quantity: qty, fee: fee, date: .now), at: 0)
         }
         recordEvent("buy")
+        gainXP(.trade)
         save()
     }
 
@@ -132,6 +135,7 @@ final class Wallet {
             a.trades.insert(TradeRecord(side: .sell, market: market.market, koreanName: market.koreanName,
                                         price: price, quantity: quantity, fee: fee, date: .now, realizedPnL: pnl), at: 0)
         }
+        gainXP(.trade)
         save()
     }
 
@@ -165,6 +169,7 @@ final class Wallet {
             a.positions.insert(position, at: 0)
         }
         recordEvent("futures")
+        gainXP(.futures)
         save()
     }
 
@@ -241,6 +246,7 @@ final class Wallet {
             a.krw = max(0, a.krw - lock)
             a.orders.insert(order, at: 0)
         }
+        gainXP(.order)
         save()
     }
 
@@ -261,6 +267,7 @@ final class Wallet {
             a.holdings[market.market] = left.quantity < 1e-8 ? nil : left
             a.orders.insert(order, at: 0)
         }
+        gainXP(.order)
         save()
     }
 
@@ -497,6 +504,8 @@ final class Wallet {
         // 미니게임·출석 기록은 유지 (같은 라운드·같은 날 보상을 다시 받지 못하게)
         fresh.predictions = state.predictions
         fresh.daily = state.daily
+        fresh.xp = state.xp
+        fresh.rewardedLevel = state.rewardedLevel
         state = fresh
         save()
     }
@@ -525,6 +534,7 @@ final class Wallet {
         state.predictions.insert(Prediction(roundKey: round.key, market: market.market, koreanName: market.koreanName,
                                             choice: choice, createdAt: serverNow), at: 0)
         recordEvent("predict", day: KST.dayKey(serverNow))
+        gainXP(.predict)
         save()
     }
 
@@ -557,6 +567,7 @@ final class Wallet {
             p.reward = TradexRules.predictionRewardKRW
             let reward = p.reward
             update(ex) { $0.krw += reward }
+            gainXP(.predictWin)
         } else {
             p.status = .lost
         }
@@ -601,6 +612,7 @@ final class Wallet {
         state.daily.checkInDays = Array(state.daily.checkInDays.prefix(60))
         let bonus = state.daily.streak % DailyRules.streakBonusEvery == 0 ? DailyRules.streakBonus : 0
         update(ex) { $0.krw += DailyRules.checkInReward + bonus }
+        gainXP(.attendance)
         save()
         return (DailyRules.checkInReward, bonus, state.daily.streak)
     }
@@ -636,6 +648,7 @@ final class Wallet {
         }
         state.daily.claimedMissions.append(m.id)
         update(ex) { $0.krw += m.reward }
+        gainXP(.mission)
         save()
     }
 
@@ -654,9 +667,69 @@ final class Wallet {
         guard state.daily.quizAnswers[q.id] == nil else { throw DailyError.alreadyAnswered }
         state.daily.quizAnswers[q.id] = choice
         let correct = choice == q.answer
-        if correct { update(ex) { $0.krw += DailyRules.quizReward } }
+        if correct {
+            update(ex) { $0.krw += DailyRules.quizReward }
+            gainXP(.quiz)
+        }
         save()
         return correct
+    }
+
+    // MARK: - 등급 · 경험치
+
+    var level: TraderLevel { TraderLevel.level(for: state.xp) }
+
+    /// 경험치 적립. 거래 관련은 하루 상한, 등급이 오르면 TRADEX 보너스 지급.
+    func gainXP(_ rule: XPRule, day: String = KST.dayKey(.now)) {
+        var amount = rule.amount
+        if rule.isTradeCapped {
+            if state.daily.tradeXPDay != day {
+                state.daily.tradeXPDay = day
+                state.daily.tradeXP = 0
+            }
+            amount = min(amount, XPRule.dailyTradeCap - state.daily.tradeXP)
+            guard amount > 0 else { return }
+            state.daily.tradeXP += amount
+        }
+        let before = level
+        state.xp += amount
+        let after = level
+        // 한 번에 여러 등급이 올라도 아직 보상받지 않은 등급만 지급
+        if after.index > before.index, after.index > state.rewardedLevel {
+            let bonus = TraderLevel.all[(state.rewardedLevel + 1)...after.index].reduce(0) { $0 + $1.rewardTradex }
+            state.rewardedLevel = after.index
+            if bonus > 0 {
+                state.tradex += bonus
+                state.grantedTradex += bonus
+                state.tradexHistory.insert(TradexRecord(kind: .levelReward, amount: bonus, date: .now), at: 0)
+            }
+            pendingLevelUp = after
+        }
+        save()
+    }
+
+    // MARK: - 과거 차트 맞히기
+
+    func chartGameRewardedLeft(today: String) -> Int {
+        let plays = state.daily.chartGameDay == today ? state.daily.chartGamePlays : 0
+        return max(0, ChartGameRules.rewardedPerDay - plays)
+    }
+
+    /// 한 판 결과 기록. 보상 가능한 판이면 정답 시 모의 원화·경험치 지급. 지급액을 돌려준다.
+    @discardableResult
+    func recordChartGame(correct: Bool, today: String, creditTo ex: ExchangeID) -> Double {
+        guard chartGameRewardedLeft(today: today) > 0 else { return 0 }
+        if state.daily.chartGameDay != today {
+            state.daily.chartGameDay = today
+            state.daily.chartGamePlays = 0
+        }
+        state.daily.chartGamePlays += 1
+        gainXP(.chartGame, day: today)
+        guard correct else { save(); return 0 }
+        update(ex) { $0.krw += ChartGameRules.reward }
+        gainXP(.chartGameWin, day: today)
+        save()
+        return ChartGameRules.reward
     }
 
     func deleteFile() {

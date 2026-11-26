@@ -94,6 +94,15 @@ enum UpbitAPI {
         return rows.compactMap(\.value)
     }
 
+    /// 1시간 봉 종가 (오래된 순) — 과거 차트 맞히기용
+    static func hourCloses(market: String, count: Int, on ex: ExchangeID) async throws -> [ChartPoint] {
+        let rows: [Lossy<Candle>] = try await get("candles/minutes/60", query: [
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "count", value: String(min(max(count, 1), 200))),
+        ], on: ex)
+        return rows.compactMap(\.value).map { ChartPoint(date: $0.date, price: $0.tradePrice) }.sorted { $0.date < $1.date }
+    }
+
     /// 차트용 캔들 (오래된 순으로 정렬해서 반환)
     static func candles(market: String, range: ChartRange, on ex: ExchangeID = .upbit) async throws -> [ChartPoint] {
         let (path, count) = range.request

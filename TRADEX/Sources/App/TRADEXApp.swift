@@ -123,6 +123,16 @@ struct MainTabView: View {
         } message: {
             Text(liquidated.map { "\($0.koreanName) \($0.side.title) \($0.leverage)× · 증거금 \(Fmt.krw($0.margin)) 소진" }.joined(separator: "\n"))
         }
+        .overlay {
+            if let lv = wallet.pendingLevelUp, !session.showWelcome {
+                LevelUpOverlay(level: lv) {
+                    withAnimation(.easeOut(duration: 0.25)) { wallet.pendingLevelUp = nil }
+                }
+                .transition(.opacity)
+                .zIndex(2)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: wallet.pendingLevelUp)
         .sheet(isPresented: $session.showWelcome) {
             WelcomeBonusView()
                 .presentationDetents([.medium])
