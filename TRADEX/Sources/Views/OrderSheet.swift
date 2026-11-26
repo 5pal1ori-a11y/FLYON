@@ -1,6 +1,11 @@
 import SwiftUI
 
-/// 시장가 주문 화면 — 숫자 키패드로 금액(매수) 또는 수량(매도)을 입력
+/// 주문 입력 단위
+enum OrderUnit: Hashable {
+    case krw, coin
+}
+
+/// 시장가 주문 화면 — 원(금액) 또는 코인 개수로 입력해서 매수·매도
 struct OrderSheet: View {
     let market: Market
     let side: TradeSide
@@ -9,9 +14,17 @@ struct OrderSheet: View {
     @Environment(Wallet.self) private var wallet
     @Environment(\.dismiss) private var dismiss
 
+    @State private var unit: OrderUnit
     @State private var input = ""
     @State private var errorText: String?
     @State private var done = false
+
+    init(market: Market, side: TradeSide) {
+        self.market = market
+        self.side = side
+        // 기본값: 매수는 원, 매도는 개수
+        _unit = State(initialValue: side == .buy ? .krw : .coin)
+    }
 
     private var price: Double { store.tickers[market.market]?.tradePrice ?? 0 }
     private var holdingQty: Double { wallet.state.holdings[market.market]?.quantity ?? 0 }
@@ -19,15 +32,27 @@ struct OrderSheet: View {
     private var isBuy: Bool { side == .buy }
     private var accent: Color { isBuy ? Theme.rise : Theme.fall }
 
-    /// 매수: 입력=원화, 환산=수량 / 매도: 입력=수량, 환산=원화
+    /// 입력값을 코인 개수로 환산
+    private var quantity: Double {
+        guard price > 0 else { return 0 }
+        return unit == .coin ? value : floor(value / price * 1e8) / 1e8
+    }
+
+    /// 입력값을 원화 금액으로 환산
+    private var amountKRW: Double { unit == .krw ? value : value * price }
+
     private var converted: String {
-        guard price > 0 else { return "-" }
-        return isBuy ? "≈ \(Fmt.qty(floor(value / price * 1e8) / 1e8)) \(market.symbol)"
-                     : "≈ \(Fmt.krw(value * price))"
+        guard price > 0, value > 0 else { return " " }
+        return unit == .krw ? "≈ \(Fmt.qty(quantity)) \(market.symbol)" : "≈ \(Fmt.krw(amountKRW))"
     }
 
     private var available: String {
-        isBuy ? "주문 가능 \(Fmt.krw(wallet.state.krw))" : "보유 \(Fmt.qty(holdingQty)) \(market.symbol)"
+        if isBuy {
+            let maxQty = price > 0 ? floor(wallet.maxBuyKRW / price * 1e8) / 1e8 : 0
+            return "주문 가능 \(Fmt.krw(wallet.state.krw)) (최대 \(Fmt.qty(maxQty)) \(market.symbol))"
+        } else {
+            return "보유 \(Fmt.qty(holdingQty)) \(market.symbol) (≈ \(Fmt.krw(holdingQty * price)))"
+        }
     }
 
     var body: some View {
@@ -43,6 +68,7 @@ struct OrderSheet: View {
                             .animation(.snappy, value: price)
                     }
                     Spacer()
+                    unitPicker
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -54,12 +80,12 @@ struct OrderSheet: View {
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                        Text(isBuy ? "원" : market.symbol)
+                        Text(unit == .krw ? "원" : market.symbol)
                             .font(.title2.weight(.bold))
                             .foregroundStyle(.secondary)
                     }
                     Text(converted).font(.headline).foregroundStyle(accent).monospacedDigit()
-                    Text(available).font(.footnote).foregroundStyle(.secondary)
+                    Text(available).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
                     if let errorText {
                         Text(errorText).font(.footnote.weight(.medium)).foregroundStyle(Theme.rise)
                     }
@@ -81,7 +107,7 @@ struct OrderSheet: View {
                 }
                 .padding(.horizontal, 20)
 
-                NumberPad(allowsDecimal: !isBuy) { key in tap(key) }
+                NumberPad(allowsDecimal: unit == .coin) { key in tap(key) }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
 
@@ -98,18 +124,67 @@ struct OrderSheet: View {
                 ToolbarItem(placement: .topBarLeading) { Button("닫기") { dismiss() } }
             }
             .sensoryFeedback(.success, trigger: done)
+            .sensoryFeedback(.selection, trigger: unit)
             .overlay {
                 if done { DoneOverlay(text: isBuy ? "매수 완료" : "매도 완료", color: accent) }
             }
         }
     }
 
+    /// 원 / 개수 전환 버튼
+    private var unitPicker: some View {
+        HStack(spacing: 2) {
+            unitButton("원", .krw)
+            unitButton("개수", .coin)
+        }
+        .padding(3)
+        .background(Theme.card, in: Capsule())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("입력 단위")
+    }
+
+    private func unitButton(_ title: String, _ u: OrderUnit) -> some View {
+        Button {
+            switchUnit(to: u)
+        } label: {
+            Text(title)
+                .font(.footnote.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .foregroundStyle(unit == u ? Color(.systemBackground) : .secondary)
+                .background(unit == u ? Color.primary : .clear, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(unit == u ? .isSelected : [])
+    }
+
+    /// 단위를 바꾸면 입력해 둔 값을 새 단위로 환산해서 유지
+    private func switchUnit(to newUnit: OrderUnit) {
+        guard newUnit != unit else { return }
+        errorText = nil
+        if value > 0, price > 0 {
+            if newUnit == .coin {
+                input = plain(floor(value / price * 1e8) / 1e8)
+            } else {
+                input = String(Int(floor(value * price)))
+            }
+        }
+        withAnimation(.snappy) { unit = newUnit }
+    }
+
     private var formattedInput: String {
-        if isBuy { return Fmt.number(value) }
-        // 매도: 소수점 입력 중인 모양 유지
+        if unit == .krw { return Fmt.number(value) }
+        // 개수: 소수점 입력 중인 모양 유지
         let parts = input.split(separator: ".", omittingEmptySubsequences: false)
         let intPart = Fmt.number(Double(parts.first ?? "0") ?? 0)
         return parts.count > 1 ? "\(intPart).\(parts[1])" : intPart
+    }
+
+    /// 쉼표 없는 숫자 문자열 (소수 8자리까지, 끝의 0 제거)
+    private func plain(_ v: Double) -> String {
+        var s = String(format: "%.8f", v)
+        while s.contains(".") && (s.hasSuffix("0") || s.hasSuffix(".")) { s.removeLast() }
+        return s
     }
 
     private func tap(_ key: NumberPad.Key) {
@@ -117,9 +192,10 @@ struct OrderSheet: View {
         switch key {
         case .digit(let d):
             if input == "0" { input = "" }
-            if !isBuy, let dot = input.firstIndex(of: "."), input[input.index(after: dot)...].count >= 8 { return }
+            if unit == .coin, let dot = input.firstIndex(of: "."), input[input.index(after: dot)...].count >= 8 { return }
             if input.count < 15 { input.append(String(d)) }
         case .dot:
+            guard unit == .coin else { return }
             if !input.contains(".") { input = input.isEmpty ? "0." : input + "." }
         case .delete:
             if !input.isEmpty { input.removeLast() }
@@ -128,20 +204,29 @@ struct OrderSheet: View {
 
     private func fill(_ ratio: Double) {
         errorText = nil
+        guard price > 0 else { return }
         if isBuy {
-            input = String(Int(floor(wallet.maxBuyKRW * ratio)))
+            let krw = floor(wallet.maxBuyKRW * ratio)
+            input = unit == .krw ? String(Int(krw)) : plain(floor(krw / price * 1e8) / 1e8)
         } else {
-            let q = ratio == 1 ? holdingQty : floor(holdingQty * ratio * 1e8) / 1e8
-            input = Fmt.qty(q).replacingOccurrences(of: ",", with: "")
+            let qty = ratio == 1 ? holdingQty : floor(holdingQty * ratio * 1e8) / 1e8
+            input = unit == .coin ? plain(qty) : String(Int(floor(qty * price)))
         }
     }
 
     private func submit() {
         do {
             if isBuy {
-                try wallet.buy(market: market, krwAmount: value, price: price)
+                if unit == .krw {
+                    try wallet.buy(market: market, krwAmount: value, price: price)
+                } else {
+                    try wallet.buy(market: market, quantity: value, price: price)
+                }
             } else {
-                try wallet.sell(market: market, quantity: min(value, holdingQty), price: price)
+                // 원으로 입력했는데 보유 평가금액 이상이면 전량 매도
+                var qty = unit == .coin ? value : floor(value / price * 1e8) / 1e8
+                if unit == .krw && value >= floor(holdingQty * price) { qty = holdingQty }
+                try wallet.sell(market: market, quantity: min(qty, holdingQty), price: price)
             }
             done = true
             Task {

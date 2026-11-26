@@ -66,16 +66,23 @@ final class Wallet {
     /// 원화 금액만큼 시장가 매수. 수수료는 별도로 차감.
     func buy(market: Market, krwAmount: Double, price: Double) throws {
         guard krwAmount > 0, price > 0 else { throw WalletError.invalid }
-        guard krwAmount >= TradexRules.minOrderKRW else { throw WalletError.minOrder }
-        let fee = krwAmount * TradexRules.feeRate
-        guard krwAmount + fee <= state.krw + 0.000001 else { throw WalletError.insufficientKRW }
-        let qty = floor(krwAmount / price * 1e8) / 1e8
+        try buy(market: market, quantity: floor(krwAmount / price * 1e8) / 1e8, price: price)
+    }
+
+    /// 코인 개수만큼 시장가 매수. 수수료는 별도로 차감.
+    func buy(market: Market, quantity: Double, price: Double) throws {
+        let qty = floor(quantity * 1e8) / 1e8
+        guard qty > 0, price > 0 else { throw WalletError.invalid }
+        let cost = qty * price
+        guard cost >= TradexRules.minOrderKRW else { throw WalletError.minOrder }
+        let fee = cost * TradexRules.feeRate
+        guard cost + fee <= state.krw + 0.000001 else { throw WalletError.insufficientKRW }
 
         var h = state.holdings[market.market] ?? Holding(quantity: 0, averagePrice: 0, koreanName: market.koreanName)
-        h.averagePrice = (h.averagePrice * h.quantity + price * qty) / (h.quantity + qty)
+        h.averagePrice = (h.averagePrice * h.quantity + cost) / (h.quantity + qty)
         h.quantity += qty
         state.holdings[market.market] = h
-        state.krw = max(0, state.krw - krwAmount - fee)
+        state.krw = max(0, state.krw - cost - fee)
         state.trades.insert(TradeRecord(side: .buy, market: market.market, koreanName: market.koreanName,
                                         price: price, quantity: qty, fee: fee, date: .now), at: 0)
         save()
