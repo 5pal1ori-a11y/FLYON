@@ -118,11 +118,11 @@ struct CoinDetailView: View {
                         .contentTransition(.numericText(value: selected?.price ?? t.tradePrice))
                         .animation(.snappy, value: t.tradePrice)
                     HStack(spacing: 4) {
-                        Image(systemName: t.signedChangeRate >= 0 ? "arrowtriangle.up" : "arrowtriangle.down")
+                        Image(systemName: t.signedChangeRate >= 0 ? "arrow.up" : "arrow.down")
                             .font(.caption2.weight(.bold))
                         Text(Fmt.signedPrice(t.signedChangePrice))
                         Text("(\(Fmt.rate(t.signedChangeRate)))")
-                        Text("전일 대비").foregroundStyle(.secondary).fontWeight(.regular)
+                        Text("전일 대비").foregroundStyle(Color.secondary).fontWeight(.regular)
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.color(for: t.signedChangeRate))
@@ -267,7 +267,8 @@ struct CoinDetailView: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 4)
-        .background(.bar)
+        // 반투명(.bar) 위에서는 검정(primary)이 흐린 회색으로 보이므로 불투명 배경 사용
+        .background(Theme.background)
         .disabled(ticker == nil)
     }
 
