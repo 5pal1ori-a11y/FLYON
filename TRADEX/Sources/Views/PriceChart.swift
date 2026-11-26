@@ -17,7 +17,7 @@ struct PriceChart: View {
     private var yDomain: ClosedRange<Double> {
         let prices = points.map(\.price)
         guard let lo = prices.min(), let hi = prices.max() else { return 0...1 }
-        let pad = max((hi - lo) * 0.12, hi * 0.0005)
+        let pad = max((hi - lo) * 0.16, hi * 0.0005)
         return (lo - pad)...(hi + pad)
     }
 
@@ -48,6 +48,19 @@ struct PriceChart: View {
                 PointMark(x: .value("현재", last.date), y: .value("가격", last.price))
                     .foregroundStyle(color)
                     .symbolSize(50)
+                // 기간 중 최고·최저
+                if let hi = points.max(by: { $0.price < $1.price }), let lo = points.min(by: { $0.price < $1.price }), hi.price > lo.price {
+                    PointMark(x: .value("최고", hi.date), y: .value("가격", hi.price))
+                        .symbolSize(0)
+                        .annotation(position: .top, spacing: 2, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                            Text("최고 \(Fmt.price(hi.price))").font(.caption2.weight(.semibold)).foregroundStyle(Theme.rise)
+                        }
+                    PointMark(x: .value("최저", lo.date), y: .value("가격", lo.price))
+                        .symbolSize(0)
+                        .annotation(position: .bottom, spacing: 2, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                            Text("최저 \(Fmt.price(lo.price))").font(.caption2.weight(.semibold)).foregroundStyle(Theme.fall)
+                        }
+                }
             }
         }
         .chartYScale(domain: yDomain)

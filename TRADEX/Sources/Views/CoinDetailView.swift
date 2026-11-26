@@ -26,9 +26,9 @@ struct CoinDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 18) {
                 header
-                BWSegmented(options: [("차트", "차트"), ("호가", "호가")], selection: $section)
+                BWSegmented(options: [("차트", "차트"), ("호가", "호가")], selection: $section, compact: true)
                 Group {
                     if section == "차트" {
                         chartSection
@@ -56,18 +56,25 @@ struct CoinDetailView: View {
                     PositionRow(position: p, price: ticker?.tradePrice, exchange: store.exchange)
                 }
                 statsCard
-                Text("시세 제공: 업비트 Open API · 모의투자 전용, 실제 거래가 아닙니다.")
+                Text("시세 제공: \(store.exchange.name) Open API · 모의투자 전용, 실제 거래가 아니에요.")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 100)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 24)
         }
         .background(Theme.background)
-        .navigationTitle(market.englishName)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle(market.koreanName)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 1) {
+                    Text(market.koreanName).font(.headline)
+                    Text("\(market.symbol)/KRW · \(store.exchange.name)").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showPlan = true } label: { Image(systemName: "repeat") }
                     .accessibilityLabel("적립식 자동 매수 만들기")
@@ -98,26 +105,35 @@ struct CoinDetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            CoinIcon(symbol: market.symbol, size: 48)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(market.koreanName) · \(market.symbol)/KRW")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        HStack(alignment: .center, spacing: 14) {
+            CoinIcon(symbol: market.symbol, size: 46)
+            VStack(alignment: .leading, spacing: 3) {
                 if let t = ticker {
+                    Text(selected.map { $0.date.formatted(.dateTime.month().day().hour().minute()) } ?? "현재 거래 가능 가격")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text("₩ \(Fmt.price(selected?.price ?? t.tradePrice))")
-                        .font(.system(size: 30, weight: .bold))
+                        .font(.system(size: 32, weight: .bold))
                         .monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.6)
                         .contentTransition(.numericText(value: selected?.price ?? t.tradePrice))
                         .animation(.snappy, value: t.tradePrice)
-                    ChangeLabel(change: t.signedChangePrice, rate: t.signedChangeRate)
+                    HStack(spacing: 4) {
+                        Image(systemName: t.signedChangeRate >= 0 ? "arrowtriangle.up" : "arrowtriangle.down")
+                            .font(.caption2.weight(.bold))
+                        Text(Fmt.signedPrice(t.signedChangePrice))
+                        Text("(\(Fmt.rate(t.signedChangeRate)))")
+                        Text("전일 대비").foregroundStyle(.secondary).fontWeight(.regular)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.color(for: t.signedChangeRate))
+                    .monospacedDigit()
                 } else {
                     ProgressView()
                 }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .padding(.top, 4)
+        .padding(.vertical, 6)
     }
 
     private var chartSection: some View {
@@ -131,10 +147,12 @@ struct CoinDetailView: View {
                     PriceChart(points: livePoints, selected: $selected)
                 }
             }
-            .frame(height: 240)
+            .frame(height: 220)
 
-            BWSegmented(options: ChartRange.allCases.map { ($0, $0.rawValue) }, selection: $range)
+            BWSegmented(options: ChartRange.allCases.map { ($0, $0.rawValue) }, selection: $range, compact: true)
         }
+        .padding(16)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     }
 
     private func holdingCard(_ h: Holding) -> some View {
@@ -165,15 +183,62 @@ struct CoinDetailView: View {
     }
 
     private var statsCard: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("시세 정보").font(.headline)
             if let t = ticker {
-                row("고가", "₩ \(Fmt.price(t.highPrice))", color: Theme.rise)
-                row("저가", "₩ \(Fmt.price(t.lowPrice))", color: Theme.fall)
-                row("전일 종가", "₩ \(Fmt.price(t.prevClosingPrice))")
-                row("거래대금(24H)", "\(Fmt.compactKRW(t.accTradePrice24h))원")
+                dayRange(t)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    tile("고가", "₩ \(Fmt.price(t.highPrice))", Theme.rise)
+                    tile("저가", "₩ \(Fmt.price(t.lowPrice))", Theme.fall)
+                    tile("전일 종가", "₩ \(Fmt.price(t.prevClosingPrice))", .primary)
+                    tile("거래대금 (24H)", "\(Fmt.compactKRW(t.accTradePrice24h))원", .primary)
+                }
             }
         }
         .card()
+    }
+
+    /// 오늘 저가~고가 사이에서 현재가 위치
+    private func dayRange(_ t: Ticker) -> some View {
+        let span = max(t.highPrice - t.lowPrice, 0.0000001)
+        let pos = min(max((t.tradePrice - t.lowPrice) / span, 0), 1)
+        return VStack(spacing: 6) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(LinearGradient(colors: [Theme.fall.opacity(0.35), Theme.rise.opacity(0.35)], startPoint: .leading, endPoint: .trailing))
+                        .frame(height: 6)
+                    Circle()
+                        .fill(Color.primary)
+                        .frame(width: 14, height: 14)
+                        .overlay(Circle().strokeBorder(Color(.systemBackground), lineWidth: 2))
+                        .offset(x: (geo.size.width - 14) * pos)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: pos)
+                }
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 16)
+            HStack {
+                Text("저가 \(Fmt.price(t.lowPrice))").foregroundStyle(Theme.fall)
+                Spacer()
+                Text("오늘 가격 범위").foregroundStyle(.secondary)
+                Spacer()
+                Text("고가 \(Fmt.price(t.highPrice))").foregroundStyle(Theme.rise)
+            }
+            .font(.caption2.weight(.medium))
+            .monospacedDigit()
+        }
+    }
+
+    private func tile(_ title: String, _ value: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(color)
+                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
     }
 
     private func row(_ title: String, _ value: String, color: Color = .primary) -> some View {
@@ -186,27 +251,43 @@ struct CoinDetailView: View {
     }
 
     private var orderButtons: some View {
-        HStack(spacing: 10) {
-            Button("매도") { orderSide = .sell }
-                .buttonStyle(PrimaryButtonStyle(color: Theme.fall))
-                .disabled(holding == nil)
-                .opacity(holding == nil ? 0.4 : 1)
-            Button("매수") { orderSide = .buy }
-                .buttonStyle(PrimaryButtonStyle(color: Theme.rise))
+        HStack(spacing: 8) {
+            tradeButton("매도", color: Theme.fall, enabled: holding != nil) { orderSide = .sell }
+            tradeButton("매수", color: Theme.rise, enabled: true) { orderSide = .buy }
             Button { showFutures = true } label: {
-                VStack(spacing: 0) {
+                VStack(spacing: 1) {
                     Text("선물").font(.headline)
-                    Text("롱·숏").font(.caption2)
+                    Text("롱·숏").font(.caption2.weight(.medium)).opacity(0.8)
                 }
+                .frame(width: 74, height: 54)
+                .bwBackground(selected: true, cornerRadius: 14)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .frame(width: 76)
+            .buttonStyle(PressScaleStyle())
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.bottom, 4)
         .background(.bar)
         .disabled(ticker == nil)
+    }
+
+    /// 매수·매도 버튼: 쓸 수 없을 때는 같은 색 테두리만 흐리게
+    private func tradeButton(_ title: String, color: Color, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .foregroundStyle(enabled ? Color.white : color.opacity(0.45))
+                .background {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(enabled ? color : Color.clear)
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(color.opacity(enabled ? 0 : 0.35), lineWidth: 1.2))
+                }
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(!enabled)
     }
 
     private func loadChart() async {

@@ -15,6 +15,7 @@ struct ExchangeView: View {
     @State private var column: Column = .volume
     @State private var ascending = false
     @State private var order: [String] = []
+    @State private var path: [Market] = []
 
     /// 정렬 순서는 5초마다만 갱신 (매 틱마다 줄이 바뀌면 누르기 어렵다)
     private let reorderTimer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
@@ -37,7 +38,7 @@ struct ExchangeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if let error = store.loadError, store.markets.isEmpty {
                     ContentUnavailableView {
@@ -76,6 +77,14 @@ struct ExchangeView: View {
         .onChange(of: store.markets) { reorder() }
         .onReceive(reorderTimer) { _ in reorder() }
         .onAppear { reorder() }
+        #if DEBUG
+        // 화면 캡처용: 실행 인자 -screenshotCoin KRW-BTC 이면 그 코인 상세 화면을 연다
+        .onChange(of: store.markets) {
+            if path.isEmpty, let code = UserDefaults.standard.string(forKey: "screenshotCoin"), let m = store.market(code) {
+                path = [m]
+            }
+        }
+        #endif
     }
 
     // MARK: - 요약 바 (총 평가 · 평가손익 · 수익률)

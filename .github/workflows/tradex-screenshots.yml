@@ -60,6 +60,11 @@ jobs:
               sleep 14
               xcrun simctl io "$UDID" screenshot "shots/${mode}-${t}.png"
             done
+            # 코인 상세 화면
+            xcrun simctl terminate "$UDID" "$BID" || true
+            xcrun simctl launch "$UDID" "$BID" -autoLogin YES -screenshotTab exchange -screenshotCoin KRW-BTC
+            sleep 16
+            xcrun simctl io "$UDID" screenshot "shots/${mode}-detail.png"
           done
           ls -la shots
 

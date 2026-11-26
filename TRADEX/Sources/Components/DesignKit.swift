@@ -214,6 +214,7 @@ struct AppearModifier: ViewModifier {
 struct BWSegmented<Value: Hashable>: View {
     let options: [(Value, String)]
     @Binding var selection: Value
+    var compact = false
     @Namespace private var ns
 
     var body: some View {
@@ -223,10 +224,10 @@ struct BWSegmented<Value: Hashable>: View {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { selection = value }
                 } label: {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
+                        .font(compact ? .footnote.weight(.semibold) : .subheadline.weight(.semibold))
                         .foregroundStyle(selection == value ? Color(.systemBackground) : Color.primary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .padding(.vertical, compact ? 6 : 9)
                         .background {
                             if selection == value {
                                 Capsule().fill(Color.primary).matchedGeometryEffect(id: "pill", in: ns)
@@ -242,5 +243,14 @@ struct BWSegmented<Value: Hashable>: View {
         .background(Capsule().fill(Color(.systemBackground)))
         .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
         .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+/// 눌렀을 때 살짝 작아지는 효과만 주는 버튼 스타일
+struct PressScaleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
