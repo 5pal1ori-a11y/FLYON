@@ -5,7 +5,28 @@ enum OrderUnit: Hashable {
     case krw, coin
 }
 
-/// 시장가 주문 화면 — 원(금액) 또는 코인 개수로 입력해서 매수·매도
+/// 주문 종류
+enum OrderType: Hashable {
+    case market, limit, stop, take
+    func title(buy: Bool) -> String {
+        switch self {
+        case .market: return "시장가"
+        case .limit: return "지정가"
+        case .stop: return "손절"
+        case .take: return "익절"
+        }
+    }
+    var priceLabel: String {
+        switch self {
+        case .market: return "현재가"
+        case .limit: return "지정가"
+        case .stop: return "손절가 (이 가격 이하가 되면 매도)"
+        case .take: return "익절가 (이 가격 이상이 되면 매도)"
+        }
+    }
+}
+
+/// 주문 화면 — 시장가 · 지정가(매수·매도) · 손절 · 익절. 원(금액) 또는 코인 개수로 입력
 struct OrderSheet: View {
     let market: Market
     let side: TradeSide
@@ -15,7 +36,10 @@ struct OrderSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var unit: OrderUnit
+    @State private var orderType: OrderType = .market
     @State private var input = ""
+    @State private var priceText = ""
+    @State private var editingPrice = false
     @State private var errorText: String?
     @State private var done = false
 
@@ -32,27 +56,40 @@ struct OrderSheet: View {
     private var value: Double { Double(input) ?? 0 }
     private var isBuy: Bool { side == .buy }
     private var accent: Color { isBuy ? Theme.rise : Theme.fall }
+    private var types: [OrderType] { isBuy ? [.market, .limit] : [.market, .limit, .stop, .take] }
+    private var triggerPrice: Double { Double(priceText) ?? 0 }
+    /// 환산에 쓰는 가격: 시장가는 현재가, 예약 주문은 지정한 가격
+    private var refPrice: Double { orderType == .market ? price : triggerPrice }
 
     /// 입력값을 코인 개수로 환산
     private var quantity: Double {
-        guard price > 0 else { return 0 }
-        return unit == .coin ? value : floor(value / price * 1e8) / 1e8
+        guard refPrice > 0 else { return 0 }
+        return unit == .coin ? value : floor(value / refPrice * 1e8) / 1e8
     }
 
     /// 입력값을 원화 금액으로 환산
-    private var amountKRW: Double { unit == .krw ? value : value * price }
+    private var amountKRW: Double { unit == .krw ? value : value * refPrice }
 
     private var converted: String {
-        guard price > 0, value > 0 else { return " " }
+        guard refPrice > 0, value > 0 else { return " " }
         return unit == .krw ? "≈ \(Fmt.qty(quantity)) \(market.symbol)" : "≈ \(Fmt.krw(amountKRW))"
     }
 
     private var available: String {
         if isBuy {
-            let maxQty = price > 0 ? floor(wallet.maxBuyKRW(ex) / price * 1e8) / 1e8 : 0
+            let maxQty = refPrice > 0 ? floor(wallet.maxBuyKRW(ex) / refPrice * 1e8) / 1e8 : 0
             return "주문 가능 \(Fmt.krw(wallet.account(ex).krw)) (최대 \(Fmt.qty(maxQty)) \(market.symbol))"
         } else {
-            return "보유 \(Fmt.qty(holdingQty)) \(market.symbol) (≈ \(Fmt.krw(holdingQty * price)))"
+            return "보유 \(Fmt.qty(holdingQty)) \(market.symbol) (≈ \(Fmt.krw(holdingQty * refPrice)))"
+        }
+    }
+
+    private var submitTitle: String {
+        switch orderType {
+        case .market: return isBuy ? "매수" : "매도"
+        case .limit: return isBuy ? "지정가 매수 주문" : "지정가 매도 주문"
+        case .stop: return "손절 주문 걸기"
+        case .take: return "익절 주문 걸기"
         }
     }
 
@@ -74,10 +111,21 @@ struct OrderSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
 
+                BWSegmented(options: types.map { ($0, $0.title(buy: isBuy)) }, selection: $orderType)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+
+                if orderType != .market {
+                    priceRow
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(input.isEmpty ? "0" : formattedInput)
-                            .font(.system(size: 40, weight: .bold))
+                            .font(.system(size: orderType == .market ? 40 : 32, weight: .bold))
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
@@ -92,9 +140,15 @@ struct OrderSheet: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
+                .padding(16)
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.primary, lineWidth: orderType != .market && !editingPrice ? 1.5 : 0))
+                .contentShape(Rectangle())
+                .onTapGesture { withAnimation(.snappy) { editingPrice = false } }
+                .padding(.horizontal, 4)
+                .padding(12)
 
-                Spacer()
+                Spacer(minLength: 0)
 
                 HStack {
                     ForEach([0.25, 0.5, 1.0], id: \.self) { ratio in
@@ -106,17 +160,18 @@ struct OrderSheet: View {
                 }
                 .padding(.horizontal, 20)
 
-                NumberPad(allowsDecimal: unit == .coin) { key in tap(key) }
+                NumberPad(allowsDecimal: editingPrice || unit == .coin) { key in tap(key) }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
 
-                Button(isBuy ? "매수" : "매도") { submit() }
+                Button(submitTitle) { submit() }
                     .buttonStyle(PrimaryButtonStyle(color: accent))
-                    .disabled(value <= 0 || price <= 0)
-                    .opacity(value <= 0 ? 0.5 : 1)
+                    .disabled(value <= 0 || refPrice <= 0)
+                    .opacity(value <= 0 || refPrice <= 0 ? 0.5 : 1)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 12)
             }
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: orderType)
             .navigationTitle("\(market.koreanName) \(isBuy ? "매수" : "매도")")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -124,14 +179,76 @@ struct OrderSheet: View {
             }
             .sensoryFeedback(.success, trigger: done)
             .sensoryFeedback(.selection, trigger: unit)
+            .onChange(of: orderType) { _, t in
+                errorText = nil
+                editingPrice = false
+                let base = price
+                switch t {
+                case .market: priceText = ""
+                case .limit: priceText = plainPrice(base)
+                case .stop: priceText = plainPrice(base * 0.95)
+                case .take: priceText = plainPrice(base * 1.05)
+                }
+            }
             .overlay {
                 if done {
-                    DoneOverlay(text: isBuy ? "매수 완료" : "매도 완료", color: accent)
+                    DoneOverlay(text: orderType == .market ? (isBuy ? "매수 완료" : "매도 완료") : "주문 접수",
+                                color: accent)
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: done)
         }
+    }
+
+    // MARK: - 가격 입력 (지정가 · 손절가 · 익절가)
+
+    private var priceRow: some View {
+        let diff = price > 0 && triggerPrice > 0 ? triggerPrice / price - 1 : 0
+        let chips: [Double] = {
+            switch orderType {
+            case .stop: return [-0.03, -0.05, -0.10]
+            case .take: return [0.03, 0.05, 0.10]
+            default: return isBuy ? [0, -0.01, -0.03] : [0, 0.01, 0.03]
+            }
+        }()
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.snappy) { editingPrice = true }
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(orderType.priceLabel).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(priceText.isEmpty ? "0" : priceText).font(.title3.weight(.bold)).monospacedDigit()
+                    Text("원").font(.subheadline).foregroundStyle(.secondary)
+                    Text(Fmt.rate(diff)).font(.caption.weight(.semibold)).foregroundStyle(Theme.color(for: diff))
+                        .monospacedDigit()
+                }
+                .padding(12)
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary, lineWidth: editingPrice ? 1.5 : 0.5))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            HStack(spacing: 6) {
+                ForEach(chips, id: \.self) { c in
+                    Button {
+                        priceText = plainPrice(price * (1 + c))
+                        editingPrice = true
+                    } label: {
+                        Text(c == 0 ? "현재가" : String(format: "%+.0f%%", c * 100)).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(BWButtonStyle(verticalPadding: 6))
+                }
+            }
+        }
+    }
+
+    /// 가격대에 맞춰 반올림한 가격 문자열
+    private func plainPrice(_ v: Double) -> String {
+        guard v > 0 else { return "" }
+        if v >= 100 { return String(Int(v.rounded())) }
+        return plain((v * (v >= 1 ? 100 : 10_000)).rounded() / (v >= 1 ? 100 : 10_000))
     }
 
     /// 원 / 개수 전환 버튼
@@ -166,11 +283,11 @@ struct OrderSheet: View {
     private func switchUnit(to newUnit: OrderUnit) {
         guard newUnit != unit else { return }
         errorText = nil
-        if value > 0, price > 0 {
+        if value > 0, refPrice > 0 {
             if newUnit == .coin {
-                input = plain(floor(value / price * 1e8) / 1e8)
+                input = plain(floor(value / refPrice * 1e8) / 1e8)
             } else {
-                input = String(Int(floor(value * price)))
+                input = String(Int(floor(value * refPrice)))
             }
         }
         withAnimation(.snappy) { unit = newUnit }
@@ -193,6 +310,20 @@ struct OrderSheet: View {
 
     private func tap(_ key: NumberPad.Key) {
         errorText = nil
+        if editingPrice && orderType != .market {
+            // 가격 입력
+            switch key {
+            case .digit(let d):
+                if priceText == "0" { priceText = "" }
+                if let dot = priceText.firstIndex(of: "."), priceText[priceText.index(after: dot)...].count >= 4 { return }
+                if priceText.count < 15 { priceText.append(String(d)) }
+            case .dot:
+                if !priceText.contains(".") { priceText = priceText.isEmpty ? "0." : priceText + "." }
+            case .delete:
+                if !priceText.isEmpty { priceText.removeLast() }
+            }
+            return
+        }
         switch key {
         case .digit(let d):
             if input == "0" { input = "" }
@@ -208,29 +339,41 @@ struct OrderSheet: View {
 
     private func fill(_ ratio: Double) {
         errorText = nil
-        guard price > 0 else { return }
+        editingPrice = false
+        guard refPrice > 0 else { return }
         if isBuy {
             let krw = floor(wallet.maxBuyKRW(ex) * ratio)
-            input = unit == .krw ? String(Int(krw)) : plain(floor(krw / price * 1e8) / 1e8)
+            input = unit == .krw ? String(Int(krw)) : plain(floor(krw / refPrice * 1e8) / 1e8)
         } else {
             let qty = ratio == 1 ? holdingQty : floor(holdingQty * ratio * 1e8) / 1e8
-            input = unit == .coin ? plain(qty) : String(Int(floor(qty * price)))
+            input = unit == .coin ? plain(qty) : String(Int(floor(qty * refPrice)))
         }
     }
 
     private func submit() {
         do {
-            if isBuy {
+            switch (orderType, isBuy) {
+            case (.market, true):
                 if unit == .krw {
                     try wallet.buy(market: market, krwAmount: value, price: price, on: ex)
                 } else {
                     try wallet.buy(market: market, quantity: value, price: price, on: ex)
                 }
-            } else {
+            case (.market, false):
                 // 원으로 입력했는데 보유 평가금액 이상이면 전량 매도
                 var qty = unit == .coin ? value : floor(value / price * 1e8) / 1e8
                 if unit == .krw && value >= floor(holdingQty * price) { qty = holdingQty }
                 try wallet.sell(market: market, quantity: min(qty, holdingQty), price: price, on: ex)
+            case (_, true):
+                // 지정가 매수: 원으로 입력하면 그 금액, 개수로 입력하면 개수 × 지정가
+                try wallet.placeLimitBuy(market: market, limitPrice: triggerPrice, krwAmount: amountKRW, on: ex)
+            case (let t, false):
+                var qty = unit == .coin ? value : floor(value / triggerPrice * 1e8) / 1e8
+                if unit == .krw && value >= floor(holdingQty * triggerPrice) { qty = holdingQty }
+                let kind: OrderKind = t == .stop ? .stopLoss : (t == .take ? .takeProfit : .limitSell)
+                if kind == .stopLoss && triggerPrice >= price { errorText = "손절가는 현재가보다 낮아야 해요."; return }
+                if kind == .takeProfit && triggerPrice <= price { errorText = "익절가는 현재가보다 높아야 해요."; return }
+                try wallet.placeSellOrder(kind, market: market, triggerPrice: triggerPrice, quantity: min(qty, holdingQty), on: ex)
             }
             done = true
             Task {

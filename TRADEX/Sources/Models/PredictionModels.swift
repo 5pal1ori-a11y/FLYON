@@ -91,6 +91,7 @@ struct DayCandle: Decodable {
     let candleDateTimeKst: String
     let tradePrice: Double          // 해당 일봉 종가(진행 중이면 현재가)
     let prevClosingPrice: Double    // 전일 종가
+    let openingPrice: Double        // 시가 (적립식 자동 매수 체결가)
 
     var changeRate: Double { prevClosingPrice > 0 ? tradePrice / prevClosingPrice - 1 : 0 }
 
@@ -98,5 +99,6 @@ struct DayCandle: Decodable {
         case candleDateTimeKst = "candle_date_time_kst"
         case tradePrice = "trade_price"
         case prevClosingPrice = "prev_closing_price"
+        case openingPrice = "opening_price"
     }
 }

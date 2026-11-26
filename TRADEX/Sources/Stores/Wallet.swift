@@ -216,6 +216,213 @@ final class Wallet {
         return done
     }
 
+    // MARK: - 예약 주문 (지정가 · 손절 · 익절)
+
+    enum OrderError: LocalizedError {
+        case invalidPrice, notFound
+        var errorDescription: String? {
+            switch self {
+            case .invalidPrice: return "주문 가격을 확인해 주세요."
+            case .notFound: return "주문을 찾을 수 없어요."
+            }
+        }
+    }
+
+    /// 지정가 매수: 원화(수수료 포함)를 잠가 두고, 현재가가 지정가 이하가 되면 체결
+    func placeLimitBuy(market: Market, limitPrice: Double, krwAmount: Double, on ex: ExchangeID) throws {
+        guard limitPrice > 0 else { throw OrderError.invalidPrice }
+        guard krwAmount >= TradexRules.minOrderKRW else { throw WalletError.minOrder }
+        let lock = krwAmount * (1 + TradexRules.feeRate)
+        guard lock <= account(ex).krw + 0.000001 else { throw WalletError.insufficientKRW }
+        let order = PendingOrder(kind: .limitBuy, market: market.market, koreanName: market.koreanName,
+                                 triggerPrice: limitPrice, krwAmount: krwAmount, lockedKRW: lock,
+                                 quantity: 0, averagePrice: 0, createdAt: .now)
+        update(ex) { a in
+            a.krw = max(0, a.krw - lock)
+            a.orders.insert(order, at: 0)
+        }
+        save()
+    }
+
+    /// 지정가 매도 · 손절 · 익절: 코인 수량을 잠가 두고 조건이 되면 체결
+    func placeSellOrder(_ kind: OrderKind, market: Market, triggerPrice: Double, quantity: Double, on ex: ExchangeID) throws {
+        guard !kind.isBuy, triggerPrice > 0 else { throw OrderError.invalidPrice }
+        let qty = floor(quantity * 1e8) / 1e8
+        guard qty > 0 else { throw WalletError.invalid }
+        guard let h = account(ex).holdings[market.market], h.quantity + 1e-9 >= qty else { throw WalletError.insufficientQty }
+        let all = abs(h.quantity - qty) < 1e-8
+        guard qty * triggerPrice >= TradexRules.minOrderKRW || all else { throw WalletError.minOrder }
+        let order = PendingOrder(kind: kind, market: market.market, koreanName: market.koreanName,
+                                 triggerPrice: triggerPrice, krwAmount: 0, lockedKRW: 0,
+                                 quantity: all ? h.quantity : qty, averagePrice: h.averagePrice, createdAt: .now)
+        update(ex) { a in
+            var left = h
+            left.quantity -= order.quantity
+            a.holdings[market.market] = left.quantity < 1e-8 ? nil : left
+            a.orders.insert(order, at: 0)
+        }
+        save()
+    }
+
+    /// 주문 취소: 잠가 둔 원화·코인을 돌려준다
+    func cancelOrder(id: UUID, on ex: ExchangeID) throws {
+        guard let o = account(ex).orders.first(where: { $0.id == id }) else { throw OrderError.notFound }
+        update(ex) { a in
+            a.orders.removeAll { $0.id == id }
+            if o.kind.isBuy {
+                a.krw += o.lockedKRW
+            } else {
+                var h = a.holdings[o.market] ?? Holding(quantity: 0, averagePrice: 0, koreanName: o.koreanName)
+                h.averagePrice = (h.averagePrice * h.quantity + o.averagePrice * o.quantity) / (h.quantity + o.quantity)
+                h.quantity += o.quantity
+                a.holdings[o.market] = h
+            }
+        }
+        save()
+    }
+
+    /// 주문 체결 (잠가 둔 자산으로 처리)
+    @discardableResult
+    private func fill(_ o: PendingOrder, at price: Double, on ex: ExchangeID) -> OrderFill? {
+        guard price > 0, account(ex).orders.contains(where: { $0.id == o.id }) else { return nil }
+        var filledQty = 0.0
+        update(ex) { a in
+            a.orders.removeAll { $0.id == o.id }
+            if o.kind.isBuy {
+                let qty = floor(o.krwAmount / price * 1e8) / 1e8
+                let cost = qty * price
+                let fee = cost * TradexRules.feeRate
+                a.krw += max(0, o.lockedKRW - cost - fee)   // 남은 돈 돌려주기
+                var h = a.holdings[o.market] ?? Holding(quantity: 0, averagePrice: 0, koreanName: o.koreanName)
+                h.averagePrice = (h.averagePrice * h.quantity + cost) / (h.quantity + qty)
+                h.quantity += qty
+                a.holdings[o.market] = h
+                a.trades.insert(TradeRecord(side: .buy, market: o.market, koreanName: o.koreanName,
+                                            price: price, quantity: qty, fee: fee, date: .now), at: 0)
+                filledQty = qty
+            } else {
+                let amount = o.quantity * price
+                let fee = amount * TradexRules.feeRate
+                a.krw += amount - fee
+                a.trades.insert(TradeRecord(side: .sell, market: o.market, koreanName: o.koreanName,
+                                            price: price, quantity: o.quantity, fee: fee, date: .now,
+                                            realizedPnL: (price - o.averagePrice) * o.quantity - fee), at: 0)
+                filledQty = o.quantity
+            }
+        }
+        save()
+        return OrderFill(kind: o.kind, koreanName: o.koreanName, price: price, quantity: filledQty)
+    }
+
+    /// 현재가로 체결 조건 확인 (앱이 켜져 있는 동안 1초마다)
+    @discardableResult
+    func checkOrders(prices: [String: Ticker], on ex: ExchangeID) -> [OrderFill] {
+        var fills: [OrderFill] = []
+        for o in account(ex).orders {
+            guard let p = prices[o.market]?.tradePrice, o.kind.isTriggered(price: p, trigger: o.triggerPrice) else { continue }
+            if let f = fill(o, at: p, on: ex) { fills.append(f) }
+        }
+        return fills
+    }
+
+    /// 앱이 꺼져 있던 동안 조건이 됐는지 1시간 봉 고가·저가로 확인 (지정한 가격에 체결)
+    @discardableResult
+    func reconcileOrders(on ex: ExchangeID) async -> [OrderFill] {
+        var fills: [OrderFill] = []
+        for o in account(ex).orders {
+            let hours = Int(Date().timeIntervalSince(o.createdAt) / 3_600) + 2
+            guard let candles = try? await UpbitAPI.highLow(market: o.market, hours: min(hours, 200), on: ex) else { continue }
+            let hit = candles.contains { c in
+                c.date >= o.createdAt &&
+                    (o.kind == .limitBuy || o.kind == .stopLoss ? c.low <= o.triggerPrice : c.high >= o.triggerPrice)
+            }
+            if hit, let f = fill(o, at: o.triggerPrice, on: ex) { fills.append(f) }
+        }
+        return fills
+    }
+
+    // MARK: - 적립식 자동 매수
+
+    /// 지금 이후 첫 실행일 (오전 9시 기준)
+    static func firstRunKey(frequency: RecurringPlan.Frequency, weekday: Int, after now: Date) -> String {
+        let cal = PredictionRound.calendar
+        var day = cal.date(bySettingHour: 9, minute: 0, second: 0, of: now)!
+        if day <= now { day = cal.date(byAdding: .day, value: 1, to: day)! }
+        if frequency == .weekly {
+            while cal.component(.weekday, from: day) != weekday { day = cal.date(byAdding: .day, value: 1, to: day)! }
+        }
+        return KST.dayKey(day)
+    }
+
+    func addPlan(market: Market, krwAmount: Double, frequency: RecurringPlan.Frequency, weekday: Int, on ex: ExchangeID) throws {
+        guard krwAmount >= TradexRules.minOrderKRW else { throw WalletError.minOrder }
+        let plan = RecurringPlan(market: market.market, koreanName: market.koreanName, krwAmount: krwAmount,
+                                 frequency: frequency, weekday: weekday,
+                                 nextRunKey: Wallet.firstRunKey(frequency: frequency, weekday: weekday, after: .now),
+                                 createdAt: .now)
+        update(ex) { $0.plans.insert(plan, at: 0) }
+        save()
+    }
+
+    func setPlanPaused(_ id: UUID, _ paused: Bool, on ex: ExchangeID) {
+        update(ex) { a in
+            guard let i = a.plans.firstIndex(where: { $0.id == id }) else { return }
+            a.plans[i].paused = paused
+            if !paused {   // 다시 켜면 다음 실행일부터 (멈춘 동안의 회차는 건너뜀)
+                let p = a.plans[i]
+                a.plans[i].nextRunKey = Wallet.firstRunKey(frequency: p.frequency, weekday: p.weekday, after: .now)
+            }
+        }
+        save()
+    }
+
+    func deletePlan(_ id: UUID, on ex: ExchangeID) {
+        update(ex) { $0.plans.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// 실행일이 지난 적립식을 처리한다. 체결가는 그날 일봉 시가 (오늘이면 현재가).
+    /// 한 번에 최대 30회까지 따라잡고, 잔액이 부족한 회차는 건너뛴다. 처리 결과 문구를 돌려준다.
+    @discardableResult
+    func runDuePlans(on ex: ExchangeID, currentPrices: [String: Ticker]) async -> [String] {
+        let now = (try? await UpbitAPI.serverNow()) ?? Date()
+        let cal = PredictionRound.calendar
+        var notes: [String] = []
+        for plan in account(ex).plans where !plan.paused {
+            guard let first = PredictionRound(key: plan.nextRunKey)?.start, first <= now else { continue }
+            let days = Int(now.timeIntervalSince(first) / 86_400) + 2
+            let candles = (try? await UpbitAPI.dayCandles(market: plan.market, count: min(days, 200), on: ex)) ?? []
+            var key = plan.nextRunKey
+            var runs = 0, bought = 0, skipped = 0
+            while runs < 30, let start = PredictionRound(key: key)?.start, start <= now {
+                // 업비트 일봉은 오전 9시, 빗썸 일봉은 0시 시작 → 날짜로 찾는다
+                let price = candles.first(where: { $0.candleDateTimeKst.hasPrefix(key) })?.openingPrice
+                    ?? currentPrices[plan.market]?.tradePrice ?? 0
+                let m = Market(market: plan.market, koreanName: plan.koreanName, englishName: plan.koreanName)
+                if price > 0, (try? buy(market: m, krwAmount: plan.krwAmount, price: price, on: ex)) != nil {
+                    bought += 1
+                } else {
+                    skipped += 1
+                }
+                let step = plan.frequency == .daily ? 1 : 7
+                key = KST.dayKey(cal.date(byAdding: .day, value: step, to: start)!)
+                runs += 1
+            }
+            let b = bought, s = skipped, next = key
+            update(ex) { a in
+                guard let i = a.plans.firstIndex(where: { $0.id == plan.id }) else { return }
+                a.plans[i].nextRunKey = next
+                a.plans[i].runs += b
+                a.plans[i].totalSpent += Double(b) * plan.krwAmount
+                a.plans[i].lastResult = s > 0 ? "잔액 부족으로 \(s)회 건너뜀" : "\(b)회 매수 완료"
+            }
+            save()
+            if b > 0 { notes.append("\(plan.koreanName) 적립식 \(b)회 매수 (\(Fmt.krw(Double(b) * plan.krwAmount)))") }
+            if s > 0 { notes.append("\(plan.koreanName) 적립식 \(s)회는 현물 잔액이 부족해 건너뛰었어요") }
+        }
+        return notes
+    }
+
     // MARK: - 평가
 
     struct Valuation {
@@ -240,6 +447,16 @@ final class Wallet {
             let p = prices[code]?.tradePrice ?? h.averagePrice
             v.coinValue += p * h.quantity
             v.coinCost += h.averagePrice * h.quantity
+        }
+        // 미체결 주문에 잠가 둔 원화·코인도 내 자산
+        for o in a.orders {
+            if o.kind.isBuy {
+                v.krw += o.lockedKRW
+            } else {
+                let p = prices[o.market]?.tradePrice ?? o.averagePrice
+                v.coinValue += p * o.quantity
+                v.coinCost += o.averagePrice * o.quantity
+            }
         }
         for pos in a.positions {
             let p = prices[pos.market]?.tradePrice ?? pos.entryPrice

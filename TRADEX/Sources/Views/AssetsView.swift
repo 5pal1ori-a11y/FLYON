@@ -16,6 +16,7 @@ struct AssetsView: View {
                     tradexSection.appear(0.05)
                     walletsSection.appear(0.1)
                     coinsSection.appear(0.15)
+                    ordersSection.appear(0.18)
                     positionsSection.appear(0.2)
                     moreSection.appear(0.25)
                 }
@@ -273,6 +274,28 @@ struct AssetsView: View {
         .contentShape(Rectangle())
     }
 
+    // MARK: - 미체결 주문 (지정가 · 손절 · 익절)
+
+    private var ordersSection: some View {
+        let orders = wallet.account(store.exchange).orders
+        return section("미체결 주문 \(orders.count)") {
+            if orders.isEmpty {
+                Text("지정가·손절·익절 주문은 코인 화면의 매수·매도에서 걸 수 있어요.")
+                    .font(.subheadline).foregroundStyle(.secondary).card()
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(orders) { o in
+                        PendingOrderRow(order: o, price: store.tickers[o.market]?.tradePrice, exchange: store.exchange)
+                        if o.id != orders.last?.id { Divider().padding(.leading, 48) }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                .animation(.snappy, value: orders.map(\.id))
+            }
+        }
+    }
+
     // MARK: - 보유 포지션
 
     private var positionsSection: some View {
@@ -303,6 +326,13 @@ struct AssetsView: View {
                     PortfolioAnalysisView()
                 } label: {
                     listRow("sparkles", "AI 투자 분석", "Apple Intelligence")
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.leading, 44)
+                NavigationLink {
+                    RecurringPlansView()
+                } label: {
+                    listRow("repeat", "적립식 자동 매수", "\(a.plans.filter { !$0.paused }.count)개 진행 중")
                 }
                 .buttonStyle(.plain)
                 Divider().padding(.leading, 44)

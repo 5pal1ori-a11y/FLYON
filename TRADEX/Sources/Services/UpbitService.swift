@@ -71,11 +71,11 @@ enum UpbitAPI {
     }()
 
     /// 일봉 (최신순)
-    static func dayCandles(market: String, count: Int) async throws -> [DayCandle] {
+    static func dayCandles(market: String, count: Int, on ex: ExchangeID = .upbit) async throws -> [DayCandle] {
         let rows: [Lossy<DayCandle>] = try await get("candles/days", query: [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "count", value: String(min(max(count, 1), 200))),
-        ])
+        ], on: ex)
         return rows.compactMap(\.value)
     }
 

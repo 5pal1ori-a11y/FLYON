@@ -15,6 +15,7 @@ struct CoinDetailView: View {
     private var ticker: Ticker? { store.tickers[market.market] }
     private var holding: Holding? { wallet.account(store.exchange).holdings[market.market] }
     @State private var showFutures = false
+    @State private var showPlan = false
 
     /// 차트 마지막 점을 실시간 가격으로 이어 붙인다.
     private var livePoints: [ChartPoint] {
@@ -41,6 +42,16 @@ struct CoinDetailView: View {
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: section)
                 if let holding { holdingCard(holding) }
+                let myOrders = wallet.account(store.exchange).orders.filter { $0.market == market.market }
+                if !myOrders.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("미체결 주문").font(.subheadline).foregroundStyle(.secondary).padding(.bottom, 4)
+                        ForEach(myOrders) { o in
+                            PendingOrderRow(order: o, price: ticker?.tradePrice, exchange: store.exchange)
+                        }
+                    }
+                    .card()
+                }
                 ForEach(wallet.account(store.exchange).positions.filter { $0.market == market.market }) { p in
                     PositionRow(position: p, price: ticker?.tradePrice, exchange: store.exchange)
                 }
@@ -58,6 +69,10 @@ struct CoinDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button { showPlan = true } label: { Image(systemName: "repeat") }
+                    .accessibilityLabel("적립식 자동 매수 만들기")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     store.toggleFavorite(market.market)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -70,6 +85,9 @@ struct CoinDetailView: View {
         .safeAreaInset(edge: .bottom) { orderButtons }
         .task(id: range) { await loadChart() }
         .onAppear { wallet.recordEvent("chart:\(market.market)") }
+        .sheet(isPresented: $showPlan) {
+            NewPlanSheet(preset: market).presentationDetents([.large])
+        }
         .sheet(isPresented: $showFutures) {
             FuturesOrderSheet(market: market).presentationDetents([.large])
         }

@@ -97,6 +97,87 @@ struct FuturesRecord: Codable, Identifiable, Equatable {
     let liquidated: Bool
 }
 
+// MARK: - 예약 주문 (지정가 · 손절 · 익절)
+
+enum OrderKind: String, Codable, CaseIterable {
+    case limitBuy, limitSell, stopLoss, takeProfit
+
+    var title: String {
+        switch self {
+        case .limitBuy: return "지정가 매수"
+        case .limitSell: return "지정가 매도"
+        case .stopLoss: return "손절"
+        case .takeProfit: return "익절"
+        }
+    }
+    var isBuy: Bool { self == .limitBuy }
+
+    /// 체결 조건: 매수·손절은 가격이 기준 이하로, 매도·익절은 기준 이상으로
+    func isTriggered(price: Double, trigger: Double) -> Bool {
+        switch self {
+        case .limitBuy, .stopLoss: return price <= trigger
+        case .limitSell, .takeProfit: return price >= trigger
+        }
+    }
+}
+
+/// 미체결 주문. 매수는 원화(수수료 포함)를, 매도는 코인 수량을 주문하는 순간 잠가 둔다.
+struct PendingOrder: Codable, Identifiable, Equatable {
+    var id = UUID()
+    let kind: OrderKind
+    let market: String
+    let koreanName: String
+    let triggerPrice: Double
+    let krwAmount: Double      // 매수: 쓸 원화 (수수료 제외)
+    let lockedKRW: Double      // 매수: 잠근 원화 (수수료 포함)
+    let quantity: Double       // 매도: 잠근 수량
+    let averagePrice: Double   // 매도: 잠근 수량의 평균 매수가 (취소 시 복원)
+    let createdAt: Date
+
+    var symbol: String { String(market.split(separator: "-").last ?? "") }
+}
+
+/// 체결 알림용 요약
+struct OrderFill: Identifiable {
+    let id = UUID()
+    let kind: OrderKind
+    let koreanName: String
+    let price: Double
+    let quantity: Double
+}
+
+// MARK: - 적립식 자동 매수
+
+/// 정해진 날 오전 9시(한국시간)에 정해진 금액만큼 산다.
+/// 앱이 꺼져 있던 날은 다음에 앱을 열 때 그날 일봉 시가로 처리한다.
+struct RecurringPlan: Codable, Identifiable, Equatable {
+    enum Frequency: String, Codable, CaseIterable, Identifiable {
+        case daily, weekly
+        var id: String { rawValue }
+        var title: String { self == .daily ? "매일" : "매주" }
+    }
+
+    var id = UUID()
+    let market: String
+    let koreanName: String
+    var krwAmount: Double
+    var frequency: Frequency
+    var weekday: Int            // 매주일 때 요일 (1=일 ... 7=토)
+    var nextRunKey: String      // 다음 실행일 (yyyy-MM-dd, 한국시간)
+    var paused = false
+    var runs = 0
+    var totalSpent = 0.0
+    var lastResult: String? = nil
+    let createdAt: Date
+
+    var symbol: String { String(market.split(separator: "-").last ?? "") }
+
+    static let weekdayNames = ["", "일", "월", "화", "수", "목", "금", "토"]
+    var scheduleText: String {
+        frequency == .daily ? "매일 오전 9시" : "매주 \(RecurringPlan.weekdayNames[weekday])요일 오전 9시"
+    }
+}
+
 // MARK: - 거래소별 계좌
 
 struct ExchangeAccount: Codable, Equatable {
@@ -106,6 +187,8 @@ struct ExchangeAccount: Codable, Equatable {
     var futuresKRW: Double = 0                // 선물 지갑 (주문 가능 증거금)
     var positions: [FuturesPosition] = []
     var futuresHistory: [FuturesRecord] = []
+    var orders: [PendingOrder] = []
+    var plans: [RecurringPlan] = []
 
     init() {}
 
@@ -117,6 +200,8 @@ struct ExchangeAccount: Codable, Equatable {
         futuresKRW = try c.decodeIfPresent(Double.self, forKey: .futuresKRW) ?? 0
         positions = try c.decodeIfPresent([FuturesPosition].self, forKey: .positions) ?? []
         futuresHistory = try c.decodeIfPresent([FuturesRecord].self, forKey: .futuresHistory) ?? []
+        orders = try c.decodeIfPresent([PendingOrder].self, forKey: .orders) ?? []
+        plans = try c.decodeIfPresent([RecurringPlan].self, forKey: .plans) ?? []
     }
 }
 

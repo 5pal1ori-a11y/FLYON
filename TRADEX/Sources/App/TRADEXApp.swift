@@ -54,6 +54,12 @@ struct MainTabView: View {
     @Environment(MarketStore.self) private var market
     @Environment(Wallet.self) private var wallet
     @State private var liquidated: [FuturesRecord] = []
+    /// 주문 체결·적립식 실행 알림
+    @State private var notices: [String] = []
+
+    private func fillText(_ f: OrderFill) -> String {
+        "\(f.koreanName) \(f.kind.title) 체결 · \(Fmt.qty(f.quantity))개 @ \(Fmt.price(f.price))"
+    }
     @State private var tab = MainTabView.initialTab
 
     /// 디버그 빌드의 화면 캡처용: 실행 인자 -screenshotTab assets 등으로 시작 탭 지정
@@ -85,16 +91,33 @@ struct MainTabView: View {
         .task { await DebugDemo.seedIfRequested(wallet: wallet, market: market) }
         #endif
         // 선물 청산 감시: 앱을 연 동안은 1초마다 현재가로, 거래소를 바꾸거나 앱을 열 때는 꺼져 있던 동안의 고가·저가로 확인
+        // 예약 주문(지정가·손절·익절)과 적립식도 같이 처리
         .task(id: market.exchange) {
             let ex = market.exchange
             let offline = await wallet.reconcileLiquidations(on: ex)
             if !offline.isEmpty { liquidated = offline }
+            let offlineFills = await wallet.reconcileOrders(on: ex)
+            notices += offlineFills.map(fillText)
+            notices += await wallet.runDuePlans(on: ex, currentPrices: market.tickers)
+            var tick = 0
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
+                tick += 1
                 let done = wallet.checkLiquidations(prices: market.tickers, on: ex)
                 if !done.isEmpty { liquidated = done }
+                let fills = wallet.checkOrders(prices: market.tickers, on: ex)
+                if !fills.isEmpty { notices += fills.map(fillText) }
+                if tick % 60 == 0 {   // 1분마다 적립식 실행일 확인 (오전 9시가 지나면 실행)
+                    notices += await wallet.runDuePlans(on: ex, currentPrices: market.tickers)
+                }
             }
         }
+        .alert("알림", isPresented: Binding(get: { !notices.isEmpty && liquidated.isEmpty }, set: { if !$0 { notices = [] } })) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(notices.joined(separator: "\n"))
+        }
+        .sensoryFeedback(.success, trigger: notices.count)
         .alert("포지션 청산", isPresented: Binding(get: { !liquidated.isEmpty }, set: { if !$0 { liquidated = [] } })) {
             Button("확인", role: .cancel) {}
         } message: {
