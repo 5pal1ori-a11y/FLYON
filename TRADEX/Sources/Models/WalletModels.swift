@@ -1,8 +1,10 @@
 import Foundation
 
 enum TradexRules {
-    /// 1 TRADEX = 모의투자 원화 10,000원
-    static let krwPerTradex: Double = 10_000
+    /// 1 TRADEX = 모의투자 원화 5,000,000원
+    static let krwPerTradex: Double = 5_000_000
+    /// 예전 버전(1 TRADEX = 10,000원)에서 교환한 기록의 환율
+    static let legacyKrwPerTradex: Double = 10_000
     /// 첫 로그인 지급량
     static let signupBonus = 10
     /// 매매 수수료 (업비트 원화마켓 일반 수수료와 동일한 0.05%로 가정)
@@ -39,6 +41,8 @@ struct TradexRecord: Codable, Identifiable, Equatable {
     let kind: Kind
     let amount: Int   // +지급 / -교환
     let date: Date
+    /// 교환 당시 1 TRADEX의 원화 가치 (예전 기록은 nil → 10,000원)
+    var krwPerTradex: Double? = nil
 }
 
 /// 디스크에 저장되는 지갑 상태

@@ -42,8 +42,6 @@ struct MainTabView: View {
     var body: some View {
         @Bindable var session = session
         TabView {
-            WatchlistView()
-                .tabItem { Label("관심", systemImage: "star.fill") }
             ExchangeView()
                 .tabItem { Label("거래소", systemImage: "chart.bar.fill") }
             AssetsView()

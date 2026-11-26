@@ -57,7 +57,8 @@ final class Wallet {
         guard count <= state.tradex else { throw WalletError.insufficientTradex }
         state.tradex -= count
         state.krw += Double(count) * TradexRules.krwPerTradex
-        state.tradexHistory.insert(TradexRecord(kind: .exchange, amount: -count, date: .now), at: 0)
+        state.tradexHistory.insert(TradexRecord(kind: .exchange, amount: -count, date: .now,
+                                                krwPerTradex: TradexRules.krwPerTradex), at: 0)
         save()
     }
 
@@ -132,7 +133,13 @@ final class Wallet {
     }
 
     /// 지급받은 TRADEX 가치 대비 총 수익
-    var baseValue: Double { Double(state.grantedTradex) * TradexRules.krwPerTradex }
+    /// = 지금까지 교환해서 받은 원화(교환 당시 환율) + 아직 남은 TRADEX의 현재 가치
+    var baseValue: Double {
+        let exchanged = state.tradexHistory
+            .filter { $0.kind == .exchange }
+            .reduce(0.0) { $0 + Double(-$1.amount) * ($1.krwPerTradex ?? TradexRules.legacyKrwPerTradex) }
+        return exchanged + Double(state.tradex) * TradexRules.krwPerTradex
+    }
 
     /// 처음 상태로 되돌리기 (보너스는 다시 지급하지 않고 지급 총량으로 복원)
     func reset() {

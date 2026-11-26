@@ -122,6 +122,19 @@ struct Candle: Decodable, Identifiable, Sendable {
     var date: Date { Candle.parser.date(from: candleDateTimeUtc) ?? .distantPast }
 }
 
+/// 호가 (업비트 /v1/orderbook)
+struct Orderbook: Decodable {
+    struct Unit: Decodable, Hashable {
+        let askPrice: Double, bidPrice: Double, askSize: Double, bidSize: Double
+        enum CodingKeys: String, CodingKey {
+            case askPrice = "ask_price", bidPrice = "bid_price", askSize = "ask_size", bidSize = "bid_size"
+        }
+    }
+    let market: String
+    let units: [Unit]
+    enum CodingKeys: String, CodingKey { case market, units = "orderbook_units" }
+}
+
 /// 차트 기간
 enum ChartRange: String, CaseIterable, Identifiable {
     case hour = "1H", day = "1D", week = "1W", month = "1M", year = "1Y"

@@ -78,6 +78,12 @@ enum UpbitAPI {
         return rows.compactMap(\.value)
     }
 
+    /// 호가 (최대 30단계)
+    static func orderbook(market: String) async throws -> Orderbook? {
+        let rows: [Lossy<Orderbook>] = try await get("orderbook", query: [URLQueryItem(name: "markets", value: market)])
+        return rows.first?.value
+    }
+
     /// 차트용 캔들 (오래된 순으로 정렬해서 반환)
     static func candles(market: String, range: ChartRange) async throws -> [ChartPoint] {
         let (path, count) = range.request

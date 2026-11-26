@@ -10,6 +10,7 @@ struct CoinDetailView: View {
     @State private var selected: ChartPoint?
     @State private var chartError = false
     @State private var orderSide: TradeSide?
+    @State private var section = "차트"
 
     private var ticker: Ticker? { store.tickers[market.market] }
     private var holding: Holding? { wallet.state.holdings[market.market] }
@@ -25,7 +26,16 @@ struct CoinDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                chartSection
+                Picker("보기", selection: $section) {
+                    Text("차트").tag("차트")
+                    Text("호가").tag("호가")
+                }
+                .pickerStyle(.segmented)
+                if section == "차트" {
+                    chartSection
+                } else {
+                    OrderbookView(market: market, prevClose: ticker?.prevClosingPrice ?? 0)
+                }
                 if let holding { holdingCard(holding) }
                 statsCard
                 Text("시세 제공: 업비트 Open API · 모의투자 전용, 실제 거래가 아닙니다.")
