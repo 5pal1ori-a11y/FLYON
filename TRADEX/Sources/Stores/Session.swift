@@ -18,6 +18,13 @@ final class Session {
             activate(saved)
             Task { await self.verifyAppleCredential() }
         }
+        #if DEBUG
+        // 화면 캡처용: 실행 인자 -autoLogin YES 이면 개발용 계정으로 자동 로그인 (환영 시트는 띄우지 않음)
+        if user == nil, UserDefaults.standard.bool(forKey: "autoLogin") {
+            signInAsDeveloper()
+            showWelcome = false
+        }
+        #endif
     }
 
     /// Sign in with Apple 결과 처리

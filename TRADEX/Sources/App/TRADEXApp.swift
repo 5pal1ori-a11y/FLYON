@@ -41,19 +41,36 @@ struct MainTabView: View {
     @Environment(MarketStore.self) private var market
     @Environment(Wallet.self) private var wallet
     @State private var liquidated: [FuturesRecord] = []
+    @State private var tab = MainTabView.initialTab
+
+    /// 디버그 빌드의 화면 캡처용: 실행 인자 -screenshotTab assets 등으로 시작 탭 지정
+    private static var initialTab: String {
+        #if DEBUG
+        return UserDefaults.standard.string(forKey: "screenshotTab") ?? "exchange"
+        #else
+        return "exchange"
+        #endif
+    }
 
     var body: some View {
         @Bindable var session = session
-        TabView {
+        TabView(selection: $tab) {
             ExchangeView()
                 .tabItem { Label("거래소", systemImage: "chart.bar").environment(\.symbolVariants, .none) }
+                .tag("exchange")
             AssetsView()
                 .tabItem { Label("자산", systemImage: "wallet.pass").environment(\.symbolVariants, .none) }
+                .tag("assets")
             RewardsView()
                 .tabItem { Label("혜택", systemImage: "gift").environment(\.symbolVariants, .none) }
+                .tag("rewards")
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape").environment(\.symbolVariants, .none) }
+                .tag("settings")
         }
+        #if DEBUG
+        .task { await DebugDemo.seedIfRequested(wallet: wallet, market: market) }
+        #endif
         // 선물 청산 감시: 앱을 연 동안은 1초마다 현재가로, 거래소를 바꾸거나 앱을 열 때는 꺼져 있던 동안의 고가·저가로 확인
         .task(id: market.exchange) {
             let ex = market.exchange
