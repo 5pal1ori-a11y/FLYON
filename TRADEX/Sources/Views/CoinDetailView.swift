@@ -28,7 +28,7 @@ struct CoinDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
-                BWSegmented(options: [("차트", "차트"), ("호가", "호가")], selection: $section, compact: true)
+                BWSegmented(options: [("차트", "차트"), ("호가", "호가")], selection: $section, compact: true, outlined: false)
                 Group {
                     if section == "차트" {
                         chartSection
@@ -41,20 +41,30 @@ struct CoinDetailView: View {
                     }
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: section)
-                if let holding { holdingCard(holding) }
+                if let holding {
+                    Divider()
+                    holdingCard(holding)
+                }
                 let myOrders = wallet.account(store.exchange).orders.filter { $0.market == market.market }
                 if !myOrders.isEmpty {
+                    Divider()
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("미체결 주문").font(.subheadline).foregroundStyle(.secondary).padding(.bottom, 4)
+                        Text("미체결 주문").font(.headline).padding(.bottom, 4)
                         ForEach(myOrders) { o in
                             PendingOrderRow(order: o, price: ticker?.tradePrice, exchange: store.exchange)
                         }
                     }
-                    .card()
                 }
-                ForEach(wallet.account(store.exchange).positions.filter { $0.market == market.market }) { p in
-                    PositionRow(position: p, price: ticker?.tradePrice, exchange: store.exchange)
+                let myPositions = wallet.account(store.exchange).positions.filter { $0.market == market.market }
+                if !myPositions.isEmpty {
+                    Divider()
+                    Text("선물 포지션").font(.headline)
+                    ForEach(myPositions) { p in
+                        PositionRow(position: p, price: ticker?.tradePrice, exchange: store.exchange, boxed: false)
+                        if p.id != myPositions.last?.id { Divider() }
+                    }
                 }
+                Divider()
                 statsCard
                 Text("시세 제공: \(store.exchange.name) Open API · 모의투자 전용, 실제 거래가 아니에요.")
                     .font(.caption2)
@@ -65,7 +75,7 @@ struct CoinDetailView: View {
             .padding(.top, 4)
             .padding(.bottom, 24)
         }
-        .background(Theme.background)
+        .background(Color(.systemBackground))
         .navigationTitle(market.koreanName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -149,10 +159,8 @@ struct CoinDetailView: View {
             }
             .frame(height: 220)
 
-            BWSegmented(options: ChartRange.allCases.map { ($0, $0.rawValue) }, selection: $range, compact: true)
+            BWSegmented(options: ChartRange.allCases.map { ($0, $0.rawValue) }, selection: $range, compact: true, outlined: false)
         }
-        .padding(16)
-        .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     }
 
     private func holdingCard(_ h: Holding) -> some View {
@@ -161,7 +169,7 @@ struct CoinDetailView: View {
         let pnl = (price - h.averagePrice) * h.quantity
         let rate = h.averagePrice > 0 ? price / h.averagePrice - 1 : 0
         return VStack(alignment: .leading, spacing: 12) {
-            Text("내 보유").font(.subheadline).foregroundStyle(.secondary)
+            Text("내 보유").font(.headline)
             HStack(alignment: .firstTextBaseline) {
                 Text("\(Fmt.qty(h.quantity)) \(market.symbol)").font(.title3.bold()).monospacedDigit()
                 Spacer()
@@ -179,7 +187,6 @@ struct CoinDetailView: View {
             }
             .font(.subheadline)
         }
-        .card()
     }
 
     private var statsCard: some View {
@@ -195,7 +202,6 @@ struct CoinDetailView: View {
                 }
             }
         }
-        .card()
     }
 
     /// 오늘 저가~고가 사이에서 현재가 위치
@@ -237,8 +243,8 @@ struct CoinDetailView: View {
                 .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
+        .padding(.vertical, 6)
+
     }
 
     private func row(_ title: String, _ value: String, color: Color = .primary) -> some View {
@@ -268,7 +274,7 @@ struct CoinDetailView: View {
         .padding(.top, 10)
         .padding(.bottom, 4)
         // 반투명(.bar) 위에서는 검정(primary)이 흐린 회색으로 보이므로 불투명 배경 사용
-        .background(Theme.background)
+        .background(Color(.systemBackground))
         .disabled(ticker == nil)
     }
 

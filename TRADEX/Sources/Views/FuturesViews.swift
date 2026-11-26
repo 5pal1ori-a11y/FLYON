@@ -5,6 +5,7 @@ struct PositionRow: View {
     let position: FuturesPosition
     let price: Double?
     let exchange: ExchangeID
+    var boxed = true
 
     @Environment(Wallet.self) private var wallet
     @State private var confirmClose = false
@@ -53,7 +54,14 @@ struct PositionRow: View {
             .buttonStyle(BWButtonStyle(cornerRadius: 10, verticalPadding: 10))
             .disabled(price == nil)
         }
-        .card()
+        .padding(boxed ? 16 : 0)
+        .padding(.vertical, boxed ? 0 : 8)
+        .background {
+            if boxed {
+                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).fill(Theme.card)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .confirmationDialog("현재가 \(Fmt.price(now))에 종료할까요? 예상 손익 \(Fmt.signedKRW(pnl))원",
                             isPresented: $confirmClose, titleVisibility: .visible) {
             Button("포지션 종료", role: .destructive) {

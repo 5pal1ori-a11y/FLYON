@@ -215,6 +215,8 @@ struct BWSegmented<Value: Hashable>: View {
     let options: [(Value, String)]
     @Binding var selection: Value
     var compact = false
+    /// false면 바깥 테두리·바탕 없이 선택된 칸만 검정 알약으로 표시
+    var outlined = true
     @Namespace private var ns
 
     var body: some View {
@@ -240,8 +242,8 @@ struct BWSegmented<Value: Hashable>: View {
             }
         }
         .padding(3)
-        .background(Capsule().fill(Color(.systemBackground)))
-        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
+        .background(Capsule().fill(outlined ? Color(.systemBackground) : .clear))
+        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: outlined ? 1 : 0))
         .sensoryFeedback(.selection, trigger: selection)
     }
 }
