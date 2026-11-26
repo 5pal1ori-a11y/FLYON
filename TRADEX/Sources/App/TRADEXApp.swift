@@ -38,6 +38,9 @@ struct RootView: View {
 
 struct MainTabView: View {
     @Environment(Session.self) private var session
+    @Environment(MarketStore.self) private var market
+    @Environment(Wallet.self) private var wallet
+    @State private var liquidated: [FuturesRecord] = []
 
     var body: some View {
         @Bindable var session = session
@@ -50,6 +53,22 @@ struct MainTabView: View {
                 .tabItem { Label("혜택", systemImage: "gift.fill") }
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape.fill") }
+        }
+        // 선물 청산 감시: 앱을 연 동안은 1초마다 현재가로, 거래소를 바꾸거나 앱을 열 때는 꺼져 있던 동안의 고가·저가로 확인
+        .task(id: market.exchange) {
+            let ex = market.exchange
+            let offline = await wallet.reconcileLiquidations(on: ex)
+            if !offline.isEmpty { liquidated = offline }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                let done = wallet.checkLiquidations(prices: market.tickers, on: ex)
+                if !done.isEmpty { liquidated = done }
+            }
+        }
+        .alert("포지션 청산", isPresented: Binding(get: { !liquidated.isEmpty }, set: { if !$0 { liquidated = [] } })) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(liquidated.map { "\($0.koreanName) \($0.side.title) \($0.leverage)× · 증거금 \(Fmt.krw($0.margin)) 소진" }.joined(separator: "\n"))
         }
         .sheet(isPresented: $session.showWelcome) {
             WelcomeBonusView()

@@ -1,7 +1,8 @@
 import Foundation
 
-/// 업비트 공개 시세(Quotation) API — API 키 불필요.
-/// 출시 전 업비트 Open API 이용약관에서 제3자 앱 표시 허용 범위를 반드시 확인할 것.
+/// 거래소 공개 시세(Quotation) API — API 키 불필요. 업비트와 빗썸이 같은 v1 형식을 쓴다.
+/// 출시 전 각 거래소 Open API 이용약관에서 제3자 앱 표시 허용 범위를 반드시 확인할 것.
+/// (미니게임 판정·서버 시간은 항상 업비트 기준)
 enum UpbitAPI {
     static let baseURL = URL(string: "https://api.upbit.com/v1/")!
     static let socketURL = URL(string: "wss://api.upbit.com/websocket/v1")!
@@ -19,8 +20,8 @@ enum UpbitAPI {
         }
     }
 
-    private static func get<T: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> T {
-        var comps = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+    private static func get<T: Decodable>(_ path: String, query: [URLQueryItem], on ex: ExchangeID = .upbit) async throws -> T {
+        var comps = URLComponents(url: ex.restBase.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
         comps.queryItems = query
         var req = URLRequest(url: comps.url!)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -33,17 +34,17 @@ enum UpbitAPI {
     }
 
     /// 원화마켓 목록
-    static func krwMarkets() async throws -> [Market] {
-        let all: [Lossy<Market>] = try await get("market/all", query: [URLQueryItem(name: "isDetails", value: "false")])
+    static func krwMarkets(on ex: ExchangeID = .upbit) async throws -> [Market] {
+        let all: [Lossy<Market>] = try await get("market/all", query: [URLQueryItem(name: "isDetails", value: "false")], on: ex)
         return all.compactMap(\.value).filter { $0.market.hasPrefix("KRW-") }
     }
 
     /// 현재 시세 (여러 마켓 한 번에, 100개씩 나눠 요청)
-    static func tickers(_ markets: [String]) async throws -> [Ticker] {
+    static func tickers(_ markets: [String], on ex: ExchangeID = .upbit) async throws -> [Ticker] {
         var result: [Ticker] = []
         for start in stride(from: 0, to: markets.count, by: 100) {
             let chunk = markets[start..<min(start + 100, markets.count)]
-            let rows: [Lossy<RestTicker>] = try await get("ticker", query: [URLQueryItem(name: "markets", value: chunk.joined(separator: ","))])
+            let rows: [Lossy<RestTicker>] = try await get("ticker", query: [URLQueryItem(name: "markets", value: chunk.joined(separator: ","))], on: ex)
             result += rows.compactMap { $0.value?.ticker }
         }
         return result
@@ -79,18 +80,27 @@ enum UpbitAPI {
     }
 
     /// 호가 (최대 30단계)
-    static func orderbook(market: String) async throws -> Orderbook? {
-        let rows: [Lossy<Orderbook>] = try await get("orderbook", query: [URLQueryItem(name: "markets", value: market)])
+    static func orderbook(market: String, on ex: ExchangeID = .upbit) async throws -> Orderbook? {
+        let rows: [Lossy<Orderbook>] = try await get("orderbook", query: [URLQueryItem(name: "markets", value: market)], on: ex)
         return rows.first?.value
     }
 
+    /// 1시간 봉 고가·저가 (선물 청산 확인용, 최신순)
+    static func highLow(market: String, hours: Int, on ex: ExchangeID) async throws -> [HighLowCandle] {
+        let rows: [Lossy<HighLowCandle>] = try await get("candles/minutes/60", query: [
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "count", value: String(min(max(hours, 1), 200))),
+        ], on: ex)
+        return rows.compactMap(\.value)
+    }
+
     /// 차트용 캔들 (오래된 순으로 정렬해서 반환)
-    static func candles(market: String, range: ChartRange) async throws -> [ChartPoint] {
+    static func candles(market: String, range: ChartRange, on ex: ExchangeID = .upbit) async throws -> [ChartPoint] {
         let (path, count) = range.request
         let rows: [Lossy<Candle>] = try await get(path, query: [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "count", value: String(count)),
-        ])
+        ], on: ex)
         return rows.compactMap(\.value).map { ChartPoint(date: $0.date, price: $0.tradePrice) }.sorted { $0.date < $1.date }
     }
 }
@@ -98,8 +108,8 @@ enum UpbitAPI {
 /// 업비트 실시간 시세 WebSocket
 enum UpbitSocket {
     /// 연결이 끊기거나 작업이 취소될 때까지 시세를 onTicker로 전달한다.
-    static func listen(codes: [String], onTicker: @escaping @Sendable (Ticker) async -> Void) async throws {
-        let task = URLSession.shared.webSocketTask(with: UpbitAPI.socketURL)
+    static func listen(codes: [String], on ex: ExchangeID = .upbit, onTicker: @escaping @Sendable (Ticker) async -> Void) async throws {
+        let task = URLSession.shared.webSocketTask(with: ex.socketURL)
         task.resume()
 
         let subscribe: [[String: Any]] = [

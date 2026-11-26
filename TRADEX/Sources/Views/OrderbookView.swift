@@ -4,6 +4,7 @@ import SwiftUI
 struct OrderbookView: View {
     let market: Market
     let prevClose: Double
+    var exchange: ExchangeID = .upbit
     var levels = 12
 
     @State private var book: Orderbook?
@@ -29,7 +30,7 @@ struct OrderbookView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .task(id: market.market) {
             while !Task.isCancelled {
-                if let b = try? await UpbitAPI.orderbook(market: market.market) {
+                if let b = try? await UpbitAPI.orderbook(market: market.market, on: exchange) {
                     book = b; failed = false
                 } else if book == nil {
                     failed = true

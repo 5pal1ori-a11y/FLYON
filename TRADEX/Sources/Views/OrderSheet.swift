@@ -27,7 +27,8 @@ struct OrderSheet: View {
     }
 
     private var price: Double { store.tickers[market.market]?.tradePrice ?? 0 }
-    private var holdingQty: Double { wallet.state.holdings[market.market]?.quantity ?? 0 }
+    private var ex: ExchangeID { store.exchange }
+    private var holdingQty: Double { wallet.account(ex).holdings[market.market]?.quantity ?? 0 }
     private var value: Double { Double(input) ?? 0 }
     private var isBuy: Bool { side == .buy }
     private var accent: Color { isBuy ? Theme.rise : Theme.fall }
@@ -48,8 +49,8 @@ struct OrderSheet: View {
 
     private var available: String {
         if isBuy {
-            let maxQty = price > 0 ? floor(wallet.maxBuyKRW / price * 1e8) / 1e8 : 0
-            return "주문 가능 \(Fmt.krw(wallet.state.krw)) (최대 \(Fmt.qty(maxQty)) \(market.symbol))"
+            let maxQty = price > 0 ? floor(wallet.maxBuyKRW(ex) / price * 1e8) / 1e8 : 0
+            return "주문 가능 \(Fmt.krw(wallet.account(ex).krw)) (최대 \(Fmt.qty(maxQty)) \(market.symbol))"
         } else {
             return "보유 \(Fmt.qty(holdingQty)) \(market.symbol) (≈ \(Fmt.krw(holdingQty * price)))"
         }
@@ -206,7 +207,7 @@ struct OrderSheet: View {
         errorText = nil
         guard price > 0 else { return }
         if isBuy {
-            let krw = floor(wallet.maxBuyKRW * ratio)
+            let krw = floor(wallet.maxBuyKRW(ex) * ratio)
             input = unit == .krw ? String(Int(krw)) : plain(floor(krw / price * 1e8) / 1e8)
         } else {
             let qty = ratio == 1 ? holdingQty : floor(holdingQty * ratio * 1e8) / 1e8
@@ -218,15 +219,15 @@ struct OrderSheet: View {
         do {
             if isBuy {
                 if unit == .krw {
-                    try wallet.buy(market: market, krwAmount: value, price: price)
+                    try wallet.buy(market: market, krwAmount: value, price: price, on: ex)
                 } else {
-                    try wallet.buy(market: market, quantity: value, price: price)
+                    try wallet.buy(market: market, quantity: value, price: price, on: ex)
                 }
             } else {
                 // 원으로 입력했는데 보유 평가금액 이상이면 전량 매도
                 var qty = unit == .coin ? value : floor(value / price * 1e8) / 1e8
                 if unit == .krw && value >= floor(holdingQty * price) { qty = holdingQty }
-                try wallet.sell(market: market, quantity: min(qty, holdingQty), price: price)
+                try wallet.sell(market: market, quantity: min(qty, holdingQty), price: price, on: ex)
             }
             done = true
             Task {

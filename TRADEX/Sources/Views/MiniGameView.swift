@@ -231,7 +231,7 @@ struct PredictionGameView: View {
     }
 
     private func settle() async {
-        let settled = await wallet.settlePendingPredictions()
+        let settled = await wallet.settlePendingPredictions(creditTo: store.exchange)
         if !settled.isEmpty {
             results = settled
             UINotificationFeedbackGenerator().notificationOccurred(settled.contains { $0.status == .won } ? .success : .warning)

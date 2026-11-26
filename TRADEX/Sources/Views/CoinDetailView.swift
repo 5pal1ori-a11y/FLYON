@@ -13,7 +13,8 @@ struct CoinDetailView: View {
     @State private var section = "차트"
 
     private var ticker: Ticker? { store.tickers[market.market] }
-    private var holding: Holding? { wallet.state.holdings[market.market] }
+    private var holding: Holding? { wallet.account(store.exchange).holdings[market.market] }
+    @State private var showFutures = false
 
     /// 차트 마지막 점을 실시간 가격으로 이어 붙인다.
     private var livePoints: [ChartPoint] {
@@ -34,9 +35,12 @@ struct CoinDetailView: View {
                 if section == "차트" {
                     chartSection
                 } else {
-                    OrderbookView(market: market, prevClose: ticker?.prevClosingPrice ?? 0)
+                    OrderbookView(market: market, prevClose: ticker?.prevClosingPrice ?? 0, exchange: store.exchange)
                 }
                 if let holding { holdingCard(holding) }
+                ForEach(wallet.account(store.exchange).positions.filter { $0.market == market.market }) { p in
+                    PositionRow(position: p, price: ticker?.tradePrice, exchange: store.exchange)
+                }
                 statsCard
                 Text("시세 제공: 업비트 Open API · 모의투자 전용, 실제 거래가 아닙니다.")
                     .font(.caption2)
@@ -63,6 +67,9 @@ struct CoinDetailView: View {
         .safeAreaInset(edge: .bottom) { orderButtons }
         .task(id: range) { await loadChart() }
         .onAppear { wallet.recordEvent("chart:\(market.market)") }
+        .sheet(isPresented: $showFutures) {
+            FuturesOrderSheet(market: market).presentationDetents([.large])
+        }
         .sheet(item: $orderSide) { side in
             OrderSheet(market: market, side: side)
                 .presentationDetents([.large])
@@ -181,6 +188,14 @@ struct CoinDetailView: View {
                 .opacity(holding == nil ? 0.4 : 1)
             Button("매수") { orderSide = .buy }
                 .buttonStyle(PrimaryButtonStyle(color: Theme.rise))
+            Button { showFutures = true } label: {
+                VStack(spacing: 0) {
+                    Text("선물").font(.headline)
+                    Text("롱·숏").font(.caption2)
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .frame(width: 76)
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -193,7 +208,7 @@ struct CoinDetailView: View {
         chartError = false
         selected = nil
         do {
-            let result = try await UpbitAPI.candles(market: market.market, range: range)
+            let result = try await UpbitAPI.candles(market: market.market, range: range, on: store.exchange)
             withAnimation { points = result }
         } catch is CancellationError {
         } catch {

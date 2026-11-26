@@ -14,7 +14,7 @@ struct PortfolioAnalysisView: View {
     @State private var running = false
     @State private var errorText: String?
 
-    private var stats: PortfolioStats { PortfolioStats(wallet: wallet, prices: store.tickers) }
+    private var stats: PortfolioStats { PortfolioStats(wallet: wallet) { store.prices(for: $0) } }
 
     var body: some View {
         ScrollView {
@@ -47,6 +47,11 @@ struct PortfolioAnalysisView: View {
             if s.sellCount > 0 {
                 row("수익 낸 매도", "\(s.winningSells)/\(s.sellCount)")
                 row("실현 손익", "\(Fmt.signedKRW(s.realizedPnL))원", Theme.color(for: s.realizedPnL))
+            }
+            if s.openPositions + s.futuresTrades > 0 {
+                row("선물", "보유 \(s.openPositions) · 종료 \(s.futuresTrades) (청산 \(s.liquidations))")
+                row("평균 레버리지", String(format: "%.1f×", s.averageLeverage))
+                row("선물 실현 손익", "\(Fmt.signedKRW(s.futuresRealizedPnL))원", Theme.color(for: s.futuresRealizedPnL))
             }
             if s.predictionsDone > 0 {
                 row("오를까 내릴까 적중", "\(s.predictionsWon)/\(s.predictionsDone)")
@@ -161,24 +166,43 @@ struct PortfolioStats {
     var buyCount = 0, sellCount = 0, recentTrades = 0, winningSells = 0
     var realizedPnL = 0.0
     var predictionsDone = 0, predictionsWon = 0
+    var openPositions = 0, futuresTrades = 0, liquidations = 0
+    var averageLeverage = 0.0
+    var futuresRealizedPnL = 0.0
 
-    init(wallet: Wallet, prices: [String: Ticker]) {
-        let v = wallet.valuation(prices: prices)
+    /// 모든 거래소 계좌를 합쳐서 계산
+    init(wallet: Wallet, pricesFor: (ExchangeID) -> [String: Ticker]) {
+        let v = wallet.totalValuation(pricesFor: pricesFor)
         let total = max(v.total, 1)
         totalReturn = wallet.baseValue > 0 ? v.total / wallet.baseValue - 1 : 0
-        cashRatio = (v.krw + v.tradexValue) / total
-        holdings = wallet.state.holdings.map { code, h in
-            let price = prices[code]?.tradePrice ?? h.averagePrice
-            return Item(name: h.koreanName, symbol: String(code.dropFirst(4)),
-                        weight: price * h.quantity / total,
-                        pnlRate: h.averagePrice > 0 ? price / h.averagePrice - 1 : 0)
-        }.sorted { $0.weight > $1.weight }
-        let trades = wallet.state.trades
+        cashRatio = (v.krw + v.futuresKRW + v.tradexValue) / total
+        var items: [String: Item] = [:]
+        var trades: [TradeRecord] = []
+        var leverages: [Int] = []
+        var history: [FuturesRecord] = []
+        for ex in ExchangeID.allCases {
+            let a = wallet.account(ex), prices = pricesFor(ex)
+            for (code, h) in a.holdings {
+                let price = prices[code]?.tradePrice ?? h.averagePrice
+                let weight = price * h.quantity / total + (items[code]?.weight ?? 0)
+                items[code] = Item(name: h.koreanName, symbol: String(code.dropFirst(4)), weight: weight,
+                                   pnlRate: h.averagePrice > 0 ? price / h.averagePrice - 1 : 0)
+            }
+            trades += a.trades
+            openPositions += a.positions.count
+            leverages += a.positions.map(\.leverage) + a.futuresHistory.map(\.leverage)
+            history += a.futuresHistory
+        }
+        holdings = items.values.sorted { $0.weight > $1.weight }
         buyCount = trades.filter { $0.side == .buy }.count
         sellCount = trades.filter { $0.side == .sell }.count
         recentTrades = trades.filter { $0.date > Date().addingTimeInterval(-7 * 86_400) }.count
         winningSells = trades.filter { ($0.realizedPnL ?? 0) > 0 }.count
         realizedPnL = trades.compactMap(\.realizedPnL).reduce(0, +)
+        futuresTrades = history.count
+        liquidations = history.filter(\.liquidated).count
+        futuresRealizedPnL = history.map(\.pnl).reduce(0, +)
+        averageLeverage = leverages.isEmpty ? 0 : Double(leverages.reduce(0, +)) / Double(leverages.count)
         let done = wallet.state.predictions.filter { $0.status != .pending }
         predictionsDone = done.count
         predictionsWon = done.filter { $0.status == .won }.count
@@ -193,7 +217,7 @@ struct PortfolioStats {
     - 실제 돈이 아닌 모의투자 기록이라는 점을 전제로 한다.
     형식:
     1) '한눈에 보기' 2~3문장
-    2) '투자 습관' 관찰 3개 이내 (분산 정도, 현금 비중, 거래 빈도, 손익 관리 등)
+    2) '투자 습관' 관찰 3개 이내 (분산 정도, 현금 비중, 거래 빈도, 손익 관리, 레버리지·청산 위험 등)
     3) '공부해 볼 개념' 2~3개 (분산투자, 손절 원칙, 수수료, 변동성 같은 일반 개념)
     전체 500자 이내.
     """
@@ -211,6 +235,7 @@ struct PortfolioStats {
         lines += [
             "매수 \(buyCount)회, 매도 \(sellCount)회, 최근 7일 거래 \(recentTrades)회",
             "수익 낸 매도: \(winningSells)/\(sellCount)회, 실현 손익 합계: \(Int(realizedPnL))원",
+            "선물(모의): 보유 포지션 \(openPositions)개, 종료 \(futuresTrades)회, 그중 청산 \(liquidations)회, 평균 레버리지 \(String(format: "%.1f", averageLeverage))배, 실현 손익 \(Int(futuresRealizedPnL))원",
             "오를까 내릴까 미니게임 적중: \(predictionsWon)/\(predictionsDone)",
         ]
         return lines.joined(separator: "\n")

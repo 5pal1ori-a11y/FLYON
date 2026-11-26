@@ -24,7 +24,9 @@ struct ExchangeView: View {
         if base.isEmpty { base = store.markets }
         switch tab {
         case .krw: break
-        case .holdings: base = base.filter { wallet.state.holdings[$0.market] != nil }
+        case .holdings:
+            let a = wallet.account(store.exchange)
+            base = base.filter { a.holdings[$0.market] != nil || a.positions.contains(where: { p in p.market == $0.market }) }
         case .favorites: base = base.filter { store.favorites.contains($0.market) }
         }
         guard !query.isEmpty else { return base }
@@ -61,7 +63,9 @@ struct ExchangeView: View {
             .navigationTitle("거래소")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { TradexLogo(height: 18, showsWordmark: true) }
+                ToolbarItem(placement: .topBarLeading) {
+                    ExchangePicker(selection: Binding(get: { store.exchange }, set: { new in Task { await store.select(new) } }))
+                }
                 ToolbarItem(placement: .topBarTrailing) { LiveIndicator(isLive: store.isConnected) }
             }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "코인명/심볼 검색")
@@ -77,13 +81,15 @@ struct ExchangeView: View {
     // MARK: - 요약 바 (총 평가 · 평가손익 · 수익률)
 
     private var summaryBar: some View {
-        let v = wallet.valuation(prices: store.tickers)
-        let pnl = v.total - wallet.baseValue
-        let rate = wallet.baseValue > 0 ? pnl / wallet.baseValue : 0
+        // 선택한 거래소 계좌 기준: 평가손익 = 현물 평가손익 + 선물 미실현 손익
+        let v = wallet.valuation(store.exchange, prices: store.tickers)
+        let pnl = v.coinPnL + v.futuresPnL
+        let invested = v.coinCost + v.positionMargin
+        let rate = invested > 0 ? pnl / invested : 0
         return HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 summaryRow("주문가능", Fmt.krw(v.krw))
-                summaryRow("총 평가", Fmt.krw(v.total))
+                summaryRow("총 평가", Fmt.krw(v.coinValue + v.krw + v.futuresKRW + v.positionValue))
             }
             .frame(maxWidth: .infinity)
             Divider().frame(height: 34)
@@ -215,6 +221,7 @@ struct MarketTableRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             if let t = ticker {
                 let color = Theme.color(for: t.signedChangeRate)
                 FlashingPrice(price: t.tradePrice, font: .subheadline, color: color)

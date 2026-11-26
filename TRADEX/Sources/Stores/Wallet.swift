@@ -38,6 +38,16 @@ final class Wallet {
 
     var isNew: Bool { state.grantedTradex == 0 }
 
+    // MARK: - 계좌
+
+    func account(_ ex: ExchangeID) -> ExchangeAccount { state.accounts[ex.rawValue] ?? ExchangeAccount() }
+
+    private func update(_ ex: ExchangeID, _ body: (inout ExchangeAccount) throws -> Void) rethrows {
+        var a = account(ex)
+        try body(&a)
+        state.accounts[ex.rawValue] = a
+    }
+
     // MARK: - TRADEX
 
     /// 첫 로그인 보너스 지급 (한 계정당 1회)
@@ -51,89 +61,207 @@ final class Wallet {
         return true
     }
 
-    /// TRADEX → 모의 원화 교환 (단방향, 되돌릴 수 없음)
-    func exchange(tradex count: Int) throws {
+    /// TRADEX → 거래소 계좌(현물 또는 선물)로 충전 (단방향, 되돌릴 수 없음)
+    func charge(tradex count: Int, to ex: ExchangeID, futures: Bool) throws {
         guard count > 0 else { throw WalletError.invalid }
         guard count <= state.tradex else { throw WalletError.insufficientTradex }
         state.tradex -= count
-        state.krw += Double(count) * TradexRules.krwPerTradex
+        let krw = Double(count) * TradexRules.krwPerTradex
+        update(ex) { if futures { $0.futuresKRW += krw } else { $0.krw += krw } }
         state.tradexHistory.insert(TradexRecord(kind: .exchange, amount: -count, date: .now,
-                                                krwPerTradex: TradexRules.krwPerTradex), at: 0)
+                                                krwPerTradex: TradexRules.krwPerTradex,
+                                                exchange: ex, toFutures: futures), at: 0)
         save()
     }
 
-    // MARK: - 매매 (시장가)
+    /// 같은 거래소 안에서 현물 ↔ 선물 원화 이동
+    func transfer(_ amount: Double, in ex: ExchangeID, toFutures: Bool) throws {
+        let a = account(ex)
+        guard amount > 0 else { throw WalletError.invalid }
+        guard amount <= (toFutures ? a.krw : a.futuresKRW) + 0.000001 else { throw WalletError.insufficientKRW }
+        update(ex) {
+            if toFutures { $0.krw -= amount; $0.futuresKRW += amount } else { $0.futuresKRW -= amount; $0.krw += amount }
+        }
+        save()
+    }
+
+    // MARK: - 현물 매매 (시장가)
 
     /// 원화 금액만큼 시장가 매수. 수수료는 별도로 차감.
-    func buy(market: Market, krwAmount: Double, price: Double) throws {
+    func buy(market: Market, krwAmount: Double, price: Double, on ex: ExchangeID) throws {
         guard krwAmount > 0, price > 0 else { throw WalletError.invalid }
-        try buy(market: market, quantity: floor(krwAmount / price * 1e8) / 1e8, price: price)
+        try buy(market: market, quantity: floor(krwAmount / price * 1e8) / 1e8, price: price, on: ex)
     }
 
     /// 코인 개수만큼 시장가 매수. 수수료는 별도로 차감.
-    func buy(market: Market, quantity: Double, price: Double) throws {
+    func buy(market: Market, quantity: Double, price: Double, on ex: ExchangeID) throws {
         let qty = floor(quantity * 1e8) / 1e8
         guard qty > 0, price > 0 else { throw WalletError.invalid }
         let cost = qty * price
         guard cost >= TradexRules.minOrderKRW else { throw WalletError.minOrder }
         let fee = cost * TradexRules.feeRate
-        guard cost + fee <= state.krw + 0.000001 else { throw WalletError.insufficientKRW }
+        guard cost + fee <= account(ex).krw + 0.000001 else { throw WalletError.insufficientKRW }
 
-        var h = state.holdings[market.market] ?? Holding(quantity: 0, averagePrice: 0, koreanName: market.koreanName)
-        h.averagePrice = (h.averagePrice * h.quantity + cost) / (h.quantity + qty)
-        h.quantity += qty
-        state.holdings[market.market] = h
-        state.krw = max(0, state.krw - cost - fee)
-        state.trades.insert(TradeRecord(side: .buy, market: market.market, koreanName: market.koreanName,
+        update(ex) { a in
+            var h = a.holdings[market.market] ?? Holding(quantity: 0, averagePrice: 0, koreanName: market.koreanName)
+            h.averagePrice = (h.averagePrice * h.quantity + cost) / (h.quantity + qty)
+            h.quantity += qty
+            a.holdings[market.market] = h
+            a.krw = max(0, a.krw - cost - fee)
+            a.trades.insert(TradeRecord(side: .buy, market: market.market, koreanName: market.koreanName,
                                         price: price, quantity: qty, fee: fee, date: .now), at: 0)
+        }
         recordEvent("buy")
         save()
     }
 
     /// 수량만큼 시장가 매도
-    func sell(market: Market, quantity: Double, price: Double) throws {
+    func sell(market: Market, quantity: Double, price: Double, on ex: ExchangeID) throws {
         guard quantity > 0, price > 0 else { throw WalletError.invalid }
-        guard var h = state.holdings[market.market], h.quantity + 1e-9 >= quantity else { throw WalletError.insufficientQty }
+        guard let h = account(ex).holdings[market.market], h.quantity + 1e-9 >= quantity else { throw WalletError.insufficientQty }
         let amount = quantity * price
         guard amount >= TradexRules.minOrderKRW || abs(h.quantity - quantity) < 1e-9 else { throw WalletError.minOrder }
         let fee = amount * TradexRules.feeRate
         let pnl = (price - h.averagePrice) * quantity - fee
 
-        h.quantity -= quantity
-        if h.quantity < 1e-8 { state.holdings[market.market] = nil } else { state.holdings[market.market] = h }
-        state.krw += amount - fee
-        state.trades.insert(TradeRecord(side: .sell, market: market.market, koreanName: market.koreanName,
+        update(ex) { a in
+            var left = h
+            left.quantity -= quantity
+            a.holdings[market.market] = left.quantity < 1e-8 ? nil : left
+            a.krw += amount - fee
+            a.trades.insert(TradeRecord(side: .sell, market: market.market, koreanName: market.koreanName,
                                         price: price, quantity: quantity, fee: fee, date: .now, realizedPnL: pnl), at: 0)
+        }
         save()
     }
 
     /// 수수료 포함해서 지금 살 수 있는 최대 원화 금액
-    var maxBuyKRW: Double { floor(state.krw / (1 + TradexRules.feeRate)) }
+    func maxBuyKRW(_ ex: ExchangeID) -> Double { floor(account(ex).krw / (1 + TradexRules.feeRate)) }
+
+    // MARK: - 선물 (모의, 격리 마진, 수수료·펀딩비 없음)
+
+    enum FuturesError: LocalizedError {
+        case insufficientMargin, minMargin, invalidLeverage, notFound
+        var errorDescription: String? {
+            switch self {
+            case .insufficientMargin: return "선물 지갑의 원화가 부족해요. 충전하거나 현물에서 옮겨 주세요."
+            case .minMargin: return "최소 증거금은 \(Fmt.krw(TradexRules.minOrderKRW))이에요."
+            case .invalidLeverage: return "레버리지는 1~\(TradexRules.maxLeverage)배까지 가능해요."
+            case .notFound: return "포지션을 찾을 수 없어요."
+            }
+        }
+    }
+
+    func openPosition(market: Market, side: PositionSide, leverage: Int, margin: Double, price: Double, on ex: ExchangeID) throws {
+        guard price > 0, margin > 0 else { throw WalletError.invalid }
+        guard (1...TradexRules.maxLeverage).contains(leverage) else { throw FuturesError.invalidLeverage }
+        guard margin >= TradexRules.minOrderKRW else { throw FuturesError.minMargin }
+        guard margin <= account(ex).futuresKRW + 0.000001 else { throw FuturesError.insufficientMargin }
+        let position = FuturesPosition(market: market.market, koreanName: market.koreanName, side: side, leverage: leverage,
+                                       margin: margin, entryPrice: price, quantity: margin * Double(leverage) / price,
+                                       openedAt: .now)
+        update(ex) { a in
+            a.futuresKRW = max(0, a.futuresKRW - margin)
+            a.positions.insert(position, at: 0)
+        }
+        recordEvent("futures")
+        save()
+    }
+
+    /// 포지션 종료. 돌려받은 금액(증거금 + 손익)을 선물 지갑에 넣는다.
+    @discardableResult
+    func closePosition(id: UUID, price: Double, on ex: ExchangeID, liquidated: Bool = false) throws -> FuturesRecord {
+        guard let p = account(ex).positions.first(where: { $0.id == id }) else { throw FuturesError.notFound }
+        let exit = liquidated ? p.liquidationPrice : price
+        let pnl = liquidated ? -p.margin : p.pnl(at: exit)
+        let record = FuturesRecord(market: p.market, koreanName: p.koreanName, side: p.side, leverage: p.leverage,
+                                   margin: p.margin, entryPrice: p.entryPrice, exitPrice: exit, pnl: max(pnl, -p.margin),
+                                   closedAt: .now, liquidated: liquidated || p.isLiquidated(at: exit))
+        update(ex) { a in
+            a.positions.removeAll { $0.id == id }
+            a.futuresKRW += max(0, p.margin + pnl)
+            a.futuresHistory.insert(record, at: 0)
+        }
+        save()
+        return record
+    }
+
+    /// 현재가로 청산 조건을 확인해 청산된 포지션을 돌려준다.
+    @discardableResult
+    func checkLiquidations(prices: [String: Ticker], on ex: ExchangeID) -> [FuturesRecord] {
+        var done: [FuturesRecord] = []
+        for p in account(ex).positions {
+            guard let price = prices[p.market]?.tradePrice, p.isLiquidated(at: price) else { continue }
+            if let r = try? closePosition(id: p.id, price: price, on: ex, liquidated: true) { done.append(r) }
+        }
+        return done
+    }
+
+    /// 앱이 꺼져 있던 동안 청산 가격을 지나갔는지 1시간 봉의 고가·저가로 확인
+    @discardableResult
+    func reconcileLiquidations(on ex: ExchangeID) async -> [FuturesRecord] {
+        var done: [FuturesRecord] = []
+        for p in account(ex).positions {
+            let hours = Int(Date().timeIntervalSince(p.openedAt) / 3_600) + 2
+            guard let candles = try? await UpbitAPI.highLow(market: p.market, hours: min(hours, 200), on: ex) else { continue }
+            let crossed = candles.contains { c in
+                c.date.addingTimeInterval(3_600) > p.openedAt &&
+                    (p.side == .long ? c.low <= p.liquidationPrice : c.high >= p.liquidationPrice)
+            }
+            if crossed, let r = try? closePosition(id: p.id, price: p.liquidationPrice, on: ex, liquidated: true) {
+                done.append(r)
+            }
+        }
+        return done
+    }
 
     // MARK: - 평가
 
     struct Valuation {
-        var coinValue: Double
-        var coinCost: Double
-        var krw: Double
-        var tradexValue: Double
-        var total: Double { coinValue + krw + tradexValue }
+        var coinValue = 0.0
+        var coinCost = 0.0
+        var krw = 0.0              // 현물 원화
+        var futuresKRW = 0.0       // 선물 지갑 원화
+        var positionValue = 0.0    // 포지션 평가 (증거금 + 미실현 손익)
+        var positionMargin = 0.0
+        var tradexValue = 0.0
+        var cashAndPositions: Double { krw + futuresKRW + positionValue }
+        var total: Double { coinValue + krw + futuresKRW + positionValue + tradexValue }
         var coinPnL: Double { coinValue - coinCost }
+        var futuresPnL: Double { positionValue - positionMargin }
     }
 
-    func valuation(prices: [String: Ticker]) -> Valuation {
-        var value = 0.0, cost = 0.0
-        for (code, h) in state.holdings {
+    /// 한 거래소 계좌 평가 (TRADEX 제외)
+    func valuation(_ ex: ExchangeID, prices: [String: Ticker]) -> Valuation {
+        let a = account(ex)
+        var v = Valuation(krw: a.krw, futuresKRW: a.futuresKRW)
+        for (code, h) in a.holdings {
             let p = prices[code]?.tradePrice ?? h.averagePrice
-            value += p * h.quantity
-            cost += h.averagePrice * h.quantity
+            v.coinValue += p * h.quantity
+            v.coinCost += h.averagePrice * h.quantity
         }
-        return Valuation(coinValue: value, coinCost: cost, krw: state.krw,
-                         tradexValue: Double(state.tradex) * TradexRules.krwPerTradex)
+        for pos in a.positions {
+            let p = prices[pos.market]?.tradePrice ?? pos.entryPrice
+            v.positionValue += pos.value(at: p)
+            v.positionMargin += pos.margin
+        }
+        return v
+    }
+
+    /// 전체 평가 (모든 거래소 + 남은 TRADEX). pricesFor: 거래소별 마지막 시세
+    func totalValuation(pricesFor: (ExchangeID) -> [String: Ticker]) -> Valuation {
+        var total = Valuation(tradexValue: Double(state.tradex) * TradexRules.krwPerTradex)
+        for ex in ExchangeID.allCases {
+            let v = valuation(ex, prices: pricesFor(ex))
+            total.coinValue += v.coinValue; total.coinCost += v.coinCost
+            total.krw += v.krw; total.futuresKRW += v.futuresKRW
+            total.positionValue += v.positionValue; total.positionMargin += v.positionMargin
+        }
+        return total
     }
 
     /// 지급받은 TRADEX 가치 대비 총 수익
-    /// = 지금까지 교환해서 받은 원화(교환 당시 환율) + 아직 남은 TRADEX의 현재 가치
+    /// = 지금까지 충전한 원화(충전 당시 환율) + 아직 남은 TRADEX의 현재 가치
     var baseValue: Double {
         let exchanged = state.tradexHistory
             .filter { $0.kind == .exchange }
@@ -144,10 +272,14 @@ final class Wallet {
     /// 처음 상태로 되돌리기 (보너스는 다시 지급하지 않고 지급 총량으로 복원)
     func reset() {
         let granted = state.grantedTradex
-        // 미니게임 기록은 유지 (같은 라운드에 다시 참여하지 못하게)
-        state = WalletState(tradex: granted, krw: 0, holdings: [:], trades: [],
-                            tradexHistory: [TradexRecord(kind: .signupBonus, amount: granted, date: .now)],
-                            grantedTradex: granted, predictions: state.predictions, daily: state.daily)
+        var fresh = WalletState()
+        fresh.tradex = granted
+        fresh.grantedTradex = granted
+        fresh.tradexHistory = [TradexRecord(kind: .signupBonus, amount: granted, date: .now)]
+        // 미니게임·출석 기록은 유지 (같은 라운드·같은 날 보상을 다시 받지 못하게)
+        fresh.predictions = state.predictions
+        fresh.daily = state.daily
+        state = fresh
         save()
     }
 
@@ -179,7 +311,7 @@ final class Wallet {
     }
 
     /// 결과가 나온 예측을 판정하고 적중 시 모의 원화 지급. 새로 판정된 예측을 돌려준다.
-    func settlePendingPredictions() async -> [Prediction] {
+    func settlePendingPredictions(creditTo ex: ExchangeID) async -> [Prediction] {
         let pending = state.predictions.filter { $0.status == .pending }
         guard !pending.isEmpty, let now = try? await UpbitAPI.serverNow() else { return [] }
         var settled: [Prediction] = []
@@ -190,12 +322,12 @@ final class Wallet {
                   let candles = try? await UpbitAPI.dayCandles(market: p.market, count: days),
                   let candle = candles.first(where: { $0.candleDateTimeKst == round.candleTimeKST })
             else { continue }
-            if let result = settle(id: p.id, changeRate: candle.changeRate) { settled.append(result) }
+            if let result = settle(id: p.id, changeRate: candle.changeRate, creditTo: ex) { settled.append(result) }
         }
         return settled
     }
 
-    private func settle(id: UUID, changeRate: Double) -> Prediction? {
+    private func settle(id: UUID, changeRate: Double, creditTo ex: ExchangeID) -> Prediction? {
         guard let i = state.predictions.firstIndex(where: { $0.id == id }),
               state.predictions[i].status == .pending else { return nil }
         var p = state.predictions[i]
@@ -205,7 +337,8 @@ final class Wallet {
         } else if (changeRate > 0) == (p.choice == .up) {
             p.status = .won
             p.reward = TradexRules.predictionRewardKRW
-            state.krw += p.reward
+            let reward = p.reward
+            update(ex) { $0.krw += reward }
         } else {
             p.status = .lost
         }
@@ -241,7 +374,7 @@ final class Wallet {
     func checkedIn(on day: String) -> Bool { state.daily.checkInDays.first == day }
 
     /// 출석 (서버 시간 기준 날짜). 지급액(기본 + 연속 보너스)을 돌려준다.
-    func checkIn(serverNow: Date) throws -> (reward: Double, bonus: Double, streak: Int) {
+    func checkIn(serverNow: Date, creditTo ex: ExchangeID) throws -> (reward: Double, bonus: Double, streak: Int) {
         let today = KST.dayKey(serverNow)
         guard !checkedIn(on: today) else { throw DailyError.alreadyCheckedIn }
         let continued = state.daily.checkInDays.first == KST.previousDayKey(today)
@@ -249,7 +382,7 @@ final class Wallet {
         state.daily.checkInDays.insert(today, at: 0)
         state.daily.checkInDays = Array(state.daily.checkInDays.prefix(60))
         let bonus = state.daily.streak % DailyRules.streakBonusEvery == 0 ? DailyRules.streakBonus : 0
-        state.krw += DailyRules.checkInReward + bonus
+        update(ex) { $0.krw += DailyRules.checkInReward + bonus }
         save()
         return (DailyRules.checkInReward, bonus, state.daily.streak)
     }
@@ -275,7 +408,7 @@ final class Wallet {
         state.daily.claimedDay == today && state.daily.claimedMissions.contains(m.id)
     }
 
-    func claimMission(_ m: Mission, serverNow: Date) throws {
+    func claimMission(_ m: Mission, serverNow: Date, creditTo ex: ExchangeID) throws {
         let today = KST.dayKey(serverNow)
         guard !missionClaimed(m, today: today) else { throw DailyError.alreadyClaimed }
         guard missionProgress(m, today: today) >= m.goal else { throw DailyError.notComplete }
@@ -284,7 +417,7 @@ final class Wallet {
             state.daily.claimedMissions = []
         }
         state.daily.claimedMissions.append(m.id)
-        state.krw += m.reward
+        update(ex) { $0.krw += m.reward }
         save()
     }
 
@@ -293,7 +426,7 @@ final class Wallet {
     }
 
     /// 퀴즈 답 제출. 맞히면 보상 지급 후 true.
-    func answerQuiz(_ q: QuizQuestion, choice: Int, serverNow: Date) throws -> Bool {
+    func answerQuiz(_ q: QuizQuestion, choice: Int, serverNow: Date, creditTo ex: ExchangeID) throws -> Bool {
         let today = KST.dayKey(serverNow)
         guard QuizQuestion.today(today).contains(q) else { throw DailyError.alreadyAnswered }
         if state.daily.quizDay != today {
@@ -303,7 +436,7 @@ final class Wallet {
         guard state.daily.quizAnswers[q.id] == nil else { throw DailyError.alreadyAnswered }
         state.daily.quizAnswers[q.id] = choice
         let correct = choice == q.answer
-        if correct { state.krw += DailyRules.quizReward }
+        if correct { update(ex) { $0.krw += DailyRules.quizReward } }
         save()
         return correct
     }

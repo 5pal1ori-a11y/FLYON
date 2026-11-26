@@ -4,11 +4,11 @@ import Foundation
 // 보상은 모두 앱 안에서만 쓰는 모의투자금(원)이며 현금·상품으로 바꿀 수 없다.
 
 enum DailyRules {
-    static let checkInReward: Double = 2_000
+    static let checkInReward: Double = 100_000
     /// 7일 연속 출석할 때마다 추가 보너스
-    static let streakBonus: Double = 10_000
+    static let streakBonus: Double = 1_000_000
     static let streakBonusEvery = 7
-    static let quizReward: Double = 1_000
+    static let quizReward: Double = 50_000
     static let quizPerDay = 3
 }
 
@@ -61,10 +61,10 @@ struct Mission: Identifiable, Hashable {
     let reward: Double
 
     static let all: [Mission] = [
-        Mission(id: "buy", title: "코인 1번 매수하기", icon: "cart.fill", goal: 1, reward: 3_000),
-        Mission(id: "predict", title: "오를까 내릴까 참여하기", icon: "chart.line.uptrend.xyaxis", goal: 1, reward: 2_000),
-        Mission(id: "chart", title: "코인 차트 3개 살펴보기", icon: "chart.xyaxis.line", goal: 3, reward: 1_000),
-        Mission(id: "quiz", title: "오늘의 퀴즈 모두 풀기", icon: "questionmark.circle.fill", goal: DailyRules.quizPerDay, reward: 2_000),
+        Mission(id: "buy", title: "코인 1번 매수하기", icon: "cart.fill", goal: 1, reward: 300_000),
+        Mission(id: "predict", title: "오를까 내릴까 참여하기", icon: "chart.line.uptrend.xyaxis", goal: 1, reward: 200_000),
+        Mission(id: "chart", title: "코인 차트 3개 살펴보기", icon: "chart.xyaxis.line", goal: 3, reward: 100_000),
+        Mission(id: "quiz", title: "오늘의 퀴즈 모두 풀기", icon: "questionmark.circle.fill", goal: DailyRules.quizPerDay, reward: 200_000),
     ]
 }
 

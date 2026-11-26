@@ -22,7 +22,7 @@ struct RewardsView: View {
                     predictionCard
                     missionsCard
                     quizCard
-                    Text("모든 보상은 앱 안에서만 쓰는 모의투자금이며, 현금·상품으로 바꿀 수 없어요.")
+                    Text("보상은 지금 선택한 거래소(\(store.exchange.name))의 현물 지갑으로 들어가요. 모든 보상은 앱 안에서만 쓰는 모의투자금이며, 현금·상품으로 바꿀 수 없어요.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -188,7 +188,7 @@ struct RewardsView: View {
         do {
             let now = try await UpbitAPI.serverNow()
             serverOffset = now.timeIntervalSince(Date())
-            let r = try wallet.checkIn(serverNow: now)
+            let r = try wallet.checkIn(serverNow: now, creditTo: store.exchange)
             show(r.bonus > 0 ? "🎁 \(r.streak)일 연속! \(Fmt.krw(r.reward + r.bonus)) 받았어요" : "출석 완료! \(Fmt.krw(r.reward)) 받았어요")
         } catch let e as Wallet.DailyError {
             errorText = e.localizedDescription
@@ -202,8 +202,8 @@ struct RewardsView: View {
         do {
             let now = try await UpbitAPI.serverNow()
             serverOffset = now.timeIntervalSince(Date())
-            try wallet.claimMission(m, serverNow: now)
-            show("미션 완료! \(Fmt.krw(m.reward)) 받았어요")
+            try wallet.claimMission(m, serverNow: now, creditTo: store.exchange)
+            show("미션 완료! \(Fmt.krw(m.reward)) 받았어요 (\(store.exchange.name) 현물)")
         } catch let e as Wallet.DailyError {
             errorText = e.localizedDescription
         } catch {
@@ -222,6 +222,7 @@ struct RewardsView: View {
 }
 
 struct QuizView: View {
+    @Environment(MarketStore.self) private var store
     @Environment(Wallet.self) private var wallet
     @State private var serverOffset: TimeInterval?
     @State private var errorText: String?
@@ -287,7 +288,7 @@ struct QuizView: View {
         do {
             let now = try await UpbitAPI.serverNow()
             serverOffset = now.timeIntervalSince(Date())
-            let correct = try wallet.answerQuiz(q, choice: choice, serverNow: now)
+            let correct = try wallet.answerQuiz(q, choice: choice, serverNow: now, creditTo: store.exchange)
             UINotificationFeedbackGenerator().notificationOccurred(correct ? .success : .error)
         } catch let e as Wallet.DailyError {
             errorText = e.localizedDescription

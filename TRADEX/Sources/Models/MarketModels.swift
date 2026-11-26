@@ -122,6 +122,17 @@ struct Candle: Decodable, Identifiable, Sendable {
     var date: Date { Candle.parser.date(from: candleDateTimeUtc) ?? .distantPast }
 }
 
+/// 고가·저가 캔들 (선물 청산 확인용)
+struct HighLowCandle: Decodable {
+    let candleDateTimeUtc: String
+    let high: Double
+    let low: Double
+    var date: Date { Candle(candleDateTimeUtc: candleDateTimeUtc, tradePrice: 0).date }
+    enum CodingKeys: String, CodingKey {
+        case candleDateTimeUtc = "candle_date_time_utc", high = "high_price", low = "low_price"
+    }
+}
+
 /// 호가 (업비트 /v1/orderbook)
 struct Orderbook: Decodable {
     struct Unit: Decodable, Hashable {
