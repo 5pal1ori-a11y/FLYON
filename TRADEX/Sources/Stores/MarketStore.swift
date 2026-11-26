@@ -41,14 +41,19 @@ final class MarketStore {
         guard markets.isEmpty else { return }
         do {
             let list = try await UpbitAPI.krwMarkets()
-            markets = list
-            marketIndex = Dictionary(uniqueKeysWithValues: list.map { ($0.market, $0) })
             let snapshot = try await UpbitAPI.tickers(list.map(\.market))
+            guard !list.isEmpty, !snapshot.isEmpty else { throw URLError(.cannotParseResponse) }
+            // 목록과 시세를 둘 다 받은 뒤에 한 번에 반영 (시세 없이 목록만 뜨는 상태를 만들지 않음)
+            marketIndex = Dictionary(uniqueKeysWithValues: list.map { ($0.market, $0) })
             tickers = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.market, $0) })
+            markets = list
             loadError = nil
             startLive()
         } catch {
             loadError = "시세를 불러오지 못했어요. 네트워크를 확인해 주세요."
+            #if DEBUG
+            print("bootstrap 실패:", error)
+            #endif
         }
     }
 

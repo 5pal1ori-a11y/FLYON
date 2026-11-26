@@ -8,6 +8,12 @@ struct Market: Codable, Identifiable, Hashable, Sendable {
 
     var id: String { market }
     var symbol: String { String(market.split(separator: "-").last ?? "") }
+
+    enum CodingKeys: String, CodingKey {
+        case market
+        case koreanName = "korean_name"
+        case englishName = "english_name"
+    }
 }
 
 /// 실시간 시세 (REST·WebSocket 공통 형태)
@@ -23,6 +29,15 @@ struct Ticker: Equatable, Sendable {
     let accTradePrice24h: Double    // 24시간 거래대금
 }
 
+/// 배열 중 하나가 깨져도 나머지는 살리기 위한 래퍼
+struct Lossy<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+}
+
+// ⚠️ convertFromSnakeCase를 쓰지 말 것: "acc_trade_price_24h"가 "accTradePrice24H"(대문자 H)로 바뀌어
+//    디코딩이 전부 실패한다. 키는 CodingKeys로 직접 지정한다.
+
 /// REST /v1/ticker 응답
 struct RestTicker: Decodable {
     let market: String
@@ -35,6 +50,18 @@ struct RestTicker: Decodable {
     let prevClosingPrice: Double
     let accTradePrice24h: Double
 
+    enum CodingKeys: String, CodingKey {
+        case market
+        case tradePrice = "trade_price"
+        case change
+        case signedChangePrice = "signed_change_price"
+        case signedChangeRate = "signed_change_rate"
+        case highPrice = "high_price"
+        case lowPrice = "low_price"
+        case prevClosingPrice = "prev_closing_price"
+        case accTradePrice24h = "acc_trade_price_24h"
+    }
+
     var ticker: Ticker {
         Ticker(market: market, tradePrice: tradePrice, change: change,
                signedChangePrice: signedChangePrice, signedChangeRate: signedChangeRate,
@@ -45,7 +72,6 @@ struct RestTicker: Decodable {
 
 /// WebSocket ticker 응답 (DEFAULT 포맷: 마켓 코드가 "code" 필드)
 struct SocketTicker: Decodable {
-    let type: String
     let code: String
     let tradePrice: Double
     let change: String
@@ -55,6 +81,18 @@ struct SocketTicker: Decodable {
     let lowPrice: Double
     let prevClosingPrice: Double
     let accTradePrice24h: Double
+
+    enum CodingKeys: String, CodingKey {
+        case code
+        case tradePrice = "trade_price"
+        case change
+        case signedChangePrice = "signed_change_price"
+        case signedChangeRate = "signed_change_rate"
+        case highPrice = "high_price"
+        case lowPrice = "low_price"
+        case prevClosingPrice = "prev_closing_price"
+        case accTradePrice24h = "acc_trade_price_24h"
+    }
 
     var ticker: Ticker {
         Ticker(market: code, tradePrice: tradePrice, change: change,
@@ -68,6 +106,11 @@ struct Candle: Decodable, Identifiable, Sendable {
     let candleDateTimeUtc: String
     let tradePrice: Double
     var id: String { candleDateTimeUtc }
+
+    enum CodingKeys: String, CodingKey {
+        case candleDateTimeUtc = "candle_date_time_utc"
+        case tradePrice = "trade_price"
+    }
 
     private static let parser: DateFormatter = {
         let f = DateFormatter()

@@ -129,7 +129,7 @@ struct CoinRow: View {
                     }
                 }
             } else {
-                ProgressView()
+                Text("-").foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 10)

@@ -25,6 +25,11 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Decode live Upbit data with app models
+        run: |
+          swiftc -parse-as-library TRADEX/Sources/Models/MarketModels.swift TRADEX/ci/DecodeCheck.swift -o "$RUNNER_TEMP/decodecheck"
+          "$RUNNER_TEMP/decodecheck"
+
       - name: Generate Xcode project
         run: cd TRADEX && xcodegen generate
 

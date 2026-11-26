@@ -6,11 +6,8 @@ enum UpbitAPI {
     static let baseURL = URL(string: "https://api.upbit.com/v1/")!
     static let socketURL = URL(string: "wss://api.upbit.com/websocket/v1")!
 
-    static let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.keyDecodingStrategy = .convertFromSnakeCase
-        return d
-    }()
+    /// 키 변환 전략은 쓰지 않는다 (모델의 CodingKeys가 snake_case 키를 직접 지정)
+    static let decoder = JSONDecoder()
 
     enum APIError: LocalizedError {
         case http(Int)
@@ -37,8 +34,8 @@ enum UpbitAPI {
 
     /// 원화마켓 목록
     static func krwMarkets() async throws -> [Market] {
-        let all: [Market] = try await get("market/all", query: [URLQueryItem(name: "isDetails", value: "false")])
-        return all.filter { $0.market.hasPrefix("KRW-") }
+        let all: [Lossy<Market>] = try await get("market/all", query: [URLQueryItem(name: "isDetails", value: "false")])
+        return all.compactMap(\.value).filter { $0.market.hasPrefix("KRW-") }
     }
 
     /// 현재 시세 (여러 마켓 한 번에, 100개씩 나눠 요청)
@@ -46,8 +43,8 @@ enum UpbitAPI {
         var result: [Ticker] = []
         for start in stride(from: 0, to: markets.count, by: 100) {
             let chunk = markets[start..<min(start + 100, markets.count)]
-            let rows: [RestTicker] = try await get("ticker", query: [URLQueryItem(name: "markets", value: chunk.joined(separator: ","))])
-            result += rows.map(\.ticker)
+            let rows: [Lossy<RestTicker>] = try await get("ticker", query: [URLQueryItem(name: "markets", value: chunk.joined(separator: ","))])
+            result += rows.compactMap { $0.value?.ticker }
         }
         return result
     }
@@ -55,11 +52,11 @@ enum UpbitAPI {
     /// 차트용 캔들 (오래된 순으로 정렬해서 반환)
     static func candles(market: String, range: ChartRange) async throws -> [ChartPoint] {
         let (path, count) = range.request
-        let rows: [Candle] = try await get(path, query: [
+        let rows: [Lossy<Candle>] = try await get(path, query: [
             URLQueryItem(name: "market", value: market),
             URLQueryItem(name: "count", value: String(count)),
         ])
-        return rows.map { ChartPoint(date: $0.date, price: $0.tradePrice) }.sorted { $0.date < $1.date }
+        return rows.compactMap(\.value).map { ChartPoint(date: $0.date, price: $0.tradePrice) }.sorted { $0.date < $1.date }
     }
 }
 
