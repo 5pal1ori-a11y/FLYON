@@ -26,7 +26,7 @@ struct ExchangeView: View {
         case .krw: break
         case .holdings:
             let a = wallet.account(store.exchange)
-            base = base.filter { a.holdings[$0.market] != nil || a.positions.contains(where: { p in p.market == $0.market }) }
+            base = base.filter { m in a.holdings[m.market] != nil || a.positions.contains { $0.market == m.market } }
         case .favorites: base = base.filter { store.favorites.contains($0.market) }
         }
         guard !query.isEmpty else { return base }
