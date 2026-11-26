@@ -6,6 +6,8 @@ struct PriceChart: View {
     @Binding var selected: ChartPoint?
 
     @State private var selectedDate: Date?
+    /// 차트가 왼쪽에서 오른쪽으로 그려지는 애니메이션 (0 → 1)
+    @State private var reveal: CGFloat = 0
 
     private var color: Color {
         guard let first = points.first?.price, let last = points.last?.price else { return .secondary }
@@ -58,5 +60,17 @@ struct PriceChart: View {
             UISelectionFeedbackGenerator().selectionChanged()
         }
         .animation(.easeInOut(duration: 0.25), value: points.count)
+        .mask {
+            GeometryReader { geo in
+                Rectangle().frame(width: geo.size.width * reveal)
+            }
+        }
+        .onAppear { draw() }
+        .onChange(of: points.first?.date) { draw() }
+    }
+
+    private func draw() {
+        reveal = 0
+        withAnimation(.easeOut(duration: 0.9)) { reveal = 1 }
     }
 }

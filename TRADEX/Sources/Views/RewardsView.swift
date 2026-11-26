@@ -18,10 +18,10 @@ struct RewardsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    checkInCard
-                    predictionCard
-                    missionsCard
-                    quizCard
+                    checkInCard.appear(0)
+                    predictionCard.appear(0.06)
+                    missionsCard.appear(0.12)
+                    quizCard.appear(0.18)
                     Text("보상은 지금 선택한 거래소(\(store.exchange.name))의 현물 지갑으로 들어가요. 모든 보상은 앱 안에서만 쓰는 모의투자금이며, 현금·상품으로 바꿀 수 없어요.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -66,12 +66,16 @@ struct RewardsView: View {
                 ForEach(1...DailyRules.streakBonusEvery, id: \.self) { i in
                     VStack(spacing: 4) {
                         ZStack {
-                            Circle().fill(i <= inWeek ? Color.primary : Theme.background)
+                            Circle().fill(i <= inWeek ? Color.primary : Color(.systemBackground))
+                                .overlay(Circle().strokeBorder(Color.primary, lineWidth: i <= inWeek ? 0 : 1))
+                                .scaleEffect(i == inWeek && done ? 1.08 : 1)
+                                .animation(.spring(response: 0.4, dampingFraction: 0.5).delay(Double(i) * 0.04), value: inWeek)
                             if i == DailyRules.streakBonusEvery {
                                 Image(systemName: "gift").font(.caption)
-                                    .foregroundStyle(i <= inWeek ? Color(.systemBackground) : .secondary)
+                                    .foregroundStyle(i <= inWeek ? Color(.systemBackground) : .primary)
                             } else if i <= inWeek {
                                 Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(Color(.systemBackground))
+                                    .transition(.scale.combined(with: .opacity))
                             }
                         }
                         .frame(width: 32, height: 32)
@@ -140,10 +144,11 @@ struct RewardsView: View {
                         Text(claimed ? "완료" : "받기")
                             .font(.caption.weight(.bold))
                             .padding(.horizontal, 14).padding(.vertical, 7)
-                            .foregroundStyle(progress >= m.goal && !claimed ? Color(.systemBackground) : .secondary)
-                            .background(progress >= m.goal && !claimed ? Color.primary : Theme.background, in: Capsule())
+                            .bwBackground(selected: progress >= m.goal && !claimed)
+                            .opacity(progress >= m.goal || claimed ? 1 : 0.4)
                     }
                     .buttonStyle(.plain)
+                    .sensoryFeedback(.success, trigger: claimed)
                     .disabled(claimed || progress < m.goal || busy || serverOffset == nil)
                 }
             }
@@ -267,9 +272,9 @@ struct QuizView: View {
                         }
                     }
                     .padding(12)
-                    .background(Theme.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(picked != nil && i == q.answer ? Color.green : .clear, lineWidth: 1.5))
+                    .bwBackground(selected: picked != nil && i == q.answer, cornerRadius: 10)
+                    .opacity(picked != nil && i != q.answer && i != picked ? 0.45 : 1)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.75), value: picked)
                 }
                 .buttonStyle(.plain)
                 .disabled(picked != nil || serverOffset == nil)

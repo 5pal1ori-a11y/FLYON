@@ -50,7 +50,7 @@ struct ExchangePicker: View {
             }
             .foregroundStyle(.primary)
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(Theme.card, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
         }
         .accessibilityLabel("거래소: \(selection.name)")
     }

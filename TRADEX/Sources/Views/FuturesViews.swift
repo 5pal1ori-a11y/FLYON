@@ -47,11 +47,11 @@ struct PositionRow: View {
                     label("청산가"); value(Fmt.price(p.liquidationPrice)).foregroundStyle(Theme.rise)
                 }
             }
-            Button("포지션 종료") { confirmClose = true }
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .buttonStyle(.bordered)
-                .disabled(price == nil)
+            Button { confirmClose = true } label: {
+                Text("포지션 종료").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(BWButtonStyle(cornerRadius: 10, verticalPadding: 10))
+            .disabled(price == nil)
         }
         .card()
         .confirmationDialog("현재가 \(Fmt.price(now))에 종료할까요? 예상 손익 \(Fmt.signedKRW(pnl))원",
@@ -119,11 +119,7 @@ struct FuturesOrderSheet: View {
                         }
                     }
 
-                    Picker("방향", selection: $side) {
-                        Text("롱 (상승)").tag(PositionSide.long)
-                        Text("숏 (하락)").tag(PositionSide.short)
-                    }
-                    .pickerStyle(.segmented)
+                    BWSegmented(options: [(PositionSide.long, "롱 (상승)"), (PositionSide.short, "숏 (하락)")], selection: $side)
 
                     HStack {
                         Text("주문가능").foregroundStyle(.secondary)
@@ -136,13 +132,13 @@ struct FuturesOrderSheet: View {
                         Text("레버리지 \(leverage)× / \(TradexRules.maxLeverage)×").font(.subheadline.weight(.semibold))
                         HStack(spacing: 6) {
                             ForEach(TradexRules.leverageSteps.indices, id: \.self) { i in
-                                Button("\(TradexRules.leverageSteps[i])×") { leverageIndex = i }
-                                    .font(.caption.weight(.bold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .foregroundStyle(i == leverageIndex ? Color.white : .primary)
-                                    .background(i == leverageIndex ? accent : Theme.card, in: Capsule())
-                                    .buttonStyle(.plain)
+                                Button {
+                                    withAnimation(.snappy) { leverageIndex = i }
+                                } label: {
+                                    Text("\(TradexRules.leverageSteps[i])×").frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(BWButtonStyle(selected: i == leverageIndex))
+                                .sensoryFeedback(.selection, trigger: leverageIndex)
                             }
                         }
                     }
@@ -151,16 +147,16 @@ struct FuturesOrderSheet: View {
                         .keyboardType(.numberPad)
                         .font(.title3.weight(.semibold))
                         .padding(12)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.3), lineWidth: 1))
 
                     HStack(spacing: 6) {
                         ForEach([0.25, 0.5, 0.75, 1.0], id: \.self) { r in
-                            Button("\(Int(r * 100))%") { marginText = String(Int(floor(available * r))) }
-                                .font(.caption.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(Theme.card, in: Capsule())
-                                .buttonStyle(.plain)
+                            Button {
+                                marginText = String(Int(floor(available * r)))
+                            } label: {
+                                Text("\(Int(r * 100))%").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(BWButtonStyle())
                         }
                     }
 

@@ -143,19 +143,21 @@ struct PredictionGameView: View {
             } label: {
                 Text(picked ? "내 선택" : "선택")
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 9)
-                    .background(color, in: Capsule())
+                    .bwBackground(selected: true)
             }
             .buttonStyle(.plain)
             .disabled(locked)
-            .opacity(locked && !picked ? 0.35 : 1)
+            .opacity(locked && !picked ? 0.3 : 1)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
-        .background(Theme.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(picked ? color : .clear, lineWidth: 2))
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .strokeBorder(Color.primary, lineWidth: picked ? 2 : 0.5))
+        .scaleEffect(picked ? 1.03 : 1)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: picked)
     }
 
     // MARK: - 결과 대기 / 규칙

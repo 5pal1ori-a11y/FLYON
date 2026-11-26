@@ -68,9 +68,9 @@ struct PillButtonStyle: ButtonStyle {
             .font(.footnote.weight(.bold))
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .foregroundStyle(filled ? Color(.systemBackground) : .primary)
-            .background(filled ? Color.primary : Color.primary.opacity(0.08), in: Capsule())
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .bwBackground(selected: filled)
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -142,5 +142,105 @@ struct ExchangeSegment: View {
         }
         .padding(4)
         .background(Color.primary.opacity(0.06), in: Capsule())
+    }
+}
+
+// MARK: - 흑백 버튼 · 세그먼트 · 등장 애니메이션
+
+/// 흑백 버튼: 선택·주요 = 검정 채움 + 흰 글자, 나머지 = 흰 바탕 + 검정 테두리 (다크 모드는 반전)
+struct BWButtonStyle: ButtonStyle {
+    var selected = false
+    var cornerRadius: CGFloat? = nil   // nil이면 캡슐
+    var verticalPadding: CGFloat = 8
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .padding(.vertical, verticalPadding)
+            .padding(.horizontal, 12)
+            .bwBackground(selected: selected, cornerRadius: cornerRadius)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+extension View {
+    /// 흑백 배경: 선택이면 검정 채움, 아니면 흰 바탕 + 검정 테두리
+    func bwBackground(selected: Bool, cornerRadius: CGFloat? = nil) -> some View {
+        modifier(BWBackground(selected: selected, cornerRadius: cornerRadius))
+    }
+
+    /// 화면에 처음 나타날 때 아래에서 살짝 올라오며 나타남
+    func appear(_ delay: Double = 0) -> some View { modifier(AppearModifier(delay: delay)) }
+}
+
+struct BWBackground: ViewModifier {
+    let selected: Bool
+    let cornerRadius: CGFloat?
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundStyle(selected ? Color(.systemBackground) : Color.primary)
+            .background {
+                if let r = cornerRadius {
+                    RoundedRectangle(cornerRadius: r, style: .continuous)
+                        .fill(selected ? Color.primary : Color(.systemBackground))
+                        .overlay(RoundedRectangle(cornerRadius: r, style: .continuous).strokeBorder(Color.primary, lineWidth: selected ? 0 : 1))
+                } else {
+                    Capsule()
+                        .fill(selected ? Color.primary : Color(.systemBackground))
+                        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: selected ? 0 : 1))
+                }
+            }
+            .animation(.snappy, value: selected)
+    }
+}
+
+struct AppearModifier: ViewModifier {
+    let delay: Double
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 14)
+            .onAppear {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85).delay(delay)) { shown = true }
+            }
+    }
+}
+
+/// 흑백 세그먼트: 선택된 칸에 검정 캡슐이 미끄러지듯 이동
+struct BWSegmented<Value: Hashable>: View {
+    let options: [(Value, String)]
+    @Binding var selection: Value
+    @Namespace private var ns
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options, id: \.0) { value, title in
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { selection = value }
+                } label: {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selection == value ? Color(.systemBackground) : Color.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background {
+                            if selection == value {
+                                Capsule().fill(Color.primary).matchedGeometryEffect(id: "pill", in: ns)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selection == value ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(Color(.systemBackground)))
+        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }

@@ -27,16 +27,19 @@ struct CoinDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                Picker("보기", selection: $section) {
-                    Text("차트").tag("차트")
-                    Text("호가").tag("호가")
+                BWSegmented(options: [("차트", "차트"), ("호가", "호가")], selection: $section)
+                Group {
+                    if section == "차트" {
+                        chartSection
+                            .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity),
+                                                    removal: .opacity))
+                    } else {
+                        OrderbookView(market: market, prevClose: ticker?.prevClosingPrice ?? 0, exchange: store.exchange)
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                                    removal: .opacity))
+                    }
                 }
-                .pickerStyle(.segmented)
-                if section == "차트" {
-                    chartSection
-                } else {
-                    OrderbookView(market: market, prevClose: ticker?.prevClosingPrice ?? 0, exchange: store.exchange)
-                }
+                .animation(.spring(response: 0.4, dampingFraction: 0.85), value: section)
                 if let holding { holdingCard(holding) }
                 ForEach(wallet.account(store.exchange).positions.filter { $0.market == market.market }) { p in
                     PositionRow(position: p, price: ticker?.tradePrice, exchange: store.exchange)
@@ -112,23 +115,7 @@ struct CoinDetailView: View {
             }
             .frame(height: 240)
 
-            HStack(spacing: 4) {
-                ForEach(ChartRange.allCases) { r in
-                    Button {
-                        range = r
-                    } label: {
-                        Text(r.rawValue)
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .foregroundStyle(range == r ? Color(.systemBackground) : .secondary)
-                            .background(range == r ? Color.primary : .clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(4)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            BWSegmented(options: ChartRange.allCases.map { ($0, $0.rawValue) }, selection: $range)
         }
     }
 

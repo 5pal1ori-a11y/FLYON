@@ -98,12 +98,10 @@ struct OrderSheet: View {
 
                 HStack {
                     ForEach([0.25, 0.5, 1.0], id: \.self) { ratio in
-                        Button(ratio == 1 ? "최대" : "\(Int(ratio * 100))%") { fill(ratio) }
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Theme.card, in: Capsule())
-                            .buttonStyle(.plain)
+                        Button { fill(ratio) } label: {
+                            Text(ratio == 1 ? "최대" : "\(Int(ratio * 100))%").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(BWButtonStyle(verticalPadding: 10))
                     }
                 }
                 .padding(.horizontal, 20)
@@ -127,8 +125,12 @@ struct OrderSheet: View {
             .sensoryFeedback(.success, trigger: done)
             .sensoryFeedback(.selection, trigger: unit)
             .overlay {
-                if done { DoneOverlay(text: isBuy ? "매수 완료" : "매도 완료", color: accent) }
+                if done {
+                    DoneOverlay(text: isBuy ? "매수 완료" : "매도 완료", color: accent)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
             }
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: done)
         }
     }
 
@@ -139,7 +141,7 @@ struct OrderSheet: View {
             unitButton("개수", .coin)
         }
         .padding(3)
-        .background(Theme.card, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("입력 단위")
     }
@@ -152,8 +154,9 @@ struct OrderSheet: View {
                 .font(.footnote.weight(.semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .foregroundStyle(unit == u ? Color(.systemBackground) : .secondary)
+                .foregroundStyle(unit == u ? Color(.systemBackground) : .primary)
                 .background(unit == u ? Color.primary : .clear, in: Capsule())
+                .animation(.snappy, value: unit)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(unit == u ? .isSelected : [])
@@ -286,7 +289,7 @@ struct DoneOverlay: View {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.primary)
-                .symbolEffect(.bounce, value: true)
+                .symbolEffect(.bounce, options: .nonRepeating)
             Text(text).font(.title3.bold())
         }
         .padding(32)
