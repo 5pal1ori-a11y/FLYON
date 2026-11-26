@@ -1,7 +1,29 @@
 import SwiftUI
 
-/// 코인 아이콘 — 거래소·프로젝트의 로고 이미지를 쓰지 않고 심볼 글자로 그린다 (상표 문제 회피)
+/// 코인 아이콘
+/// - 오픈소스 아이콘 세트(web3icons: MIT, cryptocurrency-icons: CC0)에서 이름까지 대조해 넣은 아이콘이 있으면 사용
+/// - 없으면 심볼 글자로 그린다. 거래소(업비트) 이미지는 쓰지 않는다.
 struct CoinIcon: View {
+    let symbol: String
+    var size: CGFloat = 40
+
+    var body: some View {
+        if let image = UIImage(named: "coin-\(symbol)") {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                .accessibilityHidden(true)
+        } else {
+            LetterCoinIcon(symbol: symbol, size: size)
+        }
+    }
+}
+
+/// 아이콘이 없는 코인용: 심볼 글자 아이콘
+struct LetterCoinIcon: View {
     let symbol: String
     var size: CGFloat = 40
 
