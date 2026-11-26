@@ -90,21 +90,6 @@ struct AssetsView: View {
                 }
             }
 
-            HStack {
-                Text("모의투자 자산을 충전해 보세요").font(.subheadline)
-                Spacer()
-                Button {
-                    showChargeMenu = true
-                } label: {
-                    Label("충전하기", systemImage: "plus").font(.subheadline.weight(.bold))
-                }
-                .buttonStyle(BWButtonStyle(selected: true, cornerRadius: 10, verticalPadding: 10))
-                .disabled(wallet.state.tradex == 0)
-                .opacity(wallet.state.tradex == 0 ? 0.4 : 1)
-            }
-            .padding(12)
-            .background(Theme.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
             HStack(spacing: 6) {
                 Text("전체 자산(모든 거래소 + TRADEX)").foregroundStyle(.secondary)
                 Spacer()
