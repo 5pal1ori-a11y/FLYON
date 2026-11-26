@@ -205,7 +205,8 @@ final class Wallet {
             let hours = Int(Date().timeIntervalSince(p.openedAt) / 3_600) + 2
             guard let candles = try? await UpbitAPI.highLow(market: p.market, hours: min(hours, 200), on: ex) else { continue }
             let crossed = candles.contains { c in
-                c.date.addingTimeInterval(3_600) > p.openedAt &&
+                // 진입 이후에 시작한 봉만 사용 (진입 전 가격으로 잘못 청산하지 않도록)
+                c.date >= p.openedAt &&
                     (p.side == .long ? c.low <= p.liquidationPrice : c.high >= p.liquidationPrice)
             }
             if crossed, let r = try? closePosition(id: p.id, price: p.liquidationPrice, on: ex, liquidated: true) {
