@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write   # 캡처 이미지를 tradex-screenshots 브랜치에 올리기 위함
 
 jobs:
   shots:
@@ -62,6 +62,19 @@ jobs:
             done
           done
           ls -la shots
+
+      - name: Push screenshots to tradex-screenshots branch
+        run: |
+          set -euo pipefail
+          # 작은 JPEG로 변환해 별도 브랜치(히스토리 없음)에 올린다. main에는 영향 없음
+          mkdir -p out
+          for f in shots/*.png; do sips -s format jpeg -s formatOptions 70 -Z 1400 "$f" --out "out/$(basename "${f%.png}").jpg" >/dev/null; done
+          cd out
+          git init -q -b tradex-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -q -m "TRADEX screenshots (run ${{ github.run_id }})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" tradex-screenshots
 
       - uses: actions/upload-artifact@v4
         with:
