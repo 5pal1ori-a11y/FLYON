@@ -1,0 +1,30 @@
+# TRADEX — 코인 모의투자 앱. 이 폴더에서 `xcodegen` 실행 → TRADEX.xcodeproj
+name: TRADEX
+options:
+  bundleIdPrefix: com.flight
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  TRADEX:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    scheme: {}
+    settings:
+      base:
+        # 지금은 FLYON 앱 레코드(com.flight.flyon)로 TestFlight 업로드. 정식 출시 땐 TRADEX 전용 번들 ID로 변경.
+        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon
+        PRODUCT_NAME: TRADEX
+        MARKETING_VERSION: "1.1"   # 구독온(1.0)·FLYON(0.1.0)과 빌드 번호가 겹치지 않게 별도 버전
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Sources/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: TRADEX
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.finance
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: Sources/TRADEX.entitlements
