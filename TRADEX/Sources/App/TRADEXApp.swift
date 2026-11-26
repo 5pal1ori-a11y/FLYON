@@ -18,15 +18,28 @@ struct RootView: View {
     @Environment(Session.self) private var session
     @Environment(MarketStore.self) private var market
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showSplash = true
 
     var body: some View {
-        Group {
-            if let wallet = session.wallet {
-                MainTabView()
-                    .environment(wallet)
-            } else {
-                LoginView()
+        ZStack {
+            Group {
+                if let wallet = session.wallet {
+                    MainTabView()
+                        .environment(wallet)
+                } else {
+                    LoginView()
+                }
             }
+            if showSplash {
+                SplashView()
+                    .transition(.opacity.combined(with: .scale(scale: 1.15)))
+                    .zIndex(1)
+            }
+        }
+        .task {
+            // 로고를 잠깐 보여 준 뒤 앱으로 (시세는 그동안 뒤에서 불러옴)
+            try? await Task.sleep(for: .seconds(1.6))
+            withAnimation(.easeInOut(duration: 0.45)) { showSplash = false }
         }
         .task { await market.bootstrap() }
         .onChange(of: scenePhase) { _, phase in
