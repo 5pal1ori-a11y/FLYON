@@ -44,22 +44,38 @@ struct RootView: View {
 
 struct MainTabs: View {
     @Environment(Game.self) private var game
+    @State private var tab = "shop"
+    #if DEBUG
+    @State private var debugSheet: DebugSheet?
+    #endif
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             ShopView()
                 .tabItem { Label("가게", systemImage: "storefront") }
                 .badge(game.pendingDecision == nil ? 0 : 1)
+                .tag("shop")
             MarketView()
                 .tabItem { Label("매물", systemImage: "tag") }
+                .tag("market")
             GoalsView()
                 .tabItem { Label("할 일", systemImage: "checklist") }
                 .badge(game.claimableCount)
+                .tag("goals")
             LedgerView()
                 .tabItem { Label("장부", systemImage: "book.closed") }
+                .tag("ledger")
             CompanyView()
                 .tabItem { Label("회사", systemImage: "building.columns") }
+                .tag("company")
         }
+        #if DEBUG
+        .onAppear {
+            if !ScreenshotArgs.tab.isEmpty { tab = ScreenshotArgs.tab }
+            if !ScreenshotArgs.sheet.isEmpty { debugSheet = DebugSheet(id: ScreenshotArgs.sheet) }
+        }
+        .sheet(item: $debugSheet) { DebugSheetView(kind: $0.id) }
+        #endif
     }
 }
 

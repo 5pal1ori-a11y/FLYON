@@ -1,0 +1,98 @@
+name: 한평상회 screenshots
+
+# 시뮬레이터에서 한평상회(디버그 빌드, 예시 데이터)를 띄워 주요 화면을 캡처한다.
+# 수동 실행: Actions 탭 > 한평상회 screenshots > Run workflow. 결과는 hanpyeong-screenshots 브랜치와 artifacts
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd Hanpyeong && xcodegen generate
+
+      - name: Build for simulator (Debug, no signing)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Hanpyeong/Hanpyeong.xcodeproj \
+            -scheme Hanpyeong \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO | tail -5
+
+      - name: Boot simulator and capture
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          c = [x for k, v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone') and 'Pro' in x['name'] and 'Max' not in x['name']]
+          c = c or [x for k, v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
+          print(c[-1]['udid'])")
+          echo "Simulator: $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          APP=$(find build/Build/Products/Debug-iphonesimulator -maxdepth 1 -name 'Hanpyeong.app' | head -1)
+          BID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p shots
+
+          # 첫 화면(온보딩): 저장 파일 없이 실행
+          xcrun simctl launch "$UDID" "$BID"
+          sleep 12
+          xcrun simctl io "$UDID" screenshot "shots/light-0-onboarding.png"
+
+          shoot() {  # $1 이름, 나머지는 실행 인자
+            local name="$1"; shift
+            xcrun simctl terminate "$UDID" "$BID" || true
+            xcrun simctl launch "$UDID" "$BID" -demoState YES "$@"
+            sleep 9
+            xcrun simctl io "$UDID" screenshot "shots/${MODE}-${name}.png"
+          }
+
+          for MODE in light dark; do
+            xcrun simctl ui "$UDID" appearance "$MODE"
+            shoot 1-shop -screenshotTab shop
+            shoot 2-market -screenshotTab market
+            shoot 3-goals -screenshotTab goals
+            shoot 4-ledger -screenshotTab ledger
+            shoot 5-company -screenshotTab company
+            if [ "$MODE" = light ]; then
+              shoot 6-detail -screenshotTab shop -screenshotSheet detail
+              shoot 7-decision -screenshotTab shop -screenshotSheet decision
+              shoot 8-open -screenshotTab shop -screenshotSheet open
+              shoot 9-talents -screenshotTab company -screenshotSheet talents
+            fi
+          done
+          ls -la shots
+
+      - name: Push screenshots to hanpyeong-screenshots branch
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for f in shots/*.png; do sips -s format jpeg -s formatOptions 70 -Z 1400 "$f" --out "out/$(basename "${f%.png}").jpg" >/dev/null; done
+          cd out
+          git init -q -b hanpyeong-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -q -m "한평상회 screenshots (run ${{ github.run_id }})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" hanpyeong-screenshots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hanpyeong-screenshots
+          path: shots/*.png
+          retention-days: 7
