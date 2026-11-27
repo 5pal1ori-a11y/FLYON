@@ -11,19 +11,25 @@ struct AssetsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 0) {
                     summaryCard.appear(0)
+                    band
                     tradexSection.appear(0.05)
+                    band
                     walletsSection.appear(0.1)
+                    band
                     coinsSection.appear(0.15)
+                    band
                     ordersSection.appear(0.18)
+                    band
                     positionsSection.appear(0.2)
+                    band
                     moreSection.appear(0.25)
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 8)
+                .padding(.bottom, 24)
             }
-            .background(Theme.background)
+            .background(Color(.systemBackground))
             .navigationTitle("자산")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -67,7 +73,7 @@ struct AssetsView: View {
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("내 보유자산").font(.headline)
+                Text("내 보유자산").font(.title3.weight(.bold))
                 Spacer()
                 Text("단위 KRW").font(.caption2).foregroundStyle(.secondary)
             }
@@ -100,7 +106,8 @@ struct AssetsView: View {
             .font(.caption)
             .monospacedDigit()
         }
-        .card()
+        .padding(.top, 8)
+        .padding(.bottom, 22)
     }
 
     private func bigValue(_ title: String, _ value: Double) -> some View {
@@ -148,7 +155,7 @@ struct AssetsView: View {
                     Spacer()
                     Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.tertiary)
                 }
-                .card()
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(wallet.state.tradex == 0)
@@ -159,8 +166,11 @@ struct AssetsView: View {
 
     private var walletsSection: some View {
         section("거래소 지갑") {
-            VStack(spacing: 12) {
-                ForEach(ExchangeID.allCases) { exchangeCard($0) }
+            VStack(spacing: 0) {
+                ForEach(ExchangeID.allCases) { e in
+                    exchangeCard(e)
+                    if e != ExchangeID.allCases.last { Divider().padding(.vertical, 14) }
+                }
             }
         }
     }
@@ -181,8 +191,7 @@ struct AssetsView: View {
                 .buttonStyle(BWButtonStyle(verticalPadding: 6))
                 .accessibilityLabel("\(e.name) 현물·선물 이동")
             }
-            .padding(.bottom, 12)
-            Divider()
+            .padding(.bottom, 4)
             walletRow("현물", a.krw, inUse: store.exchange == e && !a.holdings.isEmpty) {
                 chargeTarget = ChargeTarget(exchange: e, futures: false)
             }
@@ -191,7 +200,6 @@ struct AssetsView: View {
                 chargeTarget = ChargeTarget(exchange: e, futures: true)
             }
         }
-        .card()
     }
 
     private func walletRow(_ title: String, _ amount: Double, inUse: Bool, charge: @escaping () -> Void) -> some View {
@@ -233,7 +241,7 @@ struct AssetsView: View {
         return section("보유 코인") {
             if rows.isEmpty {
                 Text(a.krw > 0 ? "거래소 탭에서 첫 코인을 사 보세요." : "\(store.exchange.name) 현물 지갑을 충전한 뒤 거래할 수 있어요.")
-                    .font(.subheadline).foregroundStyle(.secondary).card()
+                    .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 6)
             } else {
                 VStack(spacing: 0) {
                     ForEach(rows, id: \.key) { code, h in
@@ -243,8 +251,7 @@ struct AssetsView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+
             }
         }
     }
@@ -281,7 +288,7 @@ struct AssetsView: View {
         return section("미체결 주문 \(orders.count)") {
             if orders.isEmpty {
                 Text("지정가·손절·익절 주문은 코인 화면의 매수·매도에서 걸 수 있어요.")
-                    .font(.subheadline).foregroundStyle(.secondary).card()
+                    .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 6)
             } else {
                 VStack(spacing: 0) {
                     ForEach(orders) { o in
@@ -289,8 +296,7 @@ struct AssetsView: View {
                         if o.id != orders.last?.id { Divider().padding(.leading, 48) }
                     }
                 }
-                .padding(.horizontal, 16)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+
                 .animation(.snappy, value: orders.map(\.id))
             }
         }
@@ -303,12 +309,13 @@ struct AssetsView: View {
         return section("보유 포지션 \(positions.count)") {
             if positions.isEmpty {
                 Text("열린 포지션이 없어요. 코인 화면의 ‘선물’에서 롱·숏을 연습해 보세요.")
-                    .font(.subheadline).foregroundStyle(.secondary).card()
+                    .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 6)
             } else {
-                VStack(spacing: 10) {
+                VStack(spacing: 0) {
                     ForEach(positions) { p in
-                        PositionRow(position: p, price: store.tickers[p.market]?.tradePrice, exchange: store.exchange)
+                        PositionRow(position: p, price: store.tickers[p.market]?.tradePrice, exchange: store.exchange, boxed: false)
                             .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading).combined(with: .opacity)))
+                        if p.id != positions.last?.id { Divider() }
                     }
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: positions.map(\.id))
@@ -343,8 +350,7 @@ struct AssetsView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+
         }
     }
 
@@ -361,10 +367,17 @@ struct AssetsView: View {
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary).padding(.leading, 4)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.title3.weight(.bold))
             content()
         }
+        .padding(.top, 22)
+        .padding(.bottom, 16)
+    }
+
+    /// 섹션 사이 굵은 구분 띠 (박스 대신)
+    private var band: some View {
+        Rectangle().fill(Theme.background).frame(height: 10).padding(.horizontal, -20)
     }
 }
 
@@ -460,7 +473,7 @@ struct TransferSheet: View {
                 .font(.title2.weight(.bold))
                 .multilineTextAlignment(.center)
                 .padding(12)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.3), lineWidth: 1))
             HStack {
                 Text("이동 가능 \(Fmt.krw(available))").font(.footnote).foregroundStyle(.secondary)
                 Spacer()

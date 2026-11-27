@@ -14,17 +14,19 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
-                    HStack(spacing: 14) {
-                        Image("Logo").resizable().scaledToFit().frame(width: 36, height: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(session.user?.displayName ?? "-").font(.headline)
+                    HStack(spacing: 16) {
+                        LevelBadge(level: wallet.level, size: 56, filled: true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(session.user?.displayName ?? "-").font(.title3.weight(.bold))
+                            Text("\(wallet.level.name) · \(Fmt.number(Double(wallet.state.xp))) XP")
+                                .font(.subheadline.weight(.semibold))
                             Text(session.user?.provider == "apple" ? "Apple로 로그인" : "개발용 계정")
                                 .font(.caption).foregroundStyle(.secondary)
-                            Text("\(wallet.level.name) · \(Fmt.number(Double(wallet.state.xp))) XP")
-                                .font(.caption.weight(.semibold))
                         }
+                        Spacer()
+                        TradexLogo(height: 20, showsWordmark: false).opacity(0.85)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 10)
                 }
 
                 Section("모의투자") {
@@ -50,9 +52,13 @@ struct SettingsView: View {
 
                 Section {
                     Button("로그아웃") { session.signOut() }
+                        .foregroundStyle(.primary)
                     Button("계정 삭제", role: .destructive) { confirmDelete = true }
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemBackground))
             .navigationTitle("설정")
             .confirmationDialog("모든 거래소의 코인·원화·포지션이 사라지고, 지급받은 TRADEX만 다시 돌려받아요.", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("초기화", role: .destructive) { wallet.reset() }

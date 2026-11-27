@@ -109,8 +109,10 @@ struct ExchangeView: View {
             .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Theme.background)
+        .padding(.vertical, 12)
+        .background(Color(.systemBackground))
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.background).frame(height: 8) }
+        .padding(.bottom, 8)
     }
 
     private func summaryRow(_ title: String, _ value: String, _ color: Color = .primary) -> some View {
