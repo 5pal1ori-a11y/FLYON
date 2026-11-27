@@ -227,7 +227,7 @@ struct PressScaleStyle: ButtonStyle {
     }
 }
 
-// MARK: - 3D 아이콘 (Microsoft Fluent Emoji 3D, MIT)
+// MARK: - 3D 아이콘 (TRADEX 자체 제작, TRADEX/ci/icons3d.py로 생성)
 
 /// 3D 아이콘. float이면 살짝 떠다니고, dim이면 흑백·흐리게(잠긴 상태)
 struct Icon3D: View {
