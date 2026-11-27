@@ -165,8 +165,8 @@ struct VIPBubble: View {
                         .frame(width: 28, height: 28)
                         .background(Circle().fill(Palette.gold))
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(visit.title).font(.system(size: 13, weight: .heavy)).foregroundStyle(Palette.ink)
-                        Text(visit.line).font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.inkSoft)
+                        Text(visit.title).font(.system(size: 13, weight: .heavy)).foregroundStyle(Color(hex: 0x1C222A))
+                        Text(visit.line).font(.system(size: 11, weight: .medium)).foregroundStyle(Color(hex: 0x6D685F))
                     }
                 }
                 .padding(.leading, 6)
