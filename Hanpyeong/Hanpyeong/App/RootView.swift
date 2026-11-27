@@ -88,7 +88,7 @@ struct ToastView: View {
         ZStack {
             if let text = game.toast {
                 Text(text)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Palette.paper)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
@@ -123,7 +123,7 @@ struct OfflineSheet: View {
                 .foregroundStyle(Palette.gold)
                 .padding(.top, 28)
             Text("자리 비운 \(Won.duration(report.seconds)) 동안")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Palette.inkSoft)
             Text(Won.full(report.earned))
                 .font(.myeongjo(32))
@@ -131,7 +131,7 @@ struct OfflineSheet: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text("알바생들이 가게를 지켰어요. 사장님이 없을 땐 평소의 절반만 법니다.")
-                .font(.system(size: 13))
+                .font(.system(size: 15))
                 .foregroundStyle(Palette.inkSoft)
                 .multilineTextAlignment(.center)
             Button("장부에 적기") { dismiss() }
@@ -163,7 +163,7 @@ struct RankUpOverlay: View {
 
             VStack(spacing: 18) {
                 Text("승급")
-                    .font(.system(size: 12, weight: .heavy))
+                    .font(.system(size: 14, weight: .heavy))
                     .tracking(3)
                     .foregroundStyle(Palette.inkSoft)
 
@@ -192,7 +192,7 @@ struct RankUpOverlay: View {
                             Label("새 지역 · \(d.info.name)", systemImage: "map")
                         }
                     }
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)

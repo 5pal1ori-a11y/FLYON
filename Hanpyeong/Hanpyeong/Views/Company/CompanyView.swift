@@ -44,7 +44,7 @@ struct CompanyView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(game.rank.title)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Palette.gold)
                 Text(game.rank.line)
                     .font(.myeongjo(13, bold: false))
@@ -53,7 +53,7 @@ struct CompanyView: View {
                     Image(systemName: "heart.fill").foregroundStyle(Palette.sign)
                     Text("평판 \(Int(game.reputation)) · \(game.reputationTitle)")
                 }
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .padding(.top, 2)
             }
@@ -81,21 +81,21 @@ struct CompanyView: View {
                 .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("인재 영입")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Palette.ink)
                     Text(game.hiredTalents.isEmpty
                          ? "장인, 세무사, 중개사… 사람이 가게를 키운다"
                          : game.hiredTalents.map(\.name).joined(separator: " · "))
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundStyle(Palette.inkSoft)
                         .lineLimit(1)
                 }
                 Spacer()
                 Text("\(game.talents.count)/\(Talent.all.count)")
-                    .font(.num(13, .bold))
+                    .font(.num(15, .bold))
                     .foregroundStyle(Palette.inkSoft)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Palette.inkFaint)
             }
             .paperCard(padding: 14)
@@ -143,9 +143,9 @@ struct CompanyView: View {
                 let progress = min(1, max(0, (game.netWorth - prevReq) / (next.requirement - prevReq)))
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("다음 직함 · \(next.title)").font(.system(size: 13, weight: .bold))
+                        Text("다음 직함 · \(next.title)").font(.system(size: 15, weight: .bold))
                         Spacer()
-                        Text(Won.short(next.requirement)).font(.num(12, .semibold)).foregroundStyle(Palette.inkSoft)
+                        Text(Won.short(next.requirement)).font(.num(14, .semibold)).foregroundStyle(Palette.inkSoft)
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -155,7 +155,7 @@ struct CompanyView: View {
                     }
                     .frame(height: 6)
                     Text(unlockText(next))
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundStyle(Palette.inkSoft)
                 }
             } else {
@@ -172,9 +172,9 @@ struct CompanyView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Circle().fill(c).frame(width: 6, height: 6)
-                Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.inkSoft)
+                Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.inkSoft)
             }
-            Text(Won.short(v)).font(.num(12, .bold)).foregroundStyle(Palette.ink).lineLimit(1).minimumScaleFactor(0.6)
+            Text(Won.short(v)).font(.num(14, .bold)).foregroundStyle(Palette.ink).lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -203,7 +203,7 @@ struct CompanyView: View {
                             .background(Circle().fill(current ? Palette.sign : .clear))
                         if done {
                             Image(systemName: current ? "star.fill" : "checkmark")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(current ? .white : Palette.sign)
                         }
                     }
@@ -211,10 +211,10 @@ struct CompanyView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(r.title)
-                            .font(.system(size: 14, weight: current ? .heavy : .semibold))
+                            .font(.system(size: 16, weight: current ? .heavy : .semibold))
                             .foregroundStyle(done ? Palette.ink : Palette.inkFaint)
                         Text(r.id == 0 ? "시작" : "순자산 \(Won.short(r.requirement))")
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundStyle(Palette.inkSoft)
                     }
                     Spacer()
@@ -267,7 +267,7 @@ struct CompanyView: View {
         @Bindable var game = game
         return VStack(spacing: 0) {
             Toggle("진동", isOn: $game.hapticsOn)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .tint(Palette.sign)
                 .padding(.vertical, 10)
             Divider().overlay(Palette.line)
@@ -277,9 +277,9 @@ struct CompanyView: View {
                 HStack {
                     Text("만든 사람 · 라이선스")
                     Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(Palette.inkFaint)
+                    Image(systemName: "chevron.right").font(.system(size: 14)).foregroundStyle(Palette.inkFaint)
                 }
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .padding(.vertical, 12)
             }
@@ -291,7 +291,7 @@ struct CompanyView: View {
                     Text("처음부터 다시 하기")
                     Spacer()
                 }
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Palette.sign)
                 .padding(.vertical, 12)
             }
@@ -312,15 +312,15 @@ struct CreditsSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("한평상회").font(.myeongjo(24))
                     Text("구멍가게 하나로 시작해 그룹을 일구는 경영 시뮬레이션.")
-                        .font(.system(size: 14))
+                        .font(.system(size: 16))
                         .foregroundStyle(Palette.inkSoft)
                     DashedLine()
                     Text("게임 속 상호, 지역, 인물, 뉴스는 모두 지어낸 것이며 실제 기업·브랜드와 관계없습니다. 게임 내 돈은 실제 돈으로 바꿀 수 없습니다.")
-                        .font(.system(size: 13))
+                        .font(.system(size: 15))
                     Text("글꼴: 나눔명조 (NAVER Corporation, SIL Open Font License 1.1). 라이선스 전문은 앱 번들의 OFL-NanumFont.txt에 포함되어 있습니다.")
-                        .font(.system(size: 13))
+                        .font(.system(size: 15))
                     Text("아이콘: Apple SF Symbols")
-                        .font(.system(size: 13))
+                        .font(.system(size: 15))
                 }
                 .foregroundStyle(Palette.ink)
                 .padding(20)

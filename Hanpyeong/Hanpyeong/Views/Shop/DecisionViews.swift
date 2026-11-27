@@ -12,21 +12,21 @@ struct DecisionBanner: View {
                     ZStack {
                         Circle().fill(Palette.sign)
                         Image(systemName: d.symbol)
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 17, weight: .bold))
                             .foregroundStyle(.white)
                     }
                     .frame(width: 36, height: 36)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("결정할 일")
-                            .font(.system(size: 11, weight: .heavy))
+                            .font(.system(size: 13, weight: .heavy))
                             .foregroundStyle(Palette.sign)
                         Text(d.title)
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 17, weight: .bold))
                             .foregroundStyle(Palette.ink)
                     }
                     Spacer()
                     Text("열기")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Palette.sign)
                 }
                 .padding(12)
@@ -86,7 +86,7 @@ struct DecisionSheet: View {
             }
             Spacer(minLength: 0)
             Text("금액은 지금 가게 규모(하루 매출 약 \(Won.short(game.cashAmount(1))))에 맞춰 정해집니다.")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Palette.inkFaint)
         }
     }
@@ -100,7 +100,7 @@ struct DecisionSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(o.label)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Palette.ink)
                     Spacer()
                     if o.chance < 1 {
@@ -109,12 +109,12 @@ struct DecisionSheet: View {
                 }
                 if !o.hint.isEmpty {
                     Text(o.hint)
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundStyle(Palette.inkSoft)
                 }
                 if !preview.isEmpty {
                     Text((o.chance < 1 ? "성공 시 · " : "") + preview.joined(separator: " · "))
-                        .font(.num(11, .semibold))
+                        .font(.num(13, .semibold))
                         .foregroundStyle(Palette.inkSoft)
                 }
             }
@@ -138,7 +138,7 @@ struct DecisionSheet: View {
             if !r.lines.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(r.lines, id: \.self) { line in
-                        Text(line).font(.mono(13, .semibold)).foregroundStyle(Palette.ink)
+                        Text(line).font(.mono(14, .semibold)).foregroundStyle(Palette.ink)
                     }
                 }
                 .padding(14)

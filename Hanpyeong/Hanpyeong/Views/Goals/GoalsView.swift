@@ -16,8 +16,10 @@ struct GoalsView: View {
                     missionsCard
                     achievementsCard
                 }
-                .padding(16)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 30)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: game.claimedAchievements)
             }
             .scrollIndicators(.hidden)
             .background(Palette.paper)
@@ -32,14 +34,14 @@ struct GoalsView: View {
                 Text("오늘의 할 일").sectionLabel()
                 Spacer()
                 Text("마감 때 새로 바뀌어요")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(Palette.inkFaint)
             }
             ForEach(game.missions) { m in
                 MissionRow(mission: m, compact: false)
             }
             Text("다 해 놓고 못 받은 보상은 마감 때 자동으로 들어옵니다.")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Palette.inkFaint)
         }
         .paperCard()
@@ -114,19 +116,19 @@ struct MissionRow: View {
                 .frame(height: 4)
                 if !compact {
                     Text(progressText(value))
-                        .font(.num(11))
+                        .font(.num(13))
                         .foregroundStyle(Palette.inkSoft)
                 }
             }
             Spacer(minLength: 4)
             if mission.claimed {
-                Text("완료").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.inkFaint)
+                Text("완료").font(.system(size: 14, weight: .bold)).foregroundStyle(Palette.inkFaint)
             } else if !compact {
                 Button {
                     game.claim(mission)
                 } label: {
                     Text(done ? "받기" : Won.short(mission.reward))
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(done ? .white : Palette.inkSoft)
                         .frame(width: 70, height: 34)
                         .background(RoundedRectangle(cornerRadius: 9).fill(done ? Palette.sign : Palette.cardDeep))
@@ -135,7 +137,7 @@ struct MissionRow: View {
                 .disabled(!done)
             } else {
                 Text(Won.signed(mission.reward))
-                    .font(.num(12, .bold))
+                    .font(.num(14, .bold))
                     .foregroundStyle(done ? Palette.sign : Palette.inkSoft)
             }
         }
@@ -170,10 +172,10 @@ struct AchievementRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(a.title)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Palette.ink)
                 Text(a.detail)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundStyle(Palette.inkSoft)
                 if !claimed {
                     GeometryReader { geo in
@@ -195,9 +197,9 @@ struct AchievementRow: View {
                 } label: {
                     VStack(spacing: 1) {
                         Text(achieved ? "받기" : "보상")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                         Text(Won.short(game.achievementReward(a)))
-                            .font(.num(11, .bold))
+                            .font(.num(13, .bold))
                     }
                     .foregroundStyle(achieved ? .white : Palette.inkSoft)
                     .frame(width: 70, height: 40)

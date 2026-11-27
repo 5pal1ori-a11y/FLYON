@@ -24,8 +24,10 @@ struct MarketView: View {
                     case .prices: PriceBoard()
                     }
                 }
-                .padding(16)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 30)
+                .animation(.easeInOut(duration: 0.25), value: section)
             }
             .scrollIndicators(.hidden)
             .background(Palette.paper)
@@ -52,8 +54,11 @@ struct ListingsList: View {
             }
             ForEach(game.listings) { l in
                 ListingCard(listing: l) { confirm = l }
+                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                            removal: .scale(scale: 0.85).combined(with: .opacity)))
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: game.listings.map(\.id))
         .confirmationDialog("이 가게를 인수할까요?", isPresented: Binding(
             get: { confirm != nil }, set: { if !$0 { confirm = nil } }
         ), titleVisibility: .visible) {
@@ -87,10 +92,10 @@ struct ListingCard: View {
                 KindTile(kind: l.kind, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(l.name) \(l.district.info.short)점")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Palette.ink)
                     Text("\(l.district.info.name) · \(l.kind.info.title)")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundStyle(Palette.inkSoft)
                 }
                 Spacer()
@@ -101,7 +106,7 @@ struct ListingCard: View {
                         Tag(text: "프리미엄", color: Palette.gold)
                     }
                     Text(daysLeft <= 0 ? "오늘 마감" : "D-\(daysLeft)")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(daysLeft <= 0 ? Palette.sign : Palette.inkFaint)
                 }
             }
@@ -121,27 +126,27 @@ struct ListingCard: View {
             Text(deposit > 0
                  ? "보증금 \(Won.short(deposit)) / 월세 \(Won.short(monthly)) / 권리금 \(Won.short(l.price))"
                  : "내 건물 입점 · 보증금·월세 없음 / 권리금 \(Won.short(l.price))")
-                .font(.mono(11, .semibold))
+                .font(.mono(12, .semibold))
                 .foregroundStyle(Palette.ink)
 
             DashedLine()
 
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("권리금").font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.inkSoft)
+                    Text("권리금").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.inkSoft)
                     Text(Won.full(l.price))
                         .font(.myeongjo(19))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     Text("적정가 대비 \(Won.percent(gap))")
-                        .font(.num(11, .bold))
+                        .font(.num(13, .bold))
                         .foregroundStyle(gap < 0 ? Palette.down : Palette.up)
                 }
                 Spacer()
                 Button(action: onBuy) {
                     Text(blocker ?? "인수하기")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(blocker == nil ? .white : Palette.inkFaint)
                         .padding(.horizontal, 16)
                         .frame(height: 40)
@@ -168,7 +173,7 @@ struct BuildingsList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("건물을 사면 매일 월세가 들어오고, 그 지역 내 점포는 임대료가 0원이 됩니다.")
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Palette.inkSoft)
 
             VStack(spacing: 12) {
@@ -181,7 +186,7 @@ struct BuildingsList: View {
                         Text("\(d.info.name) · \(Rank.all[d.info.unlockRank].title) 되면 열림")
                         Spacer()
                     }
-                    .font(.system(size: 13))
+                    .font(.system(size: 15))
                     .foregroundStyle(Palette.inkFaint)
                     .paperCard(padding: 12)
                 }
@@ -217,7 +222,7 @@ struct BuildingsList: View {
                 Spacer()
                 let m = game.market(d)
                 Text("지수 \(String(format: "%.1f", m.index * 100)) \(Won.percent(m.change))")
-                    .font(.num(11, .bold))
+                    .font(.num(13, .bold))
                     .foregroundStyle(trendColor(m.change))
             }
             .padding(.bottom, 8)
@@ -238,16 +243,16 @@ struct BuildingsList: View {
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(spec.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.ink)
+                    Text(spec.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.ink)
                     if owned != nil { Tag(text: "보유", color: Palette.gold, filled: true) }
                 }
                 Text("월세 \(Won.short(rent))/일")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(Palette.inkSoft)
                 if let o = owned {
                     let pnl = price * (1 - game.tradeFee) - o.purchasePrice
                     Text("매입가 \(Won.short(o.purchasePrice)) · 평가손익 \(Won.signed(pnl))")
-                        .font(.num(11, .semibold))
+                        .font(.num(13, .semibold))
                         .foregroundStyle(trendColor(pnl))
                 }
             }
@@ -256,11 +261,11 @@ struct BuildingsList: View {
                 Text(Won.short(price)).font(.myeongjo(15)).foregroundStyle(Palette.ink)
                 if owned != nil {
                     Button("매도") { selling = spec }
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Palette.down)
                 } else {
                     Button("매입") { buying = spec }
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(game.cash >= price ? Palette.sign : Palette.inkFaint)
                         .disabled(game.cash < price)
                 }
@@ -282,7 +287,7 @@ struct PriceBoard: View {
                 row(d)
             }
             Text("시세는 매일 마감 때 움직이고, 뉴스가 터지면 크게 뛰거나 빠집니다. 개업비·매물가·건물값·매각가에 모두 반영돼요.")
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Palette.inkSoft)
                 .padding(.top, 4)
         }
@@ -295,12 +300,12 @@ struct PriceBoard: View {
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 4) {
-                    if !unlocked { Image(systemName: "lock.fill").font(.system(size: 10)) }
-                    Text(d.info.name).font(.system(size: 14, weight: .bold))
+                    if !unlocked { Image(systemName: "lock.fill").font(.system(size: 12)) }
+                    Text(d.info.name).font(.system(size: 16, weight: .bold))
                 }
                 .foregroundStyle(unlocked ? Palette.ink : Palette.inkFaint)
                 Text("내 점포 \(game.stores(in: d).count) · 건물 \(game.buildings.filter { $0.district == d }.count)")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(Palette.inkSoft)
             }
             .frame(width: 112, alignment: .leading)
@@ -311,10 +316,10 @@ struct PriceBoard: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.1f", m.index * 100))
-                    .font(.num(16, .bold))
+                    .font(.num(18, .bold))
                     .foregroundStyle(Palette.ink)
                 Text(arrow(m.change) + Won.percent(m.change, signed: false))
-                    .font(.num(11, .bold))
+                    .font(.num(13, .bold))
                     .foregroundStyle(trendColor(m.change))
             }
             .frame(width: 64, alignment: .trailing)

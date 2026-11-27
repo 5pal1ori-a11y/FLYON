@@ -124,6 +124,7 @@ extension Game {
         pendingDecision = PendingDecision(id: "tvShow", scale: dailyScale, day: day)
         pendingRankUp = nil
         offlineReport = nil
+        suppressOffline = true
     }
 }
 #endif

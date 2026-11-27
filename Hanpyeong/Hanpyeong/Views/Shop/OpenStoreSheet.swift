@@ -45,8 +45,8 @@ struct OpenStoreSheet: View {
             if unlocked { withAnimation(.snappy) { district = d } }
         } label: {
             HStack(spacing: 5) {
-                if !unlocked { Image(systemName: "lock.fill").font(.system(size: 10)) }
-                Text(d.info.name).font(.system(size: 13, weight: .semibold))
+                if !unlocked { Image(systemName: "lock.fill").font(.system(size: 12)) }
+                Text(d.info.name).font(.system(size: 15, weight: .semibold))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -68,10 +68,10 @@ struct OpenStoreSheet: View {
                 Text(info.name).font(.myeongjo(19))
                 Spacer()
                 Text("자리 \(info.slots - free)/\(info.slots)")
-                    .font(.num(12, .bold))
+                    .font(.num(14, .bold))
                     .foregroundStyle(free > 0 ? Palette.inkSoft : Palette.sign)
             }
-            Text(info.mood).font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+            Text(info.mood).font(.system(size: 14)).foregroundStyle(Palette.inkSoft)
             HStack {
                 StatCell(label: "유동인구", value: "×\(String(format: "%.2f", info.traffic))")
                 StatCell(label: "임대료", value: game.ownsBuilding(in: district) ? "내 건물" : "×\(String(format: "%.1f", info.rentMult))")
@@ -95,21 +95,21 @@ struct OpenStoreSheet: View {
                 .opacity(unlocked ? 1 : 0.45)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(info.title).font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.ink)
+                    Text(info.title).font(.system(size: 17, weight: .bold)).foregroundStyle(Palette.ink)
                     if info.trait != .normal { Tag(text: info.trait.title, color: k.color) }
                 }
                 if unlocked {
                     let deposit = game.newDeposit(k, district)
                     Text(deposit > 0 ? "개업비 \(Won.short(cost)) + 보증금 \(Won.short(deposit))" : "개업비 \(Won.short(cost))")
-                        .font(.num(12, .semibold)).foregroundStyle(Palette.ink)
+                        .font(.num(14, .semibold)).foregroundStyle(Palette.ink)
                     Text("Lv.1 초당 \(Won.short(firstIncome)) · 월세 \(Won.short(rent * Lease.daysPerMonth)) · 원가율 \(Int(k.cogsRatio * 100))%")
-                        .font(.system(size: 11)).foregroundStyle(Palette.inkSoft)
+                        .font(.system(size: 13)).foregroundStyle(Palette.inkSoft)
                     Text(info.blurb)
-                        .font(.system(size: 11)).foregroundStyle(Palette.inkFaint)
+                        .font(.system(size: 13)).foregroundStyle(Palette.inkFaint)
                         .lineLimit(2)
                 } else {
                     Label("\(Rank.all[info.unlockRank].title) 되면 열림", systemImage: "lock.fill")
-                        .font(.system(size: 12)).foregroundStyle(Palette.inkFaint)
+                        .font(.system(size: 14)).foregroundStyle(Palette.inkFaint)
                 }
             }
             Spacer(minLength: 0)
@@ -118,7 +118,7 @@ struct OpenStoreSheet: View {
                     if game.openStore(k, in: district) { dismiss() }
                 } label: {
                     Text(blocker ?? "열기")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(blocker == nil ? .white : Palette.inkFaint)
                         .frame(width: 74, height: 38)
                         .background(

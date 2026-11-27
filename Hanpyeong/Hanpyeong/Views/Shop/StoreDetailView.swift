@@ -78,7 +78,7 @@ struct StoreDetailView: View {
                 Spacer()
             }
             Text(k.info.trait.detail)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Palette.inkSoft)
             HStack {
                 factorCell("\(game.season.title)", season)
@@ -93,9 +93,9 @@ struct StoreDetailView: View {
 
     private func factorCell(_ label: String, _ v: Double) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.inkSoft)
+            Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.inkSoft)
             Text(abs(v - 1) < 0.005 ? "–" : Won.percent(v - 1))
-                .font(.num(12, .bold))
+                .font(.num(14, .bold))
                 .foregroundStyle(trendColor(v - 1))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,7 +112,7 @@ struct StoreDetailView: View {
                 Text("시설 상태").sectionLabel()
                 Spacer()
                 Text(factor < 1 ? "매출 \(Won.percent(factor - 1))" : "정상")
-                    .font(.num(12, .bold))
+                    .font(.num(14, .bold))
                     .foregroundStyle(factor < 1 ? Palette.down : Palette.inkSoft)
             }
             GeometryReader { geo in
@@ -124,7 +124,7 @@ struct StoreDetailView: View {
             }
             .frame(height: 8)
             Text(wearText(s.wear))
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Palette.inkSoft)
             Button {
                 game.repair(s.id)
@@ -162,10 +162,10 @@ struct StoreDetailView: View {
             Text(right > 0
                  ? "갱신요구권 남은 기간 \(right)일. 그 안에는 갱신 때 임대료를 5% 넘게 올릴 수 없어요(상가건물 임대차보호법)."
                  : "10년 갱신요구권이 끝났어요. 다음 갱신 때 건물주가 임대료를 크게 올릴 수 있습니다.")
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Palette.inkSoft)
             Text("가게를 팔면 보증금은 돌려받아요. 이 지역 건물을 사면 임대료가 없어지고 보증금도 바로 돌려받습니다.")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Palette.inkFaint)
         }
         .paperCard()
@@ -180,7 +180,7 @@ struct StoreDetailView: View {
                 Text("시설 투자").sectionLabel()
                 Spacer()
                 Text("\(s.improvements.count)/\(list.count) · 매출 \(Won.percent(game.improvementFactor(s) - 1))")
-                    .font(.num(11, .semibold))
+                    .font(.num(13, .semibold))
                     .foregroundStyle(Palette.inkSoft)
             }
             .padding(.bottom, 8)
@@ -189,15 +189,15 @@ struct StoreDetailView: View {
                 let blocker = game.improvementBlocker(imp, for: s)
                 HStack(spacing: 12) {
                     Image(systemName: imp.symbol)
-                        .font(.system(size: 16))
+                        .font(.system(size: 18))
                         .foregroundStyle(done ? s.kind.color : Palette.inkSoft)
                         .frame(width: 26)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(imp.title)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Palette.ink)
                         Text(imp.detail)
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundStyle(Palette.inkSoft)
                     }
                     Spacer(minLength: 6)
@@ -209,9 +209,9 @@ struct StoreDetailView: View {
                         } label: {
                             VStack(spacing: 1) {
                                 Text(blocker ?? "투자")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.system(size: 13, weight: .bold))
                                 Text(Won.short(imp.cost(for: s.kind)))
-                                    .font(.num(11, .semibold))
+                                    .font(.num(13, .semibold))
                             }
                             .foregroundStyle(blocker == nil ? .white : Palette.inkFaint)
                             .frame(width: 76, height: 40)
@@ -287,7 +287,7 @@ struct StoreDetailView: View {
                     .foregroundStyle(Palette.ink)
                     .contentTransition(.numericText())
                 Text("/ \(Economy.maxLevel)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundStyle(Palette.inkFaint)
             }
             MilestoneBar(level: s.level)
@@ -303,7 +303,7 @@ struct StoreDetailView: View {
                     Text(plan.count > 0 ? "Lv +\(plan.count) · 초당 \(Won.signed(gain))" : "최고 레벨")
                     Spacer()
                     Text(plan.count > 0 ? Won.full(plan.cost) : "")
-                        .font(.num(14, .bold))
+                        .font(.num(16, .bold))
                 }
                 .padding(.horizontal, 16)
             }
@@ -325,7 +325,7 @@ struct StoreDetailView: View {
                 Text("직원").sectionLabel()
                 Spacer()
                 Text("1명당 매출 +\(Int(Economy.staffBoost * 100))% · 일당 \(Won.short(info.wage * game.wageIndex))")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(Palette.inkSoft)
             }
             HStack(spacing: 6) {
@@ -353,10 +353,10 @@ struct StoreDetailView: View {
                 .disabled(!canHire)
             }
             Text("일당 \(Won.short(info.wage * game.wageIndex)) = 기본급 + 주휴수당 \(Int(Labor.weeklyHolidayPay * 100))% + 4대보험 사업주 부담 약 \(String(format: "%.1f", Labor.insuranceRate * 100))%. 올해 최저시급 \(Won.full(game.minimumWage)).")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Palette.inkSoft)
             Text("직원 일당이 늘어난 매출보다 크면 손해예요. 레벨이 낮을 땐 혼자 버티는 게 낫습니다.")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Palette.inkFaint)
         }
         .paperCard()
@@ -368,7 +368,7 @@ struct StoreDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("매각").sectionLabel()
             Text("\(s.district.info.name) 시세지수 \(String(format: "%.1f", game.index(s.district) * 100)). 시세가 좋을 때 팔면 차익이 남아요.")
-                .font(.system(size: 13))
+                .font(.system(size: 15))
                 .foregroundStyle(Palette.inkSoft)
             Button("매수 희망자 받아보기") {
                 offers = game.offers(for: s)
@@ -405,7 +405,7 @@ struct SellSheet: View {
                     }
 
                     Text("중개수수료 \(Int(game.tradeFee * 100))%를 떼고 입금되고, 보증금 \(Won.full(store.deposit))은 따로 돌려받아요. 매각 차익은 올해 과세 소득에 더해집니다. 지금까지 들인 돈은 \(Won.full(store.invested))입니다.")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundStyle(Palette.inkSoft)
                         .padding(.top, 4)
                 }
@@ -442,13 +442,13 @@ struct SellSheet: View {
                     .font(.system(size: 30))
                     .foregroundStyle(Palette.inkFaint)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(o.buyer).font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.ink)
+                    Text(o.buyer).font(.system(size: 17, weight: .bold)).foregroundStyle(Palette.ink)
                     Text("“\(o.note)”").font(.myeongjo(12, bold: false)).foregroundStyle(Palette.inkSoft)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(Won.short(o.price)).font(.myeongjo(18)).foregroundStyle(Palette.ink)
-                    Text("손익 \(Won.signed(profit))").font(.num(11, .bold)).foregroundStyle(trendColor(profit))
+                    Text("손익 \(Won.signed(profit))").font(.num(13, .bold)).foregroundStyle(trendColor(profit))
                 }
             }
             .paperCard(padding: 14)

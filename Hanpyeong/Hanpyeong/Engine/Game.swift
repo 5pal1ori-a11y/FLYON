@@ -57,6 +57,8 @@ final class Game {
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var lastActive = Date()
     @ObservationIgnored private var sinceSave: Double = 0
+    /// 스크린샷용 예시 데이터에서는 '자리 비운 사이' 창을 띄우지 않는다
+    @ObservationIgnored var suppressOffline = false
 
     init() {
         load()
@@ -720,7 +722,7 @@ final class Game {
         let now = Date()
         let elapsed = min(now.timeIntervalSince(lastActive), Economy.offlineCap)
         lastActive = now
-        guard started, elapsed > 60 else { return }
+        guard started, !suppressOffline, elapsed > 60 else { return }
         let perSec = incomePerSec + (dailyBuildingIncome - dailyStoreCosts - dailyInterest - dailySalaries) / Economy.dayLength
         let earned = max(0, perSec) * elapsed * offlineRate
         guard earned >= 1 else { return }

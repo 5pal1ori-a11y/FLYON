@@ -15,8 +15,9 @@ struct LedgerView: View {
                     loanCard
                     entries
                 }
-                .padding(16)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 30)
             }
             .scrollIndicators(.hidden)
             .background(Palette.paper)
@@ -34,7 +35,7 @@ struct LedgerView: View {
             Text("최근 \(days.count)일 순이익").sectionLabel()
             if days.isEmpty {
                 Text("첫 영업일이 끝나면 여기에 기록이 쌓여요.")
-                    .font(.system(size: 13))
+                    .font(.system(size: 15))
                     .foregroundStyle(Palette.inkSoft)
                     .frame(maxWidth: .infinity, minHeight: 80)
             } else {
@@ -48,14 +49,14 @@ struct LedgerView: View {
                         AxisGridLine().foregroundStyle(Palette.line)
                         AxisValueLabel {
                             if let n = v.as(Double.self) {
-                                Text(Won.short(n)).font(.system(size: 9))
+                                Text(Won.short(n)).font(.system(size: 11))
                             }
                         }
                     }
                 }
                 .chartXAxis {
                     AxisMarks { _ in
-                        AxisValueLabel().font(.system(size: 9))
+                        AxisValueLabel().font(.system(size: 11))
                     }
                 }
                 .frame(height: 150)
@@ -72,7 +73,7 @@ struct LedgerView: View {
                 Text("은행").sectionLabel()
                 Spacer()
                 Text("기준금리 \(String(format: "%.2f", game.baseRate))% · 대출 연 \(String(format: "%.2f", game.loanAnnualRate))%")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.inkSoft)
             }
             HStack {
@@ -93,23 +94,23 @@ struct LedgerView: View {
             Text("거래 내역").sectionLabel().padding(.bottom, 8)
             if game.ledger.isEmpty {
                 Text("아직 큰 거래가 없어요.")
-                    .font(.system(size: 13))
+                    .font(.system(size: 15))
                     .foregroundStyle(Palette.inkSoft)
                     .padding(.vertical, 12)
             }
             ForEach(game.ledger.prefix(40)) { e in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("\(e.day)일")
-                        .font(.mono(11))
+                        .font(.mono(12))
                         .foregroundStyle(Palette.inkFaint)
                         .frame(width: 38, alignment: .leading)
                     Text(e.title)
-                        .font(.system(size: 13))
+                        .font(.system(size: 15))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                     Spacer(minLength: 6)
                     Text(Won.signed(e.amount))
-                        .font(.mono(12, .semibold))
+                        .font(.mono(13, .semibold))
                         .foregroundStyle(trendColor(e.amount))
                 }
                 .padding(.vertical, 9)
@@ -139,7 +140,7 @@ struct TodayReceipt: View {
                 Text(game.legalName)
                     .font(.myeongjo(20))
                 Text("\(GameCalendar.text(game.day)) · \(game.dayPhase)")
-                    .font(.mono(11))
+                    .font(.mono(12))
                     .foregroundStyle(Palette.inkSoft)
             }
             .padding(.top, 6)
@@ -149,9 +150,9 @@ struct TodayReceipt: View {
             line("총매출 (지금까지)", gross)
             line("원가 (재료·상품·소모품)", -(gross - revenue))
             HStack {
-                Text("매출총이익").font(.mono(12, .bold))
+                Text("매출총이익").font(.mono(13, .bold))
                 Spacer()
-                Text(Won.signed(revenue)).font(.mono(12, .bold))
+                Text(Won.signed(revenue)).font(.mono(13, .bold))
             }
             DashedLine()
             line("건물 월세 수입", building)
@@ -164,7 +165,7 @@ struct TodayReceipt: View {
 
             HStack {
                 Text("오늘 예상 손익")
-                    .font(.mono(13, .bold))
+                    .font(.mono(14, .bold))
                 Spacer()
                 Text(Won.signed(expected))
                     .font(.mono(15, .bold))
@@ -173,7 +174,7 @@ struct TodayReceipt: View {
             }
 
             Text("고정비는 마감 때 빠지고, 세금은 따로 냅니다")
-                .font(.mono(10))
+                .font(.mono(11))
                 .foregroundStyle(Palette.inkFaint)
                 .padding(.bottom, 14)
         }
@@ -187,10 +188,10 @@ struct TodayReceipt: View {
 
     private func line(_ label: String, _ amount: Double) -> some View {
         HStack {
-            Text(label).font(.mono(12))
+            Text(label).font(.mono(13))
             Spacer()
             Text(amount == 0 ? "0" : Won.signed(amount))
-                .font(.mono(12, .semibold))
+                .font(.mono(13, .semibold))
                 .foregroundStyle(amount == 0 ? Palette.inkFaint : Palette.ink)
         }
     }
@@ -206,7 +207,7 @@ struct LoanSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text("순자산의 \(Int(game.loanLimitRatio * 100))%까지 빌릴 수 있어요. 이자는 매일 마감 때 나갑니다. 빚으로 산 가게가 이자보다 많이 벌면 이득, 아니면 독이에요.")
-                    .font(.system(size: 13))
+                    .font(.system(size: 15))
                     .foregroundStyle(Palette.inkSoft)
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -218,8 +219,8 @@ struct LoanSheet: View {
                                 game.borrow(amount)
                             } label: {
                                 VStack(spacing: 2) {
-                                    Text(r == 1 ? "전부" : "\(Int(r * 100))%").font(.system(size: 12, weight: .bold))
-                                    Text(Won.short(amount)).font(.num(11))
+                                    Text(r == 1 ? "전부" : "\(Int(r * 100))%").font(.system(size: 14, weight: .bold))
+                                    Text(Won.short(amount)).font(.num(13))
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
@@ -279,15 +280,15 @@ struct TaxCard: View {
                     Image(systemName: "envelope.badge.fill")
                         .foregroundStyle(Palette.sign)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(bill.title) 고지서").font(.system(size: 14, weight: .bold))
+                        Text("\(bill.title) 고지서").font(.system(size: 16, weight: .bold))
                         Text("과세표준 \(Won.short(bill.taxable)) · \(GameCalendar.shortText(bill.dueDay)) 자동 납부")
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundStyle(Palette.inkSoft)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(Won.short(bill.amount)).font(.num(15, .bold)).foregroundStyle(Palette.sign)
-                        Text("D-\(max(0, bill.dueDay - game.day))").font(.num(11, .semibold)).foregroundStyle(Palette.inkSoft)
+                        Text(Won.short(bill.amount)).font(.num(17, .bold)).foregroundStyle(Palette.sign)
+                        Text("D-\(max(0, bill.dueDay - game.day))").font(.num(13, .semibold)).foregroundStyle(Palette.inkSoft)
                     }
                 }
                 .padding(12)
@@ -305,15 +306,15 @@ struct TaxCard: View {
             StatCell(label: "지금까지 낸 세금", value: Won.full(game.taxesPaid))
 
             Text("부가세는 1·4·7·10월 25일, \(game.isCorporation ? "법인세는 3월 말" : "종합소득세는 5월 말")에 냅니다. 세율에는 지방소득세 10%가 포함돼 있어요. 1년은 게임 속 120일입니다.")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Palette.inkFaint)
 
             if game.canIncorporate {
                 DashedLine()
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("법인 전환").font(.system(size: 14, weight: .bold))
+                    Text("법인 전환").font(.system(size: 16, weight: .bold))
                     Text("개인 종합소득세는 최고 49.5%, 법인세는 최고 26.4%(지방세 포함)예요. 소득이 크면 법인이 유리하고, 작을 땐 개인이 낫습니다. 한 번 바꾸면 되돌릴 수 없어요.")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundStyle(Palette.inkSoft)
                     Button("주식회사 설립 · \(Won.short(Tax.incorporationCost))") { confirmCorp = true }
                         .buttonStyle(SignButtonStyle(enabled: game.cash >= Tax.incorporationCost))
@@ -321,7 +322,7 @@ struct TaxCard: View {
                 }
             } else if !game.isCorporation {
                 Text("다점포 사장님(직함 4단계)이 되면 법인으로 전환할 수 있어요.")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(Palette.inkFaint)
             }
         }

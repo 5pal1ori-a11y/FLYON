@@ -10,11 +10,10 @@ struct CashHeader: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.rank.title)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Palette.gold)
-                        .tracking(0.8)
                     Text(Won.full(game.cash))
-                        .font(.myeongjo(25))
+                        .font(.myeongjo(30))
                         .foregroundStyle(game.cash < 0 ? Palette.down : Palette.ink)
                         .contentTransition(.numericText())
                         .lineLimit(1)
@@ -27,18 +26,18 @@ struct CashHeader: View {
                             .symbolRenderingMode(.multicolor)
                         Text("\(game.dateText) · \(game.dayPhase)")
                     }
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.inkSoft)
                     Text("\(Won.signed(game.incomePerSec))/초")
-                        .font(.num(15, .bold))
+                        .font(.num(18, .bold))
                         .foregroundStyle(Palette.up)
                 }
             }
             DayBar(fraction: game.dayFraction)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
         .background(Palette.paper)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.line).frame(height: 1) }
     }
@@ -57,7 +56,7 @@ struct DayBar: View {
                     .frame(width: max(4, geo.size.width * fraction))
             }
         }
-        .frame(height: 3)
+        .frame(height: 4)
         .animation(.linear(duration: 0.2), value: fraction)
     }
 }
@@ -70,12 +69,12 @@ struct Tag: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: 12, weight: .bold))
             .foregroundStyle(filled ? .white : color)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(filled ? color : color.opacity(0.12))
             )
     }
@@ -90,10 +89,12 @@ struct StatCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Palette.inkSoft)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Text(value)
-                .font(.num(15, .bold))
+                .font(.num(18, .bold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -206,9 +207,9 @@ struct FloatingAmount: View {
 
     var body: some View {
         Text(text)
-            .font(.myeongjo(20))
+            .font(.myeongjo(24))
             .foregroundStyle(Palette.sign)
-            .shadow(color: Palette.paper, radius: 0, x: 1, y: 1)
+            .shadow(color: .white, radius: 0, x: 1, y: 1)
             .offset(y: rise ? -80 : 0)
             .opacity(rise ? 0 : 1)
             .scaleEffect(rise ? 1.1 : 0.9)
@@ -226,9 +227,9 @@ struct EmptyNote: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(title).font(.myeongjo(17)).foregroundStyle(Palette.ink)
+            Text(title).font(.myeongjo(19)).foregroundStyle(Palette.ink)
             Text(detail)
-                .font(.system(size: 13))
+                .font(.system(size: 15))
                 .foregroundStyle(Palette.inkSoft)
                 .multilineTextAlignment(.center)
         }

@@ -102,29 +102,30 @@ extension Font {
 // MARK: - 카드 스타일
 
 struct PaperCard: ViewModifier {
-    var padding: CGFloat = 16
+    var padding: CGFloat = 20
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Palette.line, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Palette.line.opacity(0.7), lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 10, y: 4)
     }
 }
 
 extension View {
-    func paperCard(padding: CGFloat = 16) -> some View {
+    func paperCard(padding: CGFloat = 20) -> some View {
         modifier(PaperCard(padding: padding))
     }
 
     /// 작은 회색 머리글 (섹션 라벨)
+    /// 카드 제목 — 굵고 크게
     func sectionLabel() -> some View {
-        self.font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Palette.inkSoft)
+        self.font(.system(size: 17, weight: .bold))
+            .foregroundStyle(Palette.ink)
             .textCase(nil)
-            .tracking(0.6)
     }
 }
 
@@ -142,16 +143,16 @@ struct SignButtonStyle: ButtonStyle {
     var enabled: Bool = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .bold))
+            .font(.system(size: 17, weight: .bold))
             .foregroundStyle(.white)
-            .padding(.vertical, 13)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 56)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(enabled ? Palette.sign : Palette.inkFaint)
             )
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -159,15 +160,15 @@ struct SignButtonStyle: ButtonStyle {
 struct LineButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(Palette.ink)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 52)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Palette.line, lineWidth: 1)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Palette.card))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Palette.cardDeep.opacity(0.7))
             )
             .opacity(configuration.isPressed ? 0.7 : 1)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
