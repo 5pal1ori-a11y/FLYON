@@ -79,7 +79,9 @@ struct MainTabs: View {
         #if DEBUG
         .onAppear {
             if !ScreenshotArgs.tab.isEmpty { tab = ScreenshotArgs.tab }
-            if !ScreenshotArgs.sheet.isEmpty { debugSheet = DebugSheet(id: ScreenshotArgs.sheet) }
+            if !ScreenshotArgs.sheet.isEmpty && ScreenshotArgs.sheet != "daily" {
+                debugSheet = DebugSheet(id: ScreenshotArgs.sheet)
+            }
         }
         .sheet(item: $debugSheet) { DebugSheetView(kind: $0.id) }
         #endif
