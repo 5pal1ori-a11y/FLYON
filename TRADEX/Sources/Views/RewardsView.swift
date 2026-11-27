@@ -17,27 +17,22 @@ struct RewardsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    LevelSummaryView()
-                        .padding(.top, 8)
-                        .padding(.bottom, 20)
-                        .appear(0)
-                    band
-                    summarySection.appear(0.03)
-                    band
-                    attendanceSection.appear(0.05)
-                    band
-                    gamesSection.appear(0.1)
-                    band
-                    missionsSection.appear(0.15)
+                VStack(alignment: .leading, spacing: 12) {
+                    LevelSummaryView().tossCard().appear(0)
+                    summarySection.tossCard().appear(0.03)
+                    attendanceSection.tossCard().appear(0.05)
+                    gamesSection.tossCard(padding: 20).appear(0.1)
+                    missionsSection.tossCard().appear(0.15)
                     Text("보상은 지금 선택한 거래소(\(store.exchange.name))의 현물 지갑으로 들어가요. 모든 보상은 앱 안에서만 쓰는 모의투자금이며, 현금·상품으로 바꿀 수 없어요.")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                        .padding(.vertical, 24)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 16)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
             }
-            .background(Color(.systemBackground))
+            .background(Theme.tossBackground)
             .navigationTitle("혜택")
             .task { await syncTime() }
             .refreshable { await syncTime() }
@@ -68,8 +63,7 @@ struct RewardsView: View {
             Spacer()
             if let trailing { Text(trailing).font(.subheadline).foregroundStyle(.secondary).monospacedDigit() }
         }
-        .padding(.top, 22)
-        .padding(.bottom, 10)
+        .padding(.bottom, 6)
     }
 
     // MARK: - 오늘 남은 혜택 요약
@@ -101,8 +95,6 @@ struct RewardsView: View {
                 Text("\(done)/\(total) 완료").font(.caption.weight(.semibold)).monospacedDigit()
             }
         }
-        .padding(.top, 22)
-        .padding(.bottom, 22)
     }
 
     // MARK: - 출석체크
@@ -148,7 +140,6 @@ struct RewardsView: View {
                     .buttonStyle(PillButtonStyle(filled: !done))
                     .disabled(done || busy || serverOffset == nil)
             }
-            .padding(.bottom, 22)
         }
     }
 
@@ -198,7 +189,6 @@ struct RewardsView: View {
                         done: left == 0)
             }
             .buttonStyle(.plain)
-            .padding(.bottom, 12)
         }
     }
 

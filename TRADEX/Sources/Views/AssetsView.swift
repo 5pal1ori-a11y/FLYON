@@ -11,25 +11,20 @@ struct AssetsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 12) {
                     summaryCard.appear(0)
-                    band
                     tradexSection.appear(0.05)
-                    band
                     walletsSection.appear(0.1)
-                    band
                     coinsSection.appear(0.15)
-                    band
                     ordersSection.appear(0.18)
-                    band
                     positionsSection.appear(0.2)
-                    band
                     moreSection.appear(0.25)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemBackground))
+            .background(Theme.tossBackground)
             .navigationTitle("자산")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -106,8 +101,7 @@ struct AssetsView: View {
             .font(.caption)
             .monospacedDigit()
         }
-        .padding(.top, 8)
-        .padding(.bottom, 22)
+        .tossCard()
     }
 
     private func bigValue(_ title: String, _ value: Double) -> some View {
@@ -367,12 +361,11 @@ struct AssetsView: View {
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.title3.weight(.bold))
             content()
         }
-        .padding(.top, 22)
-        .padding(.bottom, 16)
+        .tossCard()
     }
 
     /// 섹션 사이 굵은 구분 띠 (박스 대신)

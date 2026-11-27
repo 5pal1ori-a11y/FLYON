@@ -9,6 +9,16 @@ enum Theme {
     static let card = Color(.secondarySystemGroupedBackground)
     static let cornerRadius: CGFloat = 16
 
+    // 토스 스타일 카드: 연한 회색 바탕 위 흰 카드 (테두리·그림자 없음)
+    static let tossBackground = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(red: 0.063, green: 0.063, blue: 0.075, alpha: 1)
+                                      : UIColor(red: 0.949, green: 0.957, blue: 0.965, alpha: 1)   // #F2F4F6
+    })
+    static let tossCard = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(red: 0.118, green: 0.118, blue: 0.133, alpha: 1)
+                                      : .white
+    })
+
     static func color(for change: Double) -> Color {
         change > 0 ? rise : (change < 0 ? fall : even)
     }
@@ -25,6 +35,14 @@ struct CardModifier: ViewModifier {
 
 extension View {
     func card() -> some View { modifier(CardModifier()) }
+
+    /// 토스 스타일 카드: 큰 둥근 모서리, 넉넉한 여백, 테두리 없음
+    func tossCard(padding: CGFloat = 20) -> some View {
+        self
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.tossCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
 }
 
 /// 브랜드 버튼 (검정/흰색 반전)

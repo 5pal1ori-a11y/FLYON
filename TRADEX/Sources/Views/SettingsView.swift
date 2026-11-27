@@ -56,9 +56,12 @@ struct SettingsView: View {
                     Button("계정 삭제", role: .destructive) { confirmDelete = true }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(12)
             .scrollContentBackground(.hidden)
-            .background(Color(.systemBackground))
+            .background(Theme.tossBackground)
+            .listRowBackground(Theme.tossCard)
+            .environment(\.defaultMinListRowHeight, 52)
             .navigationTitle("설정")
             .confirmationDialog("모든 거래소의 코인·원화·포지션이 사라지고, 지급받은 TRADEX만 다시 돌려받아요.", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("초기화", role: .destructive) { wallet.reset() }
