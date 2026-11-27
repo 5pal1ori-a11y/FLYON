@@ -1,0 +1,54 @@
+name: TRADEX build status
+
+# App Store Connect에서 최근 빌드의 처리 상태를 조회한다 (읽기 전용).
+# 수동 실행: Actions 탭 > TRADEX build status > Run workflow
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Query builds
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/venv && /tmp/venv/bin/pip install --quiet cryptography
+          printf '%s\n' "$PRIVATE_KEY" > /tmp/key.p8
+          /tmp/venv/bin/python - <<'PY'
+          import base64, json, os, time, urllib.request, urllib.parse
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric import ec
+          from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+          def b64u(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+          key = serialization.load_pem_private_key(open("/tmp/key.p8", "rb").read(), password=None)
+          now = int(time.time())
+          si = b64u(json.dumps({"alg": "ES256", "kid": os.environ["KEY_ID"], "typ": "JWT"}).encode()) + "." + \
+               b64u(json.dumps({"iss": os.environ["ISSUER_ID"], "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"}).encode())
+          r, s = decode_dss_signature(key.sign(si.encode(), ec.ECDSA(hashes.SHA256())))
+          tok = si + "." + b64u(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
+          def get(path):
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1" + path, headers={"Authorization": "Bearer " + tok})
+              return json.load(urllib.request.urlopen(req, timeout=60))
+          apps = get("/apps?filter[bundleId]=com.flight.flyon")["data"]
+          app = apps[0]
+          print("App:", app["attributes"]["name"], app["id"])
+          builds = get(f"/builds?filter[app]={app['id']}&sort=-uploadedDate&limit=8&include=preReleaseVersion,buildBetaDetail")
+          versions = {i["id"]: i["attributes"]["version"] for i in builds.get("included", []) if i["type"] == "preReleaseVersions"}
+          beta = {i["id"]: i["attributes"] for i in builds.get("included", []) if i["type"] == "buildBetaDetails"}
+          for b in builds["data"]:
+              a = b["attributes"]
+              pv = b["relationships"]["preReleaseVersion"]["data"]
+              bd = b["relationships"].get("buildBetaDetail", {}).get("data")
+              bstate = beta.get(bd["id"], {}) if bd else {}
+              print(f'{versions.get(pv["id"] if pv else "", "?")} ({a["version"]})  processing={a["processingState"]}  expired={a["expired"]}  '
+                    f'uploaded={a["uploadedDate"]}  internal={bstate.get("internalBuildState")}  external={bstate.get("externalBuildState")}')
+          PY
+          rm -f /tmp/key.p8
