@@ -289,7 +289,7 @@ struct StoreRow: View {
             HStack(spacing: 14) {
                 NavigationLink(value: store.id) {
                     HStack(spacing: 14) {
-                        KindTile(kind: store.kind, size: 56)
+                        BrandLogo(name: store.name, color: store.kind.color, size: 56, badge: store.kind.info.symbol)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(store.displayName)
                                 .font(.system(size: 18, weight: .bold))

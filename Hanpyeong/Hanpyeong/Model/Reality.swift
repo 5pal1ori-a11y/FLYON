@@ -26,6 +26,18 @@ extension BusinessKind {
         case .themePark: return 0.20
         case .departmentStore: return 0.70
         case .airline: return 0.65
+        case .flowerShop: return 0.45
+        case .hairSalon: return 0.15
+        case .academy: return 0.10
+        case .carRepair: return 0.40
+        case .webtoon: return 0.20
+        case .appStudio: return 0.10
+        case .foodFactory: return 0.65
+        case .entertainment: return 0.40
+        case .gameCompany: return 0.15
+        case .pharma: return 0.35
+        case .securities: return 0.20
+        case .chipFab: return 0.55
         case .holdings: return 0.05
         }
     }
@@ -63,7 +75,7 @@ struct Holiday: Identifiable {
         },
         Holiday(id: "valentine", name: "밸런타인데이", month: 2, fromDay: 13, toDay: 16,
                 note: "카페·편의점에 초콜릿") { k, _ in
-            k == .cafe || k == .convenience ? 1.2 : 1
+            k == .flowerShop ? 1.5 : (k == .cafe || k == .convenience ? 1.2 : 1)
         },
         Holiday(id: "seollal", name: "설 연휴", month: 2, fromDay: 1, toDay: 10,
                 note: "마트·백화점·항공 대목, 골목은 귀성으로 한산") { k, d in
@@ -79,6 +91,7 @@ struct Holiday: Identifiable {
                 note: "어린이날·어버이날, 테마파크와 고깃집 북적") { k, _ in
             switch k {
             case .themePark: return 1.5
+            case .flowerShop: return 1.8
             case .departmentStore, .bbq: return 1.2
             default: return 1
             }

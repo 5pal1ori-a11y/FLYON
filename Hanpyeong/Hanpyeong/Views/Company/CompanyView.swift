@@ -37,6 +37,8 @@ struct CompanyView: View {
 
     private var identity: some View {
         HStack(alignment: .center, spacing: 16) {
+            BrandLogo(name: game.companyName, color: Palette.sign, size: 72)
+                .shadow(color: Palette.sign.opacity(0.25), radius: 10, y: 4)
             VStack(alignment: .leading, spacing: 6) {
                 Text(game.highestRank >= 4 ? "\(game.companyName)그룹" : game.legalName)
                     .font(.myeongjo(28))
@@ -46,9 +48,6 @@ struct CompanyView: View {
                 Text(game.rank.title)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Palette.gold)
-                Text(game.rank.line)
-                    .font(.myeongjo(13, bold: false))
-                    .foregroundStyle(Palette.inkSoft)
                 HStack(spacing: 6) {
                     Image(systemName: "heart.fill").foregroundStyle(Palette.sign)
                     Text("평판 \(Int(game.reputation)) · \(game.reputationTitle)")
@@ -58,7 +57,7 @@ struct CompanyView: View {
                 .padding(.top, 2)
             }
             Spacer(minLength: 0)
-            Stamp(text: stampText, size: 84)
+            Stamp(text: stampText, size: 64)
         }
         .padding(.top, 12)
     }

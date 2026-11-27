@@ -46,7 +46,7 @@ struct ListingsList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("오늘 나온 가게 · 하루 지나면 새 매물").sectionLabel()
+                Text("오늘의 매물").sectionLabel()
                 Spacer()
             }
             if game.listings.isEmpty {
@@ -87,79 +87,62 @@ struct ListingCard: View {
         let blocker = game.buyBlocker(l)
         let daysLeft = l.expiresDay - game.day
 
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                KindTile(kind: l.kind, size: 40)
-                VStack(alignment: .leading, spacing: 2) {
+        let deposit = game.newDeposit(l.kind, l.district)
+        let monthly = game.baseRent(l.kind, l.district) * Lease.daysPerMonth
+
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                BrandLogo(name: l.name, color: l.kind.color, size: 54, badge: l.kind.info.symbol)
+                VStack(alignment: .leading, spacing: 3) {
                     Text("\(l.name) \(l.district.info.short)점")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Palette.ink)
-                    Text("\(l.district.info.name) · \(l.kind.info.title)")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Palette.inkSoft)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    if gap < -0.12 {
-                        Tag(text: "급매", color: Palette.sign, filled: true)
-                    } else if gap > 0.12 {
-                        Tag(text: "프리미엄", color: Palette.gold)
-                    }
-                    Text(daysLeft <= 0 ? "오늘 마감" : "D-\(daysLeft)")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(daysLeft <= 0 ? Palette.sign : Palette.inkFaint)
-                }
-            }
-
-            Text("“\(l.story)”")
-                .font(.myeongjo(13, bold: false))
-                .foregroundStyle(Palette.inkSoft)
-
-            HStack {
-                StatCell(label: "레벨", value: "Lv.\(l.level)")
-                StatCell(label: "직원", value: "\(l.staff)명")
-                StatCell(label: "초당 매출", value: Won.short(income), tint: Palette.up)
-            }
-
-            let deposit = game.newDeposit(l.kind, l.district)
-            let monthly = game.baseRent(l.kind, l.district) * Lease.daysPerMonth
-            Text(deposit > 0
-                 ? "보증금 \(Won.short(deposit)) / 월세 \(Won.short(monthly)) / 권리금 \(Won.short(l.price))"
-                 : "내 건물 입점 · 보증금·월세 없음 / 권리금 \(Won.short(l.price))")
-                .font(.mono(12, .semibold))
-                .foregroundStyle(Palette.ink)
-
-            DashedLine()
-
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("권리금").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.inkSoft)
-                    Text(Won.full(l.price))
-                        .font(.myeongjo(19))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text("적정가 대비 \(Won.percent(gap))")
-                        .font(.num(13, .bold))
-                        .foregroundStyle(gap < 0 ? Palette.down : Palette.up)
+                        .minimumScaleFactor(0.8)
+                    HStack(spacing: 6) {
+                        Text("Lv.\(l.level)").font(.num(14, .heavy)).foregroundStyle(l.kind.color)
+                        Text(l.kind.info.title).font(.system(size: 14)).foregroundStyle(Palette.inkSoft)
+                        Text("D-\(max(0, daysLeft))")
+                            .font(.num(13, .semibold))
+                            .foregroundStyle(daysLeft <= 0 ? Palette.sign : Palette.inkFaint)
+                    }
                 }
-                Spacer()
-                Button(action: onBuy) {
-                    Text(blocker ?? "인수하기")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(blocker == nil ? .white : Palette.inkFaint)
-                        .padding(.horizontal, 16)
-                        .frame(height: 40)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(blocker == nil ? Palette.sign : Palette.cardDeep)
-                        )
+                Spacer(minLength: 0)
+                if gap < -0.12 {
+                    Tag(text: "급매 \(Won.percent(gap))", color: Palette.down, filled: true)
+                } else if gap > 0.12 {
+                    Tag(text: "프리미엄", color: Palette.gold)
                 }
-                .buttonStyle(PressStyle())
-                .disabled(blocker != nil)
             }
+
+            HStack(spacing: 0) {
+                miniStat("초당", Won.short(income), Palette.up)
+                miniStat("보증금", deposit > 0 ? Won.short(deposit) : "없음", Palette.ink)
+                miniStat("월세", deposit > 0 ? Won.short(monthly) : "없음", Palette.ink)
+            }
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.cardDeep.opacity(0.6)))
+
+            Button(action: onBuy) {
+                HStack {
+                    Text(blocker ?? "인수하기")
+                    Spacer()
+                    Text("권리금 \(Won.short(l.price))").font(.num(17, .heavy))
+                }
+                .padding(.horizontal, 18)
+            }
+            .buttonStyle(SignButtonStyle(enabled: blocker == nil))
+            .disabled(blocker != nil)
         }
-        .paperCard(padding: 14)
+        .paperCard(padding: 16)
+    }
+
+    private func miniStat(_ label: String, _ value: String, _ tint: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(value).font(.num(16, .bold)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.7)
+            Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.inkSoft)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -172,7 +155,7 @@ struct BuildingsList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("건물을 사면 매일 월세가 들어오고, 그 지역 내 점포는 임대료가 0원이 됩니다.")
+            Label("사면 매일 월세 수입 · 그 지역 내 가게 임대료 0원", systemImage: "info.circle")
                 .font(.system(size: 14))
                 .foregroundStyle(Palette.inkSoft)
 
@@ -282,14 +265,10 @@ struct PriceBoard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("지역별 시세지수 (100 = 기준) · 최근 30일").sectionLabel()
+            Text("지역 시세").sectionLabel()
             ForEach(DistrictID.allCases) { d in
                 row(d)
             }
-            Text("시세는 매일 마감 때 움직이고, 뉴스가 터지면 크게 뛰거나 빠집니다. 개업비·매물가·건물값·매각가에 모두 반영돼요.")
-                .font(.system(size: 14))
-                .foregroundStyle(Palette.inkSoft)
-                .padding(.top, 4)
         }
     }
 

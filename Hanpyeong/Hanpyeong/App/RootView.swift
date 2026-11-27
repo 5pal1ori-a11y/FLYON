@@ -114,6 +114,7 @@ struct ToastView: View {
 
 struct OfflineSheet: View {
     let report: OfflineReport
+    @Environment(Game.self) private var game
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -130,10 +131,9 @@ struct OfflineSheet: View {
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-            Text("알바생들이 가게를 지켰어요. 사장님이 없을 땐 평소의 절반만 법니다.")
+            Text("평소 수익의 \(Int(game.offlineRate * 100))%")
                 .font(.system(size: 15))
                 .foregroundStyle(Palette.inkSoft)
-                .multilineTextAlignment(.center)
             Button("장부에 적기") { dismiss() }
                 .buttonStyle(SignButtonStyle())
                 .padding(.top, 6)

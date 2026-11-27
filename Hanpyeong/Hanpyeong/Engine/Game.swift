@@ -149,6 +149,7 @@ final class Game {
         if delivery && w < 1 && (weather == .rain || weather == .snow) { w = 1 }
         m *= adj(w)
         m *= adj(holidayFactor(kind, district))
+        m *= kind.hitFactor(day: day)
         m *= reputationFactor
         m *= talentIncomeFactor(kind)
         m *= phaseFactor(kind)

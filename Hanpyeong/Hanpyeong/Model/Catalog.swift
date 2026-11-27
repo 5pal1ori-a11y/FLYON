@@ -34,7 +34,7 @@ enum Economy {
 
 /// 업종마다 다른 성격. 같은 돈이라도 어디에 쓰느냐가 달라진다.
 enum Trait: String, Codable {
-    case normal, street, unmanned, night, steady, tourist
+    case normal, street, unmanned, night, steady, tourist, hit
 
     var title: String {
         switch self {
@@ -44,6 +44,7 @@ enum Trait: String, Codable {
         case .night:    return "야간형"
         case .steady:   return "불황에 강함"
         case .tourist:  return "관광형"
+        case .hit:      return "흥행형"
         }
     }
 
@@ -55,14 +56,21 @@ enum Trait: String, Codable {
         case .night:    return "저녁부터 매출이 폭발한다. 아침엔 한산하다."
         case .steady:   return "불황·악천후·악재 뉴스에 매출이 줄지 않는다."
         case .tourist:  return "여름과 맑은 날에 강하다. 겨울과 비에 약하다."
+        case .hit:      return "날마다 흥행이 갈린다. 대박과 쪽박 사이."
         }
     }
 }
 
 enum BusinessKind: String, Codable, CaseIterable, Identifiable {
-    case bungeoppang, cornerShop, snackBar, laundromat, cafe, chicken, pcBang,
-         convenience, gym, bbq, supermarket, franchiseHQ, hotel, logistics,
-         themePark, departmentStore, airline, holdings
+    case bungeoppang, cornerShop, flowerShop,
+         snackBar, laundromat, hairSalon,
+         cafe, chicken, pcBang, academy, carRepair,
+         convenience, gym, bbq, webtoon, appStudio,
+         supermarket, foodFactory, entertainment,
+         franchiseHQ, hotel, gameCompany,
+         logistics, themePark, pharma,
+         departmentStore, airline, securities, chipFab,
+         holdings
 
     var id: String { rawValue }
 
@@ -169,6 +177,66 @@ enum BusinessKind: String, Codable, CaseIterable, Identifiable {
                         openCost: 8_000_000_000_000, baseIncome: 24_000_000, baseUpgrade: 10_500_000_000,
                         rent: 3_000_000_000, wage: 6_500_000_000, maxStaff: 12, color: 0x2B5C8A, trait: .tourist,
                         blurb: "하늘길을 연다. 휴가철 좌석은 매진.")
+        case .flowerShop:
+            return Info(title: "꽃집", symbol: "camera.macro", tier: 0, unlockRank: 0,
+                        openCost: 600_000, baseIncome: 20, baseUpgrade: 2_000,
+                        rent: 800, wage: 2_500, maxStaff: 1, color: 0xD0567A, trait: .normal,
+                        blurb: "졸업식과 어버이날이 대목.")
+        case .hairSalon:
+            return Info(title: "미용실", symbol: "scissors", tier: 1, unlockRank: 1,
+                        openCost: 22_000_000, baseIncome: 240, baseUpgrade: 28_000,
+                        rent: 11_000, wage: 30_000, maxStaff: 3, color: 0x8A5FB0, trait: .normal,
+                        blurb: "단골 손님은 10년을 간다.")
+        case .academy:
+            return Info(title: "보습학원", symbol: "graduationcap.fill", tier: 2, unlockRank: 2,
+                        openCost: 160_000_000, baseIncome: 1_750, baseUpgrade: 230_000,
+                        rent: 70_000, wage: 200_000, maxStaff: 4, color: 0x2E7FA8, trait: .steady,
+                        blurb: "방학 특강이 승부처.")
+        case .carRepair:
+            return Info(title: "카센터", symbol: "wrench.and.screwdriver.fill", tier: 2, unlockRank: 2,
+                        openCost: 200_000_000, baseIncome: 2_000, baseUpgrade: 270_000,
+                        rent: 90_000, wage: 170_000, maxStaff: 3, color: 0x5D6B78, trait: .normal,
+                        blurb: "눈 오는 날 타이어 교체 줄.")
+        case .webtoon:
+            return Info(title: "웹툰 스튜디오", symbol: "paintpalette.fill", tier: 3, unlockRank: 3,
+                        openCost: 1_200_000_000, baseIncome: 13_000, baseUpgrade: 1_700_000,
+                        rent: 300_000, wage: 1_300_000, maxStaff: 5, color: 0x1FA67A, trait: .hit,
+                        blurb: "연재 한 편이 인생을 바꾼다.")
+        case .appStudio:
+            return Info(title: "앱 개발사", symbol: "iphone", tier: 3, unlockRank: 3,
+                        openCost: 1_500_000_000, baseIncome: 16_000, baseUpgrade: 2_000_000,
+                        rent: 400_000, wage: 1_600_000, maxStaff: 6, color: 0x3B5BDB, trait: .hit,
+                        blurb: "차트 1위 아니면 0원.")
+        case .foodFactory:
+            return Info(title: "식품 공장", symbol: "gearshape.2.fill", tier: 4, unlockRank: 4,
+                        openCost: 12_000_000_000, baseIncome: 95_000, baseUpgrade: 16_000_000,
+                        rent: 3_000_000, wage: 10_000_000, maxStaff: 10, color: 0x9C6B2F, trait: .steady,
+                        blurb: "라인은 멈추지 않는다.")
+        case .entertainment:
+            return Info(title: "연예 기획사", symbol: "music.mic", tier: 4, unlockRank: 4,
+                        openCost: 9_000_000_000, baseIncome: 75_000, baseUpgrade: 13_000_000,
+                        rent: 3_500_000, wage: 8_000_000, maxStaff: 8, color: 0xE0457B, trait: .hit,
+                        blurb: "데뷔 앨범 하나에 운명이 걸렸다.")
+        case .gameCompany:
+            return Info(title: "게임 회사", symbol: "gamecontroller.fill", tier: 5, unlockRank: 5,
+                        openCost: 100_000_000_000, baseIncome: 520_000, baseUpgrade: 135_000_000,
+                        rent: 25_000_000, wage: 90_000_000, maxStaff: 12, color: 0x6741D9, trait: .hit,
+                        blurb: "업데이트 날엔 서버가 운다.")
+        case .pharma:
+            return Info(title: "제약·바이오", symbol: "pills.fill", tier: 6, unlockRank: 6,
+                        openCost: 800_000_000_000, baseIncome: 3_300_000, baseUpgrade: 1_100_000_000,
+                        rent: 200_000_000, wage: 700_000_000, maxStaff: 12, color: 0x0CA678, trait: .hit,
+                        blurb: "임상 결과 발표날, 모두가 숨죽인다.")
+        case .securities:
+            return Info(title: "증권사", symbol: "chart.line.uptrend.xyaxis", tier: 7, unlockRank: 7,
+                        openCost: 6_500_000_000_000, baseIncome: 20_000_000, baseUpgrade: 9_000_000_000,
+                        rent: 2_500_000_000, wage: 5_500_000_000, maxStaff: 12, color: 0x1C7ED6, trait: .hit,
+                        blurb: "장이 열리면 돈이 돈다.")
+        case .chipFab:
+            return Info(title: "반도체 공장", symbol: "cpu", tier: 7, unlockRank: 7,
+                        openCost: 7_000_000_000_000, baseIncome: 21_000_000, baseUpgrade: 9_500_000_000,
+                        rent: 1_500_000_000, wage: 6_000_000_000, maxStaff: 12, color: 0x495057, trait: .steady,
+                        blurb: "먼지 한 톨 없는 클린룸.")
         case .holdings:
             return Info(title: "지주회사", symbol: "crown.fill", tier: 8, unlockRank: 7,
                         openCost: 50_000_000_000_000, baseIncome: 130_000_000, baseUpgrade: 65_000_000_000,
@@ -198,6 +266,18 @@ enum BusinessKind: String, Codable, CaseIterable, Identifiable {
         case .themePark:       return ["한평랜드", "드림월드", "구름나라", "판타지아 파크"]
         case .departmentStore: return ["한평 플라자", "스카이라인 백화점", "더 메리디안"]
         case .airline:         return ["한평항공", "에어 라온", "블루윙", "스카이온"]
+        case .flowerShop:      return ["꽃다발", "봄날꽃집", "플라워 온", "들꽃상회"]
+        case .hairSalon:       return ["가위손헤어", "살롱 드 한평", "단발머리", "헤어라운지"]
+        case .academy:         return ["일등학원", "수학의 정석학원", "한평에듀", "올백학원"]
+        case .carRepair:       return ["달려카센터", "믿음정비", "스피드모터스", "타이어뱅크온"]
+        case .webtoon:         return ["컷앤컷", "말풍선 스튜디오", "레드펜", "한평툰"]
+        case .appStudio:       return ["픽셀랩", "한평소프트", "탭탭스튜디오", "앱공방"]
+        case .foodFactory:     return ["한평식품", "바른먹거리", "든든푸드", "새참식품"]
+        case .entertainment:   return ["스타라이트", "한평엔터", "블루노트", "무대뒤"]
+        case .gameCompany:     return ["한평게임즈", "크리티컬", "레벨나인", "픽셀포지"]
+        case .pharma:          return ["한평제약", "새살바이오", "늘봄제약", "셀온"]
+        case .securities:      return ["한평증권", "미래가치증권", "황소증권", "온투자증권"]
+        case .chipFab:         return ["한평반도체", "나노팹", "실리콘온", "웨이퍼원"]
         case .holdings:        return ["홀딩스"]
         }
     }
@@ -225,6 +305,11 @@ enum BusinessKind: String, Codable, CaseIterable, Identifiable {
         case (.hotel, .spring), (.themePark, .spring), (.airline, .spring): return 1.1
         case (.hotel, .winter), (.themePark, .winter), (.airline, .winter): return 0.8
         case (.departmentStore, .winter): return 1.25
+        case (.flowerShop, .spring): return 1.4
+        case (.flowerShop, .winter): return 0.8
+        case (.academy, .summer), (.academy, .winter): return 1.3
+        case (.academy, .spring), (.academy, .autumn): return 0.9
+        case (.carRepair, .winter): return 1.2
         default: return 1
         }
     }
@@ -243,6 +328,9 @@ enum BusinessKind: String, Codable, CaseIterable, Identifiable {
         case (.cafe, .heat), (.convenience, .heat): return 1.3
         case (.snackBar, .cold): return 1.15
         case (.gym, .heat): return 0.85
+        case (.carRepair, .snow), (.carRepair, .cold): return 1.3
+        case (.flowerShop, .rain): return 0.7
+        case (.webtoon, _), (.appStudio, _), (.gameCompany, _), (.securities, _), (.chipFab, _), (.pharma, _): return 1
         default: break
         }
         switch (info.trait, w) {

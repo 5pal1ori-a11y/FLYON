@@ -173,10 +173,6 @@ struct TodayReceipt: View {
                     .contentTransition(.numericText())
             }
 
-            Text("고정비는 마감 때 빠지고, 세금은 따로 냅니다")
-                .font(.mono(11))
-                .foregroundStyle(Palette.inkFaint)
-                .padding(.bottom, 14)
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 18)
@@ -206,7 +202,7 @@ struct LoanSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("순자산의 \(Int(game.loanLimitRatio * 100))%까지 빌릴 수 있어요. 이자는 매일 마감 때 나갑니다. 빚으로 산 가게가 이자보다 많이 벌면 이득, 아니면 독이에요.")
+                Text("한도 순자산의 \(Int(game.loanLimitRatio * 100))% · 연 \(String(format: "%.2f", game.loanAnnualRate))%")
                     .font(.system(size: 15))
                     .foregroundStyle(Palette.inkSoft)
 
@@ -305,15 +301,12 @@ struct TaxCard: View {
             }
             StatCell(label: "지금까지 낸 세금", value: Won.full(game.taxesPaid))
 
-            Text("부가세는 1·4·7·10월 25일, \(game.isCorporation ? "법인세는 3월 말" : "종합소득세는 5월 말")에 냅니다. 세율에는 지방소득세 10%가 포함돼 있어요. 1년은 게임 속 120일입니다.")
-                .font(.system(size: 13))
-                .foregroundStyle(Palette.inkFaint)
 
             if game.canIncorporate {
                 DashedLine()
                 VStack(alignment: .leading, spacing: 6) {
                     Text("법인 전환").font(.system(size: 16, weight: .bold))
-                    Text("개인 종합소득세는 최고 49.5%, 법인세는 최고 26.4%(지방세 포함)예요. 소득이 크면 법인이 유리하고, 작을 땐 개인이 낫습니다. 한 번 바꾸면 되돌릴 수 없어요.")
+                    Text("최고세율 개인 49.5% · 법인 26.4%")
                         .font(.system(size: 14))
                         .foregroundStyle(Palette.inkSoft)
                     Button("주식회사 설립 · \(Won.short(Tax.incorporationCost))") { confirmCorp = true }
@@ -321,7 +314,7 @@ struct TaxCard: View {
                         .disabled(game.cash < Tax.incorporationCost)
                 }
             } else if !game.isCorporation {
-                Text("다점포 사장님(직함 4단계)이 되면 법인으로 전환할 수 있어요.")
+                Label("법인 전환: 다점포 사장님부터", systemImage: "lock.fill")
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.inkFaint)
             }

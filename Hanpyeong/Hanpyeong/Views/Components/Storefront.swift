@@ -30,12 +30,15 @@ struct Storefront: View {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .strokeBorder(.white.opacity(0.35), lineWidth: 1)
                 .padding(3)
-            Text(name)
-                .font(.myeongjo(height * 0.13))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 14)
+            HStack(spacing: height * 0.05) {
+                BrandLogo(name: name, color: tone, size: height * 0.15, inverted: true)
+                Text(name)
+                    .font(.myeongjo(height * 0.13))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+            .padding(.horizontal, 14)
         }
         .frame(height: height * 0.24)
         .padding(.horizontal, 6)

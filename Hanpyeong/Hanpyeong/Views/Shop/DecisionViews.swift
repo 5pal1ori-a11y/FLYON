@@ -85,9 +85,6 @@ struct DecisionSheet: View {
                 optionButton(item.element)
             }
             Spacer(minLength: 0)
-            Text("금액은 지금 가게 규모(하루 매출 약 \(Won.short(game.cashAmount(1))))에 맞춰 정해집니다.")
-                .font(.system(size: 13))
-                .foregroundStyle(Palette.inkFaint)
         }
     }
 

@@ -4,6 +4,7 @@ struct OpenStoreSheet: View {
     @Environment(Game.self) private var game
     @Environment(\.dismiss) private var dismiss
     @State private var district: DistrictID = .alley
+    @State private var sector: Sector?
 
     var body: some View {
         NavigationStack {
@@ -19,9 +20,18 @@ struct OpenStoreSheet: View {
                     districtSummary
 
                     Text("무엇을 열까요").sectionLabel().padding(.top, 8)
-                    ForEach(BusinessKind.allCases) { k in row(k) }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            sectorChip(nil)
+                            ForEach(Sector.allCases) { sectorChip($0) }
+                        }
+                        .padding(.horizontal, 1)
+                    }
+                    ForEach(BusinessKind.allCases.filter { sector == nil || $0.sector == sector }) { k in row(k) }
                 }
-                .padding(16)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .animation(.snappy, value: sector)
             }
             .background(Palette.paper)
             .navigationTitle("새 점포 열기")
@@ -71,7 +81,6 @@ struct OpenStoreSheet: View {
                     .font(.num(14, .bold))
                     .foregroundStyle(free > 0 ? Palette.inkSoft : Palette.sign)
             }
-            Text(info.mood).font(.system(size: 14)).foregroundStyle(Palette.inkSoft)
             HStack {
                 StatCell(label: "유동인구", value: "×\(String(format: "%.2f", info.traffic))")
                 StatCell(label: "임대료", value: game.ownsBuilding(in: district) ? "내 건물" : "×\(String(format: "%.1f", info.rentMult))")
@@ -102,13 +111,10 @@ struct OpenStoreSheet: View {
                     let deposit = game.newDeposit(k, district)
                     Text(deposit > 0 ? "개업비 \(Won.short(cost)) + 보증금 \(Won.short(deposit))" : "개업비 \(Won.short(cost))")
                         .font(.num(14, .semibold)).foregroundStyle(Palette.ink)
-                    Text("Lv.1 초당 \(Won.short(firstIncome)) · 월세 \(Won.short(rent * Lease.daysPerMonth)) · 원가율 \(Int(k.cogsRatio * 100))%")
+                    Text("초당 \(Won.short(firstIncome)) · 월세 \(Won.short(rent * Lease.daysPerMonth))")
                         .font(.system(size: 13)).foregroundStyle(Palette.inkSoft)
-                    Text(info.blurb)
-                        .font(.system(size: 13)).foregroundStyle(Palette.inkFaint)
-                        .lineLimit(2)
                 } else {
-                    Label("\(Rank.all[info.unlockRank].title) 되면 열림", systemImage: "lock.fill")
+                    Label(Rank.all[info.unlockRank].title, systemImage: "lock.fill")
                         .font(.system(size: 14)).foregroundStyle(Palette.inkFaint)
                 }
             }
@@ -130,6 +136,24 @@ struct OpenStoreSheet: View {
                 .disabled(blocker != nil)
             }
         }
-        .paperCard(padding: 12)
+        .paperCard(padding: 14)
+    }
+
+    private func sectorChip(_ s: Sector?) -> some View {
+        let selected = sector == s
+        return Button {
+            sector = s
+        } label: {
+            HStack(spacing: 5) {
+                if let s { Image(systemName: s.symbol).font(.system(size: 12, weight: .bold)) }
+                Text(s?.title ?? "전체").font(.system(size: 14, weight: .semibold))
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .foregroundStyle(selected ? .white : Palette.ink)
+            .background(Capsule().fill(selected ? Palette.sign : Palette.card))
+            .overlay(Capsule().strokeBorder(selected ? .clear : Palette.line))
+        }
+        .buttonStyle(.plain)
     }
 }

@@ -7,9 +7,6 @@ struct TalentsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("한 번 영입하면 계속 함께합니다. 대신 매일 일당이 나가요. (일당은 장부의 인건비에 포함)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Palette.inkSoft)
 
                 ForEach(Talent.all) { t in
                     TalentCard(talent: t) { confirm = t }
@@ -68,12 +65,6 @@ struct TalentCard: View {
                     Text(t.role)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Palette.inkSoft)
-                    if !locked {
-                        Text("“\(t.quote)”")
-                            .font(.myeongjo(13, bold: false))
-                            .foregroundStyle(Palette.inkSoft)
-                            .padding(.top, 2)
-                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -136,6 +127,7 @@ struct LeaderboardCard: View {
                         .font(.num(15, .bold))
                         .foregroundStyle(item.offset < 3 ? Palette.gold : Palette.inkFaint)
                         .frame(width: 24, alignment: .leading)
+                    BrandLogo(name: r.name, color: r.isPlayer ? Palette.sign : LogoPalette.color(for: r.name), size: 34)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(r.name)
                             .font(.system(size: 16, weight: r.isPlayer ? .heavy : .semibold))
@@ -153,10 +145,6 @@ struct LeaderboardCard: View {
                 .padding(.horizontal, r.isPlayer ? 8 : 0)
                 .background(r.isPlayer ? Palette.sign.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
             }
-            Text("가상의 회사들입니다. 경쟁사도 매일 조금씩 커집니다.")
-                .font(.system(size: 13))
-                .foregroundStyle(Palette.inkFaint)
-                .padding(.top, 8)
         }
         .paperCard()
     }

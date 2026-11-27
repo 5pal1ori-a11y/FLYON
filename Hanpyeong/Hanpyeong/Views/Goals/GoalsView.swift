@@ -33,16 +33,10 @@ struct GoalsView: View {
             HStack {
                 Text("오늘의 할 일").sectionLabel()
                 Spacer()
-                Text("마감 때 새로 바뀌어요")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Palette.inkFaint)
             }
             ForEach(game.missions) { m in
                 MissionRow(mission: m, compact: false)
             }
-            Text("다 해 놓고 못 받은 보상은 마감 때 자동으로 들어옵니다.")
-                .font(.system(size: 13))
-                .foregroundStyle(Palette.inkFaint)
         }
         .paperCard()
     }
