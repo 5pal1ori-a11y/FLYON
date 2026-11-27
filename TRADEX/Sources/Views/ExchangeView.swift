@@ -51,13 +51,7 @@ struct ExchangeView: View {
                 } else if store.markets.isEmpty {
                     ProgressView("시세 불러오는 중…")
                 } else {
-                    VStack(spacing: 0) {
-                        summaryBar
-                        tabBar
-                        columnHeader
-                        Divider()
-                        table
-                    }
+                    content
                 }
             }
             .background(Color(.systemBackground))
@@ -87,112 +81,138 @@ struct ExchangeView: View {
         #endif
     }
 
-    // MARK: - 요약 바 (총 평가 · 평가손익 · 수익률)
+    // MARK: - 본문 (요약 · 급상승 · 탭 · 정렬 · 목록)
 
-    private var summaryBar: some View {
-        // 선택한 거래소 계좌 기준: 평가손익 = 현물 평가손익 + 선물 미실현 손익
+    private var content: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                if query.isEmpty {
+                    summaryLine
+                        .padding(.horizontal, 20)
+                        .padding(.top, 6)
+                    moversStrip
+                        .padding(.top, 18)
+                        .padding(.bottom, 8)
+                }
+                Section {
+                    if visible.isEmpty {
+                        Text(tab == .holdings ? "보유한 코인이 없어요." : tab == .favorites ? "관심 코인이 없어요. 코인 화면의 ☆를 눌러 추가해요." : "검색 결과가 없어요.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)
+                    }
+                    ForEach(visible) { m in
+                        NavigationLink(value: m) {
+                            MarketTableRow(market: m, ticker: store.tickers[m.market])
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    listHeader
+                }
+            }
+            .padding(.bottom, 20)
+        }
+        .scrollDismissesKeyboard(.immediately)
+    }
+
+    /// 내 평가손익 한 줄
+    private var summaryLine: some View {
         let v = wallet.valuation(store.exchange, prices: store.tickers)
         let pnl = v.coinPnL + v.futuresPnL
         let invested = v.coinCost + v.positionMargin
         let rate = invested > 0 ? pnl / invested : 0
-        return HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                summaryRow("주문가능", Fmt.krw(v.krw))
-                summaryRow("총 평가", Fmt.krw(v.coinValue + v.krw + v.futuresKRW + v.positionValue))
+        let total = v.coinValue + v.krw + v.futuresKRW + v.positionValue
+        return HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("내 \(store.exchange.name) 자산").font(.caption).foregroundStyle(.secondary)
+                Text(Fmt.krw(total)).font(.title2.weight(.bold)).monospacedDigit()
+                    .contentTransition(.numericText(value: total))
+                    .animation(.snappy, value: total)
             }
-            .frame(maxWidth: .infinity)
-            Divider().frame(height: 34)
-            VStack(alignment: .leading, spacing: 4) {
-                summaryRow("평가손익", "\(Fmt.signedKRW(pnl))원", Theme.color(for: pnl))
-                summaryRow("수익률", Fmt.rate(rate), Theme.color(for: pnl))
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("평가손익").font(.caption).foregroundStyle(.secondary)
+                Text("\(Fmt.signedKRW(pnl))원 (\(Fmt.rate(rate)))")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.color(for: pnl))
+                    .monospacedDigit()
             }
-            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(.systemBackground))
-        .overlay(alignment: .bottom) { Rectangle().fill(Theme.background).frame(height: 8) }
-        .padding(.bottom, 8)
     }
 
-    private func summaryRow(_ title: String, _ value: String, _ color: Color = .primary) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.secondary)
-            Spacer(minLength: 6)
-            Text(value).fontWeight(.semibold).foregroundStyle(color).monospacedDigit()
-                .lineLimit(1).minimumScaleFactor(0.7)
-        }
-        .font(.caption)
-        .padding(.horizontal, 8)
-    }
-
-    // MARK: - 탭 · 표 머리
-
-    private var tabBar: some View {
-        HStack(spacing: 0) {
-            ForEach(ListTab.allCases) { t in
-                Button {
-                    withAnimation(.snappy) { tab = t }
-                } label: {
-                    VStack(spacing: 8) {
-                        Text(t.rawValue)
-                            .font(.subheadline.weight(tab == t ? .bold : .medium))
-                            .foregroundStyle(tab == t ? .primary : .secondary)
-                        Rectangle().fill(tab == t ? Color.primary : .clear).frame(height: 2)
+    /// 실시간 급상승 TOP 5 (가로 스크롤 카드)
+    private var moversStrip: some View {
+        let movers = store.markets
+            .compactMap { m in store.tickers[m.market].map { (m, $0) } }
+            .filter { $0.1.accTradePrice24h > 1_000_000_000 }   // 거래대금 10억 이상만
+            .sorted { $0.1.signedChangeRate > $1.1.signedChangeRate }
+            .prefix(5)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("지금 많이 오른 코인").font(.headline).padding(.horizontal, 20)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(movers), id: \.0.id) { m, t in
+                        NavigationLink(value: m) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                CoinIcon(symbol: m.symbol, size: 30)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(m.koreanName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                                    Text("₩\(Fmt.price(t.tradePrice))").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                                }
+                                Text(Fmt.rate(t.signedChangeRate))
+                                    .font(.title3.weight(.bold))
+                                    .foregroundStyle(Theme.color(for: t.signedChangeRate))
+                                    .monospacedDigit()
+                            }
+                            .frame(width: 128, alignment: .leading)
+                            .padding(14)
+                            .background(Theme.tossBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(PressScaleStyle())
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 10)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
             }
         }
     }
 
-    private var columnHeader: some View {
-        HStack(spacing: 4) {
-            headerButton("코인명", .name).frame(maxWidth: .infinity, alignment: .leading)
-            headerButton("현재가", .price).frame(width: 92, alignment: .trailing)
-            headerButton("전일대비", .rate).frame(width: 70, alignment: .trailing)
-            headerButton("거래대금", .volume).frame(width: 78, alignment: .trailing)
+    /// 목록 위 고정 머리: 마켓 탭 + 정렬
+    private var listHeader: some View {
+        VStack(spacing: 10) {
+            BWSegmented(options: ListTab.allCases.map { ($0, $0.rawValue) }, selection: $tab, compact: true, outlined: false)
+            HStack(spacing: 6) {
+                sortChip("거래대금", .volume)
+                sortChip("등락률", .rate)
+                sortChip("현재가", .price)
+                sortChip("이름", .name)
+                Spacer()
+                Text("\(visible.count)개").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Theme.background)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(Color(.systemBackground))
     }
 
-    private func headerButton(_ title: String, _ c: Column) -> some View {
+    private func sortChip(_ title: String, _ c: Column) -> some View {
         Button {
-            if column == c { ascending.toggle() } else { column = c; ascending = c == .name }
-        } label: {
-            HStack(spacing: 2) {
-                Text(title)
-                Image(systemName: column == c ? (ascending ? "chevron.up" : "chevron.down") : "arrow.up.arrow.down")
-                    .font(.system(size: 7))
+            withAnimation(.snappy) {
+                if column == c { ascending.toggle() } else { column = c; ascending = c == .name }
             }
-            .font(.caption2.weight(column == c ? .bold : .regular))
+        } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                if column == c {
+                    Image(systemName: ascending ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold))
+                }
+            }
+            .font(.caption.weight(column == c ? .bold : .medium))
             .foregroundStyle(column == c ? .primary : .secondary)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Capsule().fill(column == c ? Theme.tossBackground : .clear))
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - 시세 표
-
-    private var table: some View {
-        ScrollView {
-            if visible.isEmpty {
-                Text(tab == .holdings ? "보유한 코인이 없어요." : tab == .favorites ? "관심 코인이 없어요. 코인 화면에서 ☆를 눌러 추가해요." : "검색 결과가 없어요.")
-                    .font(.subheadline).foregroundStyle(.secondary).padding(.top, 60)
-            }
-            LazyVStack(spacing: 0) {
-                ForEach(visible) { m in
-                    NavigationLink(value: m) {
-                        MarketTableRow(market: m, ticker: store.tickers[m.market])
-                    }
-                    .buttonStyle(.plain)
-                    Divider().padding(.leading, 12)
-                }
-            }
-        }
     }
 
     private func reorder() {
@@ -217,45 +237,38 @@ struct ExchangeView: View {
     }
 }
 
-/// 시세 표 한 줄: 코인명 | 현재가 | 전일대비 | 거래대금
+/// 시세 목록 한 줄 (토스식): 아이콘 · 이름/심볼·거래대금 · 현재가/등락률
 struct MarketTableRow: View {
     let market: Market
     let ticker: Ticker?
 
     var body: some View {
-        HStack(spacing: 4) {
-            HStack(spacing: 8) {
-                CoinIcon(symbol: market.symbol, size: 26)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(market.koreanName).font(.subheadline.weight(.semibold)).lineLimit(1)
-                    Text("\(market.symbol)/KRW").font(.caption2).foregroundStyle(.secondary)
-                }
+        HStack(spacing: 12) {
+            CoinIcon(symbol: market.symbol, size: 38)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(market.koreanName).font(.body.weight(.semibold)).lineLimit(1)
+                Text(ticker.map { "\(market.symbol) · \(Fmt.compactKRW($0.accTradePrice24h))" } ?? market.symbol)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
+            Spacer(minLength: 8)
             if let t = ticker {
-                let color = Theme.color(for: t.signedChangeRate)
-                FlashingPrice(price: t.tradePrice, font: .subheadline, color: color)
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    .frame(width: 92, alignment: .trailing)
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(Fmt.rate(t.signedChangeRate)).font(.footnote.weight(.semibold))
-                    Text(Fmt.signedPrice(t.signedChangePrice)).font(.caption2)
+                VStack(alignment: .trailing, spacing: 3) {
+                    FlashingPrice(price: t.tradePrice, font: .body, color: .primary)
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                    Text(Fmt.rate(t.signedChangeRate))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.color(for: t.signedChangeRate))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(value: t.signedChangeRate))
+                        .animation(.snappy, value: t.signedChangeRate)
                 }
-                .foregroundStyle(color)
-                .monospacedDigit()
-                .lineLimit(1).minimumScaleFactor(0.6)
-                .frame(width: 70, alignment: .trailing)
-                Text(Fmt.millions(t.accTradePrice24h))
-                    .font(.footnote).monospacedDigit()
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    .frame(width: 78, alignment: .trailing)
             } else {
-                Text("-").foregroundStyle(.secondary).frame(width: 240, alignment: .trailing)
+                Text("-").foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 11)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }

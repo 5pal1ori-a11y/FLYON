@@ -506,6 +506,7 @@ final class Wallet {
         fresh.daily = state.daily
         fresh.xp = state.xp
         fresh.rewardedLevel = state.rewardedLevel
+        fresh.season = state.season
         state = fresh
         save()
     }
@@ -691,6 +692,7 @@ final class Wallet {
             guard amount > 0 else { return }
             state.daily.tradeXP += amount
         }
+        gainAP(rule, day: day)
         let before = level
         state.xp += amount
         let after = level
@@ -706,6 +708,37 @@ final class Wallet {
             pendingLevelUp = after
         }
         save()
+    }
+
+    // MARK: - 시즌 AP
+
+    /// 이번 시즌 (시즌이 바뀌었으면 지난 시즌을 기록하고 AP를 0으로)
+    var season: Season { Season.current() }
+    var seasonAP: Int { state.season.id == season.id ? state.season.ap : 0 }
+
+    func rollSeasonIfNeeded() {
+        let current = Season.current().id
+        guard state.season.id != current else { return }
+        if !state.season.id.isEmpty, state.season.ap > 0 {
+            state.season.history.insert(SeasonRecord(id: state.season.id, ap: state.season.ap), at: 0)
+        }
+        state.season.id = current
+        state.season.ap = 0
+        state.season.apToday = 0
+        state.season.apDay = ""
+    }
+
+    /// AP 적립 (하루 상한). 경험치와 같은 활동에서 함께 쌓인다.
+    private func gainAP(_ rule: XPRule, day: String) {
+        rollSeasonIfNeeded()
+        if state.season.apDay != day {
+            state.season.apDay = day
+            state.season.apToday = 0
+        }
+        let amount = min(rule.ap, XPRule.dailyAPCap - state.season.apToday)
+        guard amount > 0 else { return }
+        state.season.apToday += amount
+        state.season.ap += amount
     }
 
     // MARK: - 과거 차트 맞히기

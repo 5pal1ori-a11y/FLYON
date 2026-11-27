@@ -219,11 +219,13 @@ struct WalletState: Codable {
     /// 경험치와 보상을 받은 최고 등급
     var xp = 0
     var rewardedLevel = 0
+    /// 이번 시즌 AP와 지난 시즌 기록
+    var season = SeasonState()
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case tradex, accounts, tradexHistory, grantedTradex, predictions, daily, xp, rewardedLevel
+        case tradex, accounts, tradexHistory, grantedTradex, predictions, daily, xp, rewardedLevel, season
         case krw, holdings, trades   // 예전 버전(거래소 구분 없음) 필드
     }
 
@@ -239,6 +241,7 @@ struct WalletState: Codable {
         daily = try c.decodeIfPresent(DailyState.self, forKey: .daily) ?? DailyState()
         xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? 0
         rewardedLevel = try c.decodeIfPresent(Int.self, forKey: .rewardedLevel) ?? 0
+        season = try c.decodeIfPresent(SeasonState.self, forKey: .season) ?? SeasonState()
         if accounts.isEmpty {
             var legacy = ExchangeAccount()
             legacy.krw = try c.decodeIfPresent(Double.self, forKey: .krw) ?? 0
@@ -258,6 +261,7 @@ struct WalletState: Codable {
         try c.encode(daily, forKey: .daily)
         try c.encode(xp, forKey: .xp)
         try c.encode(rewardedLevel, forKey: .rewardedLevel)
+        try c.encode(season, forKey: .season)
     }
 }
 

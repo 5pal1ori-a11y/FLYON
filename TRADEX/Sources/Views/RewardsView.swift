@@ -18,7 +18,8 @@ struct RewardsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    LevelSummaryView().tossCard().appear(0)
+                    SeasonSummaryView().tossCard().appear(0)
+                    LevelSummaryView().tossCard().appear(0.02)
                     summarySection.tossCard().appear(0.03)
                     attendanceSection.tossCard().appear(0.05)
                     gamesSection.tossCard(padding: 20).appear(0.1)

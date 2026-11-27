@@ -83,3 +83,77 @@ enum ChartGameRules {
     static let visible = 40     // 보여 주는 1시간 봉 수
     static let hidden = 10      // 맞혀야 하는 구간
 }
+
+// MARK: - 시즌 (한 분기 = 한 시즌) · AP
+
+/// 시즌: 1~3월(1시즌), 4~6월(2시즌), 7~9월(3시즌), 10~12월(4시즌). 한국시간 기준.
+/// 시즌 동안 활동하면 AP(Activity Point)가 쌓이고, 시즌이 바뀌면 AP는 0부터 다시 시작한다.
+struct Season: Equatable {
+    let year: Int
+    let quarter: Int
+
+    var id: String { "\(year)-Q\(quarter)" }
+    var name: String { "\(year) 시즌 \(quarter)" }
+    var monthsText: String { "\(quarter * 3 - 2)~\(quarter * 3)월" }
+
+    static func current(at date: Date = .now) -> Season {
+        let cal = PredictionRound.calendar
+        let c = cal.dateComponents([.year, .month], from: date)
+        return Season(year: c.year ?? 2026, quarter: ((c.month ?? 1) - 1) / 3 + 1)
+    }
+
+    /// 시즌 종료 시각 (다음 분기 1일 0시, 한국시간)
+    var end: Date {
+        let cal = PredictionRound.calendar
+        var c = DateComponents(year: year, month: quarter * 3 + 1, day: 1)
+        if quarter == 4 { c.year = year + 1; c.month = 1 }
+        return cal.date(from: c) ?? .distantFuture
+    }
+
+    func daysLeft(from date: Date = .now) -> Int {
+        max(0, Int(ceil(end.timeIntervalSince(date) / 86_400)))
+    }
+}
+
+extension XPRule {
+    /// 시즌 AP (랭킹용). 하루 상한이 있다.
+    var ap: Int {
+        switch self {
+        case .attendance: return 10
+        case .quiz: return 5
+        case .mission: return 10
+        case .predict: return 5
+        case .predictWin: return 20
+        case .chartGame: return 2
+        case .chartGameWin: return 5
+        case .trade: return 2
+        case .order: return 3
+        case .futures: return 3
+        }
+    }
+    static let dailyAPCap = 150
+}
+
+/// 지난 시즌 기록
+struct SeasonRecord: Codable, Identifiable, Equatable {
+    let id: String      // "2026-Q4"
+    let ap: Int
+}
+
+struct SeasonState: Codable, Equatable {
+    var id: String = ""
+    var ap: Int = 0
+    var apDay: String = ""
+    var apToday: Int = 0
+    var history: [SeasonRecord] = []
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+        ap = try c.decodeIfPresent(Int.self, forKey: .ap) ?? 0
+        apDay = try c.decodeIfPresent(String.self, forKey: .apDay) ?? ""
+        apToday = try c.decodeIfPresent(Int.self, forKey: .apToday) ?? 0
+        history = try c.decodeIfPresent([SeasonRecord].self, forKey: .history) ?? []
+    }
+}
