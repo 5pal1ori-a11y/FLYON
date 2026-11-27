@@ -1,0 +1,8 @@
+.godot/
+build/
+*.ipa
+*.p12
+*.p8
+*.mobileprovision
+export_credentials.cfg
+.DS_Store

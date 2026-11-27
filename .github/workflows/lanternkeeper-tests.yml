@@ -1,0 +1,49 @@
+name: 등불지기 테스트
+
+# 게임 규칙 엔진 테스트 (그림자·적 AI·방 생성 400개·봇 플레이·퍼즐 100개 정답 검증). Linux에서 돌아 무료·빠름.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main, "claude/lanternkeeper-game"]
+    paths:
+      - "Lanternkeeper/**"
+      - ".github/workflows/lanternkeeper-tests.yml"
+  pull_request:
+    paths:
+      - "Lanternkeeper/**"
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: 4.5.1
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-linux-${{ env.GODOT_VERSION }}
+
+      - name: Download Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
+          chmod +x ~/godot/godot
+
+      - name: Import project
+        run: ~/godot/godot --headless --path Lanternkeeper --import || true
+
+      - name: Run tests
+        run: ~/godot/godot --headless --path Lanternkeeper -s tests/run_tests.gd
