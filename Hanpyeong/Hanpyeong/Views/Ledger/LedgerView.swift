@@ -70,7 +70,7 @@ struct LedgerView: View {
             HStack {
                 Text("은행").sectionLabel()
                 Spacer()
-                Text("일 이자 \(String(format: "%.2f", Economy.loanDailyRate * 100))%")
+                Text("일 이자 \(String(format: "%.2f", game.loanRate * 100))%")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Palette.inkSoft)
             }
@@ -130,7 +130,7 @@ struct TodayReceipt: View {
         let building = game.dailyBuildingIncome
         let interest = game.dailyInterest
         let revenue = game.today.revenue
-        let expected = revenue + building - rent - wages - interest
+        let expected = revenue + building - rent - wages - interest - game.dailySalaries
 
         VStack(spacing: 10) {
             VStack(spacing: 2) {
@@ -148,6 +148,7 @@ struct TodayReceipt: View {
             line("건물 월세", building)
             line("임대료", -rent)
             line("인건비", -wages)
+            if game.dailySalaries > 0 { line("인재 급여", -game.dailySalaries) }
             line("대출 이자", -interest)
 
             DashedLine()
@@ -195,7 +196,7 @@ struct LoanSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("순자산의 \(Int(Economy.loanLimitRatio * 100))%까지 빌릴 수 있어요. 이자는 매일 마감 때 나갑니다. 빚으로 산 가게가 이자보다 많이 벌면 이득, 아니면 독이에요.")
+                Text("순자산의 \(Int(game.loanLimitRatio * 100))%까지 빌릴 수 있어요. 이자는 매일 마감 때 나갑니다. 빚으로 산 가게가 이자보다 많이 벌면 이득, 아니면 독이에요.")
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.inkSoft)
 

@@ -19,32 +19,32 @@ enum NewsDesk {
         case 0:
             let days = Int.random(in: 2...4)
             return lasting(.traffic(d, 1.4), days: days, day: day,
-                           headline: "\(name) 축제 시즌 개막",
+                           headline: ["\(name) 축제 시즌 개막", "\(name)에 버스킹 거리 공연", "\(name) 야시장 개장"].randomElement()!,
                            detail: "\(days)일간 \(name) 손님 +40%", tone: .good)
         case 1:
             let days = Int.random(in: 2...3)
             return lasting(.traffic(d, 0.7), days: days, day: day,
-                           headline: "\(name) 도로 공사로 통행 막혀",
+                           headline: ["\(name) 도로 공사로 통행 막혀", "\(name) 상수도 공사 시작", "\(name) 주차 단속 강화"].randomElement()!,
                            detail: "\(days)일간 \(name) 손님 -30%", tone: .bad)
         case 2:
             let days = Int.random(in: 2...3)
             return lasting(.business(k, 1.5), days: days, day: day,
-                           headline: "SNS에서 '\(kind)' 열풍",
+                           headline: ["SNS에서 '\(kind)' 열풍", "'\(kind)' 먹방 영상 조회수 1,000만", "연예인 단골 \(kind) 화제", "MZ세대 사이 '\(kind)' 붐"].randomElement()!,
                            detail: "\(days)일간 \(kind) 매출 +50%", tone: .good)
         case 3:
             let days = Int.random(in: 2...3)
             return lasting(.business(k, 0.75), days: days, day: day,
-                           headline: "\(kind) 업계 원가 급등",
+                           headline: ["\(kind) 업계 원가 급등", "\(kind) 관련 위생 논란 확산", "\(kind) 과포화, 출혈 경쟁"].randomElement()!,
                            detail: "\(days)일간 \(kind) 매출 -25%", tone: .bad)
         case 4:
             let days = Int.random(in: 3...5)
             return lasting(.economy(0.85), days: days, day: day,
-                           headline: "소비 심리 위축, 지갑 닫혔다",
+                           headline: ["소비 심리 위축, 지갑 닫혔다", "금리 인상 여파, 외식 줄어", "물가 급등에 소비 한파"].randomElement()!,
                            detail: "\(days)일간 전 점포 매출 -15%", tone: .bad)
         case 5:
             let days = Int.random(in: 2...4)
             return lasting(.economy(1.2), days: days, day: day,
-                           headline: "황금연휴 소비 폭발",
+                           headline: ["황금연휴 소비 폭발", "명절 대목, 지갑이 열렸다", "보너스 시즌, 소비 심리 회복"].randomElement()!,
                            detail: "\(days)일간 전 점포 매출 +20%", tone: .good)
         case 6:
             let pct = Double.random(in: 0.12...0.25)

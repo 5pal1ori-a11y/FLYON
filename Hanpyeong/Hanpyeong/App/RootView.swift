@@ -43,12 +43,18 @@ struct RootView: View {
 }
 
 struct MainTabs: View {
+    @Environment(Game.self) private var game
+
     var body: some View {
         TabView {
             ShopView()
                 .tabItem { Label("가게", systemImage: "storefront") }
+                .badge(game.pendingDecision == nil ? 0 : 1)
             MarketView()
                 .tabItem { Label("매물", systemImage: "tag") }
+            GoalsView()
+                .tabItem { Label("할 일", systemImage: "checklist") }
+                .badge(game.claimableCount)
             LedgerView()
                 .tabItem { Label("장부", systemImage: "book.closed") }
             CompanyView()

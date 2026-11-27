@@ -11,6 +11,8 @@ struct CompanyView: View {
                 VStack(spacing: 16) {
                     identity
                     worthCard
+                    talentsLink
+                    LeaderboardCard()
                     ladder
                     statsCard
                     settings
@@ -47,6 +49,13 @@ struct CompanyView: View {
                 Text(game.rank.line)
                     .font(.myeongjo(13, bold: false))
                     .foregroundStyle(Palette.inkSoft)
+                HStack(spacing: 6) {
+                    Image(systemName: "heart.fill").foregroundStyle(Palette.sign)
+                    Text("평판 \(Int(game.reputation)) · \(game.reputationTitle)")
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+                .padding(.top, 2)
             }
             Spacer(minLength: 0)
             Stamp(text: stampText, size: 84)
@@ -55,6 +64,44 @@ struct CompanyView: View {
     }
 
     private var stampText: String { game.rank.stamp }
+
+    // MARK: 인재
+
+    private var talentsLink: some View {
+        NavigationLink {
+            TalentsView()
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.ink)
+                    Image(systemName: "person.crop.rectangle.stack.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("인재 영입")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Palette.ink)
+                    Text(game.hiredTalents.isEmpty
+                         ? "장인, 세무사, 중개사… 사람이 가게를 키운다"
+                         : game.hiredTalents.map(\.name).joined(separator: " · "))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.inkSoft)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Text("\(game.talents.count)/\(Talent.all.count)")
+                    .font(.num(13, .bold))
+                    .foregroundStyle(Palette.inkSoft)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Palette.inkFaint)
+            }
+            .paperCard(padding: 14)
+        }
+        .buttonStyle(PressStyle())
+    }
 
     // MARK: 순자산
 
@@ -199,6 +246,15 @@ struct CompanyView: View {
                 StatCell(label: "누적 매출", value: Won.short(s.totalRevenue))
                 StatCell(label: "매매", value: "\(s.trades)건")
                 StatCell(label: "매각 차익", value: Won.signed(s.tradeProfit), tint: trendColor(s.tradeProfit))
+            }
+            HStack {
+                StatCell(label: "시설 투자", value: "\(s.improvementsBought)건")
+                StatCell(label: "결정", value: "\(s.decisionsMade)번")
+                StatCell(label: "할 일 완료", value: "\(s.missionsDone)개")
+            }
+            HStack {
+                StatCell(label: "운영해 본 업종", value: "\(s.kindsOwned.count)/\(BusinessKind.allCases.count)")
+                StatCell(label: "최고 하루 순이익", value: Won.short(s.bestDailyNet))
             }
             StatCell(label: "최고 순자산", value: Won.full(s.peakNetWorth))
         }

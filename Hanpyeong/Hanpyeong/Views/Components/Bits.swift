@@ -22,9 +22,13 @@ struct CashHeader: View {
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(game.day)일차 · \(game.dayPhase)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Palette.inkSoft)
+                    HStack(spacing: 4) {
+                        Image(systemName: game.weather.symbol)
+                            .symbolRenderingMode(.multicolor)
+                        Text("\(game.dateText) · \(game.dayPhase)")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Palette.inkSoft)
                     Text("\(Won.signed(game.incomePerSec))/초")
                         .font(.num(15, .bold))
                         .foregroundStyle(Palette.up)

@@ -191,13 +191,13 @@ struct BuildingsList: View {
             get: { selling != nil }, set: { if !$0 { selling = nil } }
         ), titleVisibility: .visible) {
             if let b = selling {
-                Button("\(Won.full(game.buildingPrice(b) * (1 - Economy.tradeFee)))에 매도", role: .destructive) {
+                Button("\(Won.full(game.buildingPrice(b) * (1 - game.tradeFee)))에 매도", role: .destructive) {
                     game.sellBuilding(b)
                 }
             }
             Button("취소", role: .cancel) { selling = nil }
         } message: {
-            Text("수수료·세금 \(Int(Economy.tradeFee * 100))%를 뗀 금액이 들어옵니다.")
+            Text("수수료·세금 \(Int(game.tradeFee * 100))%를 뗀 금액이 들어옵니다.")
         }
     }
 
@@ -236,7 +236,7 @@ struct BuildingsList: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.inkSoft)
                 if let o = owned {
-                    let pnl = price * (1 - Economy.tradeFee) - o.purchasePrice
+                    let pnl = price * (1 - game.tradeFee) - o.purchasePrice
                     Text("매입가 \(Won.short(o.purchasePrice)) · 평가손익 \(Won.signed(pnl))")
                         .font(.num(11, .semibold))
                         .foregroundStyle(trendColor(pnl))

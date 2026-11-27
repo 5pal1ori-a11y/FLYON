@@ -4,6 +4,7 @@ struct ShopView: View {
     @Environment(Game.self) private var game
     @State private var showOpen = false
     @State private var showNews = false
+    @State private var showDecision = false
 
     var body: some View {
         @Bindable var game = game
@@ -11,8 +12,11 @@ struct ShopView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    DecisionBanner { showDecision = true }
+                    ConditionsStrip()
                     NewsStrip { showNews = true }
                     CounterCard()
+                    MissionPeek()
 
                     HStack(alignment: .lastTextBaseline) {
                         Text("내 점포 \(game.stores.count)곳").sectionLabel()
@@ -55,6 +59,8 @@ struct ShopView: View {
             }
             .sheet(isPresented: $showOpen) { OpenStoreSheet() }
             .sheet(isPresented: $showNews) { NewsSheet() }
+            .sheet(isPresented: $showDecision) { DecisionSheet() }
+            .animation(.snappy, value: game.pendingDecision?.id)
         }
     }
 }
@@ -347,5 +353,66 @@ struct NewsSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - 오늘의 장사 환경
+
+struct ConditionsStrip: View {
+    @Environment(Game.self) private var game
+
+    var body: some View {
+        HStack(spacing: 0) {
+            cell(symbol: game.season.symbol, title: game.season.title, sub: GameCalendar.text(game.day))
+            Divider().frame(height: 28).overlay(Palette.line)
+            cell(symbol: game.weather.symbol, title: game.weather.title, sub: game.weather.forecast)
+            Divider().frame(height: 28).overlay(Palette.line)
+            cell(symbol: "heart.fill", title: "평판 \(Int(game.reputation))",
+                 sub: "\(game.reputationTitle) · 손님 \(Won.percent(game.reputationFactor - 1))")
+        }
+        .padding(.vertical, 10)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.line))
+    }
+
+    private func cell(symbol: String, title: String, sub: String) -> some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: symbol).symbolRenderingMode(.multicolor)
+                Text(title)
+            }
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(Palette.ink)
+            Text(sub)
+                .font(.system(size: 10))
+                .foregroundStyle(Palette.inkSoft)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
+    }
+}
+
+// MARK: - 오늘의 할 일 미리보기
+
+struct MissionPeek: View {
+    @Environment(Game.self) private var game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("오늘의 할 일").sectionLabel()
+                Spacer()
+                Text("할 일 탭에서 보상 받기")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.inkFaint)
+            }
+            ForEach(game.missions) { m in
+                MissionRow(mission: m, compact: true)
+            }
+        }
+        .paperCard(padding: 14)
     }
 }

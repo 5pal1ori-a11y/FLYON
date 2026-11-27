@@ -9,9 +9,32 @@ struct Store: Identifiable, Codable, Hashable {
     var staff: Int = 0
     var invested: Double = 0
     var openedDay: Int = 1
+    var improvements: [String] = []
 
     var displayName: String {
         kind == .holdings ? name : "\(name) \(district.info.short)점"
+    }
+
+    func has(_ improvement: String) -> Bool { improvements.contains(improvement) }
+}
+
+extension Store {
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, district, name, level, staff, invested, openedDay, improvements
+    }
+
+    // 예전 저장 파일에는 improvements가 없다
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        kind = try c.decode(BusinessKind.self, forKey: .kind)
+        district = try c.decode(DistrictID.self, forKey: .district)
+        name = try c.decode(String.self, forKey: .name)
+        level = try c.decode(Int.self, forKey: .level)
+        staff = try c.decode(Int.self, forKey: .staff)
+        invested = try c.decode(Double.self, forKey: .invested)
+        openedDay = try c.decode(Int.self, forKey: .openedDay)
+        improvements = try c.decodeIfPresent([String].self, forKey: .improvements) ?? []
     }
 }
 
@@ -98,6 +121,50 @@ struct Stats: Codable, Hashable {
     var tradeProfit: Double = 0
     var storesOpened: Int = 0
     var peakNetWorth: Double = 0
+    var sells: Int = 0
+    var decisionsMade: Int = 0
+    var improvementsBought: Int = 0
+    var missionsDone: Int = 0
+    var bestDailyNet: Double = 0
+    var kindsOwned: [String] = []
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case taps, tapEarnings, totalRevenue, trades, tradeProfit, storesOpened, peakNetWorth
+        case sells, decisionsMade, improvementsBought, missionsDone, bestDailyNet, kindsOwned
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        taps = try c.decodeIfPresent(Int.self, forKey: .taps) ?? 0
+        tapEarnings = try c.decodeIfPresent(Double.self, forKey: .tapEarnings) ?? 0
+        totalRevenue = try c.decodeIfPresent(Double.self, forKey: .totalRevenue) ?? 0
+        trades = try c.decodeIfPresent(Int.self, forKey: .trades) ?? 0
+        tradeProfit = try c.decodeIfPresent(Double.self, forKey: .tradeProfit) ?? 0
+        storesOpened = try c.decodeIfPresent(Int.self, forKey: .storesOpened) ?? 0
+        peakNetWorth = try c.decodeIfPresent(Double.self, forKey: .peakNetWorth) ?? 0
+        sells = try c.decodeIfPresent(Int.self, forKey: .sells) ?? 0
+        decisionsMade = try c.decodeIfPresent(Int.self, forKey: .decisionsMade) ?? 0
+        improvementsBought = try c.decodeIfPresent(Int.self, forKey: .improvementsBought) ?? 0
+        missionsDone = try c.decodeIfPresent(Int.self, forKey: .missionsDone) ?? 0
+        bestDailyNet = try c.decodeIfPresent(Double.self, forKey: .bestDailyNet) ?? 0
+        kindsOwned = try c.decodeIfPresent([String].self, forKey: .kindsOwned) ?? []
+    }
+}
+
+struct PendingDecision: Codable, Hashable {
+    var id: String
+    var scale: Double
+    var day: Int
+}
+
+struct DecisionResult: Identifiable, Hashable {
+    let id = UUID()
+    let title: String
+    let text: String
+    let good: Bool
+    let lines: [String]
 }
 
 struct OfflineReport: Identifiable, Hashable {
@@ -136,4 +203,12 @@ struct SaveData: Codable {
     var highestRank: Int
     var lastActive: Date
     var hapticsOn: Bool
+    // v0.2에서 추가 — 예전 저장 파일엔 없으므로 옵셔널
+    var reputation: Double?
+    var weather: Weather?
+    var talents: [String]?
+    var pendingDecision: PendingDecision?
+    var missions: [Mission]?
+    var progress: DailyProgress?
+    var claimedAchievements: [String]?
 }

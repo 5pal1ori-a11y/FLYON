@@ -94,11 +94,17 @@ struct OpenStoreSheet: View {
                 .saturation(unlocked ? 1 : 0)
                 .opacity(unlocked ? 1 : 0.45)
             VStack(alignment: .leading, spacing: 3) {
-                Text(info.title).font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.ink)
+                HStack(spacing: 6) {
+                    Text(info.title).font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.ink)
+                    if info.trait != .normal { Tag(text: info.trait.title, color: k.color) }
+                }
                 if unlocked {
                     Text("개업비 \(Won.full(cost))").font(.num(12, .semibold)).foregroundStyle(Palette.ink)
                     Text("Lv.1 초당 \(Won.short(firstIncome)) · 임대료 \(Won.short(rent))/일")
                         .font(.system(size: 11)).foregroundStyle(Palette.inkSoft)
+                    Text(info.blurb)
+                        .font(.system(size: 11)).foregroundStyle(Palette.inkFaint)
+                        .lineLimit(2)
                 } else {
                     Label("\(Rank.all[info.unlockRank].title) 되면 열림", systemImage: "lock.fill")
                         .font(.system(size: 12)).foregroundStyle(Palette.inkFaint)

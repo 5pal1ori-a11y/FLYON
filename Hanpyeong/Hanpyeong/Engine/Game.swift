@@ -30,6 +30,13 @@ final class Game {
     var stats = Stats()
     var highestRank = 0
     var hapticsOn = true
+    var reputation: Double = 50
+    var weather: Weather = .sunny
+    var talents: [String] = []
+    var pendingDecision: PendingDecision?
+    var missions: [Mission] = []
+    var progress = DailyProgress()
+    var claimedAchievements: [String] = []
 
     // MARK: - 화면용 임시 상태
 
@@ -37,6 +44,7 @@ final class Game {
     var offlineReport: OfflineReport?
     var toast: String?
     var bulk: BulkMode = .one
+    var decisionResult: DecisionResult?
 
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var lastActive = Date()
@@ -67,6 +75,23 @@ final class Game {
 
     var dayFraction: Double { dayClock / Economy.dayLength }
 
+    var season: Season { GameCalendar.season(day) }
+    var dateText: String { GameCalendar.shortText(day) }
+
+    /// 평판 0 → ×0.8, 50 → ×1.0, 100 → ×1.2
+    var reputationFactor: Double { 0.8 + reputation / 250 }
+
+    var reputationTitle: String {
+        switch reputation {
+        case ..<20: return "악명"
+        case ..<40: return "별로"
+        case ..<60: return "보통"
+        case ..<80: return "좋음"
+        case ..<95: return "자랑"
+        default: return "전설"
+        }
+    }
+
     var dayPhase: String {
         switch dayFraction {
         case ..<0.2: return "아침"
@@ -96,22 +121,47 @@ final class Game {
             * district.info.traffic
     }
 
-    /// 뉴스 이벤트로 인한 배율
-    func modifier(kind: BusinessKind, district: DistrictID) -> Double {
+    /// 뉴스·계절·날씨·평판·인재·시간대를 모두 합친 배율
+    func modifier(kind: BusinessKind, district: DistrictID, delivery: Bool = false) -> Double {
+        let steady = kind.info.trait == .steady
+        func adj(_ x: Double) -> Double { steady ? max(1, x) : x }
+
         var m = 1.0
         for e in events {
             switch e.effect {
-            case .traffic(let d, let x): if d == district { m *= x }
-            case .business(let k, let x): if k == kind { m *= x }
-            case .economy(let x): m *= x
+            case .traffic(let d, let x): if d == district { m *= adj(x) }
+            case .business(let k, let x): if k == kind { m *= adj(x) }
+            case .economy(let x): m *= adj(x)
             }
         }
+        m *= adj(kind.seasonFactor(season) * district.seasonFactor(season))
+        var w = kind.weatherFactor(weather)
+        if delivery && w < 1 && (weather == .rain || weather == .snow) { w = 1 }
+        m *= adj(w)
+        m *= reputationFactor
+        m *= talentIncomeFactor(kind)
+        m *= phaseFactor(kind)
         return m
+    }
+
+    /// 야간형은 저녁에 강하고 아침에 약하다
+    func phaseFactor(_ kind: BusinessKind) -> Double {
+        guard kind.info.trait == .night else { return 1 }
+        switch dayFraction {
+        case ..<0.4: return 0.6
+        case ..<0.65: return 1.0
+        default: return 1.7
+        }
+    }
+
+    func improvementFactor(_ s: Store) -> Double {
+        1 + s.improvements.compactMap { Improvement.find($0)?.incomeBoost }.reduce(0, +)
     }
 
     func income(_ s: Store) -> Double {
         baseIncome(kind: s.kind, level: s.level, staff: s.staff, district: s.district)
-            * modifier(kind: s.kind, district: s.district)
+            * improvementFactor(s)
+            * modifier(kind: s.kind, district: s.district, delivery: s.has("delivery"))
     }
 
     var incomePerSec: Double { stores.reduce(0) { $0 + income($1) } }
@@ -119,24 +169,30 @@ final class Game {
     // MARK: - 고정비
 
     func rent(_ s: Store) -> Double {
-        ownsBuilding(in: s.district) ? 0 : s.kind.info.rent * s.district.info.rentMult
+        ownsBuilding(in: s.district) ? 0 : s.kind.info.rent * s.district.info.rentMult * (1 - costCut)
     }
 
-    func wages(_ s: Store) -> Double { Double(s.staff) * s.kind.info.wage }
+    func wages(_ s: Store) -> Double {
+        let kiosk = s.has("kiosk") ? 1 - (Improvement.find("kiosk")?.wageCut ?? 0) : 1
+        return Double(s.staff) * s.kind.info.wage * kiosk * (1 - costCut)
+    }
 
     func dailyNet(_ s: Store) -> Double {
         income(s) * Economy.dayLength - rent(s) - wages(s)
     }
 
-    var dailyInterest: Double { debt * Economy.loanDailyRate }
+    var dailyInterest: Double { debt * loanRate }
 
     var dailyStoreCosts: Double { stores.reduce(0) { $0 + rent($1) + wages($1) } }
 
     var dailyBuildingIncome: Double { buildings.reduce(0) { $0 + buildingRent($1) } }
 
     var projectedDailyNet: Double {
-        incomePerSec * Economy.dayLength + dailyBuildingIncome - dailyStoreCosts - dailyInterest
+        incomePerSec * Economy.dayLength + dailyBuildingIncome - dailyStoreCosts - dailyInterest - dailySalaries
     }
+
+    /// 보상·결정 이벤트 금액의 기준이 되는 하루 매출 규모
+    var dailyScale: Double { max(30_000, incomePerSec * Economy.dayLength) }
 
     // MARK: - 가치 평가
 
@@ -161,7 +217,10 @@ final class Game {
     }
 
     func valuation(_ s: Store) -> Double {
-        fairValue(kind: s.kind, level: s.level, staff: s.staff, district: s.district)
+        let improvements = s.improvements.compactMap { Improvement.find($0)?.cost(for: s.kind) }.reduce(0, +)
+        return fairValue(kind: s.kind, level: s.level, staff: s.staff, district: s.district)
+            * improvementFactor(s)
+            + improvements * 0.5 * index(s.district)
     }
 
     static func spec(_ id: String) -> BuildingSpec? {
@@ -180,7 +239,9 @@ final class Game {
         return buildingPrice(spec)
     }
 
-    func buildingRent(_ b: OwnedBuilding) -> Double { buildingValue(b) * Economy.buildingDailyYield }
+    func buildingRent(_ b: OwnedBuilding) -> Double {
+        buildingValue(b) * Economy.buildingDailyYield * buildingRentFactor
+    }
 
     func owns(_ spec: BuildingSpec) -> Bool { buildings.contains { $0.id == spec.id } }
 
@@ -191,8 +252,8 @@ final class Game {
     // MARK: - 계산대 (탭)
 
     var tapValue: Double {
-        Economy.tapBase * pow(Economy.tapGrowth, Double(tapLevel - 1))
-            + incomePerSec * Economy.tapIncomeShare
+        (Economy.tapBase * pow(Economy.tapGrowth, Double(tapLevel - 1))
+            + incomePerSec * Economy.tapIncomeShare) * tapFactor
     }
 
     var counterUpgradeCost: Double {
@@ -205,6 +266,7 @@ final class Game {
         cash += v
         today.revenue += v
         stats.taps += 1
+        progress.taps += 1
         stats.tapEarnings += v
         stats.totalRevenue += v
         return v
@@ -251,6 +313,7 @@ final class Game {
         cash -= plan.cost
         stores[i].level += plan.count
         stores[i].invested += plan.cost
+        progress.levels += plan.count
         let after = stores[i].level
         if let m = Economy.milestones.last(where: { $0 > before && $0 <= after }) {
             toast = "\(stores[i].displayName) Lv.\(m) 달성 · 매출 2배"
@@ -270,6 +333,7 @@ final class Game {
         cash -= cost
         stores[i].staff += 1
         stores[i].invested += cost
+        progress.hires += 1
     }
 
     func fire(_ id: UUID) {
@@ -298,6 +362,8 @@ final class Game {
         let s = Store(kind: k, district: d, name: makeName(k), invested: cost, openedDay: day)
         stores.append(s)
         stats.storesOpened += 1
+        progress.opens += 1
+        noteKind(k)
         record(.open, "\(s.displayName) 개업", -cost)
         toast = "\(s.displayName) 문을 열었어요"
         return true
@@ -332,9 +398,11 @@ final class Game {
     func sell(_ id: UUID, offer: SaleOffer) -> Bool {
         guard let i = stores.firstIndex(where: { $0.id == id }) else { return false }
         let s = stores[i]
-        let proceeds = offer.price * (1 - Economy.tradeFee)
+        let proceeds = offer.price * (1 - tradeFee)
         cash += proceeds
         stats.trades += 1
+        stats.sells += 1
+        progress.trades += 1
         stats.tradeProfit += proceeds - s.invested
         stores.remove(at: i)
         record(.sell, "\(s.displayName) 매각 · \(offer.buyer)", proceeds)
@@ -358,6 +426,8 @@ final class Game {
         stores.append(s)
         listings.removeAll { $0.id == l.id }
         stats.trades += 1
+        progress.trades += 1
+        noteKind(l.kind)
         record(.buy, "\(s.displayName) 인수", -l.price)
         toast = "\(s.displayName) 인수 완료"
         return true
@@ -372,6 +442,7 @@ final class Game {
         cash -= price
         buildings.append(OwnedBuilding(id: spec.id, district: spec.district, purchasePrice: price, boughtDay: day))
         stats.trades += 1
+        progress.trades += 1
         record(.buy, "\(spec.district.info.short) \(spec.name) 매입", -price)
         toast = "\(spec.name) 등기 완료. 이 지역 내 점포는 임대료 0원"
         return true
@@ -380,8 +451,9 @@ final class Game {
     @discardableResult
     func sellBuilding(_ spec: BuildingSpec) -> Bool {
         guard let i = buildings.firstIndex(where: { $0.id == spec.id }) else { return false }
-        let proceeds = buildingPrice(spec) * (1 - Economy.tradeFee)
+        let proceeds = buildingPrice(spec) * (1 - tradeFee)
         stats.trades += 1
+        progress.trades += 1
         stats.tradeProfit += proceeds - buildings[i].purchasePrice
         buildings.remove(at: i)
         cash += proceeds
@@ -392,7 +464,7 @@ final class Game {
 
     // MARK: - 대출
 
-    var loanAvailable: Double { max(0, max(0, netWorth) * Economy.loanLimitRatio - debt) }
+    var loanAvailable: Double { max(0, max(0, netWorth) * loanLimitRatio - debt) }
 
     func borrow(_ amount: Double) {
         let a = min(amount, loanAvailable)
@@ -452,15 +524,17 @@ final class Game {
         let totalWages = stores.reduce(0) { $0 + self.wages($1) }
         let bIncome = dailyBuildingIncome
         let interest = dailyInterest
-        let fixed = bIncome - totalRent - totalWages - interest
+        let salaries = dailySalaries
+        let fixed = bIncome - totalRent - totalWages - interest - salaries
         cash += fixed
 
         today.rent = totalRent
-        today.wages = totalWages
+        today.wages = totalWages + salaries
         today.interest = interest
         today.buildingIncome = bIncome
         history.append(today)
         if history.count > 30 { history.removeFirst(history.count - 30) }
+        stats.bestDailyNet = max(stats.bestDailyNet, today.net)
         if abs(fixed) >= 1 {
             record(.settle, "\(day)일차 마감 · 임대료·인건비·이자", fixed)
         }
@@ -473,6 +547,7 @@ final class Game {
         events.removeAll { $0.daysLeft <= 0 }
         rollNews()
         refreshListings()
+        startNewDay()
 
         if cash < 0 {
             toast = "잔고가 마이너스예요. 직원이나 대출을 정리해 보세요."
@@ -518,7 +593,7 @@ final class Game {
     func refreshListings() {
         listings.removeAll { $0.expiresDay < day }
         var attempts = 0
-        while listings.count < Economy.listingsPerDay && attempts < 20 {
+        while listings.count < listingsPerDay && attempts < 30 {
             attempts += 1
             if let l = makeListing() { listings.append(l) }
         }
@@ -559,7 +634,7 @@ final class Game {
         return sqrt(-2 * log(u1)) * cos(2 * Double.pi * u2)
     }
 
-    private func record(_ kind: LedgerEntry.Kind, _ title: String, _ amount: Double) {
+    func record(_ kind: LedgerEntry.Kind, _ title: String, _ amount: Double) {
         ledger.insert(LedgerEntry(day: day, kind: kind, title: title, amount: amount), at: 0)
         if ledger.count > 80 { ledger.removeLast(ledger.count - 80) }
     }
@@ -575,7 +650,11 @@ final class Game {
                         invested: BusinessKind.cornerShop.info.openCost, openedDay: 1)]
         news = [NewsItem(day: 1, headline: "\(companyName), 다시 문을 열다",
                          detail: "할머니의 구멍가게가 새 주인을 맞았다", tone: .neutral)]
+        stats.kindsOwned = [BusinessKind.cornerShop.rawValue]
+        reputation = 50
+        weather = .sunny
         refreshListings()
+        generateMissions()
         lastActive = Date()
         save()
     }
@@ -586,6 +665,7 @@ final class Game {
         apply(Game.blank())
         pendingRankUp = nil
         offlineReport = nil
+        decisionResult = nil
         toast = nil
         startLoop()
     }
@@ -607,8 +687,8 @@ final class Game {
         let elapsed = min(now.timeIntervalSince(lastActive), Economy.offlineCap)
         lastActive = now
         guard started, elapsed > 60 else { return }
-        let perSec = incomePerSec + (dailyBuildingIncome - dailyStoreCosts - dailyInterest) / Economy.dayLength
-        let earned = max(0, perSec) * elapsed * Economy.offlineRate
+        let perSec = incomePerSec + (dailyBuildingIncome - dailyStoreCosts - dailyInterest - dailySalaries) / Economy.dayLength
+        let earned = max(0, perSec) * elapsed * offlineRate
         guard earned >= 1 else { return }
         cash += earned
         stats.totalRevenue += earned
@@ -664,7 +744,10 @@ final class Game {
                  dayClock: dayClock, tapLevel: tapLevel, stores: stores, buildings: buildings,
                  markets: markets, listings: listings, events: events, news: news, history: history,
                  today: today, ledger: ledger, stats: stats, highestRank: highestRank,
-                 lastActive: lastActive, hapticsOn: hapticsOn)
+                 lastActive: lastActive, hapticsOn: hapticsOn,
+                 reputation: reputation, weather: weather, talents: talents,
+                 pendingDecision: pendingDecision, missions: missions, progress: progress,
+                 claimedAchievements: claimedAchievements)
     }
 
     private func apply(_ s: SaveData) {
@@ -688,6 +771,15 @@ final class Game {
         highestRank = s.highestRank
         lastActive = s.lastActive
         hapticsOn = s.hapticsOn
+        reputation = s.reputation ?? 50
+        weather = s.weather ?? .sunny
+        talents = s.talents ?? []
+        pendingDecision = s.pendingDecision
+        missions = s.missions ?? []
+        progress = s.progress ?? DailyProgress()
+        claimedAchievements = s.claimedAchievements ?? []
+        if stats.kindsOwned.isEmpty { stats.kindsOwned = Array(Set(stores.map(\.kind.rawValue))) }
+        if started && missions.isEmpty { generateMissions() }
     }
 
     private static func blank() -> SaveData {

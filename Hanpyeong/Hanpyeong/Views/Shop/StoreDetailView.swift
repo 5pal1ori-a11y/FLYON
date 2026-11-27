@@ -40,16 +40,118 @@ struct StoreDetailView: View {
                 Text(s.kind.info.blurb)
                     .font(.myeongjo(14, bold: false))
                     .foregroundStyle(Palette.inkSoft)
+                    .multilineTextAlignment(.center)
 
+                traitCard(s)
                 numbers(s)
                 levelCard(s)
-                staffCard(s)
+                improvementsCard(s)
+                if s.kind.info.maxStaff > 0 {
+                    staffCard(s)
+                }
                 sellCard(s)
             }
             .padding(16)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+    }
+
+    // MARK: 성격 · 환경
+
+    private func traitCard(_ s: Store) -> some View {
+        let k = s.kind
+        let season = k.seasonFactor(game.season) * s.district.seasonFactor(game.season)
+        let weather = k.weatherFactor(game.weather)
+        let phase = game.phaseFactor(k)
+        let talents = game.talentIncomeFactor(k)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Tag(text: k.info.trait.title, color: k.color, filled: true)
+                if s.district.info.tourist { Tag(text: "관광지", color: Palette.gold) }
+                if k.info.maxStaff == 0 { Tag(text: "직원 없음", color: Palette.inkSoft) }
+                Spacer()
+            }
+            Text(k.info.trait.detail)
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.inkSoft)
+            HStack {
+                factorCell("\(game.season.title)", season)
+                factorCell(game.weather.title, weather)
+                factorCell("평판", game.reputationFactor)
+                factorCell("인재", talents)
+                if k.info.trait == .night { factorCell(game.dayPhase, phase) }
+            }
+        }
+        .paperCard(padding: 14)
+    }
+
+    private func factorCell(_ label: String, _ v: Double) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.inkSoft)
+            Text(abs(v - 1) < 0.005 ? "–" : Won.percent(v - 1))
+                .font(.num(12, .bold))
+                .foregroundStyle(trendColor(v - 1))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: 시설 투자
+
+    private func improvementsCard(_ s: Store) -> some View {
+        let list = Improvement.all.filter { $0.applies(to: s.kind) }
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("시설 투자").sectionLabel()
+                Spacer()
+                Text("\(s.improvements.count)/\(list.count) · 매출 \(Won.percent(game.improvementFactor(s) - 1))")
+                    .font(.num(11, .semibold))
+                    .foregroundStyle(Palette.inkSoft)
+            }
+            .padding(.bottom, 8)
+            ForEach(list) { imp in
+                let done = s.has(imp.id)
+                let blocker = game.improvementBlocker(imp, for: s)
+                HStack(spacing: 12) {
+                    Image(systemName: imp.symbol)
+                        .font(.system(size: 16))
+                        .foregroundStyle(done ? s.kind.color : Palette.inkSoft)
+                        .frame(width: 26)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(imp.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                        Text(imp.detail)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Palette.inkSoft)
+                    }
+                    Spacer(minLength: 6)
+                    if done {
+                        Image(systemName: "checkmark.seal.fill").foregroundStyle(s.kind.color)
+                    } else {
+                        Button {
+                            game.buyImprovement(imp, for: s.id)
+                        } label: {
+                            VStack(spacing: 1) {
+                                Text(blocker ?? "투자")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text(Won.short(imp.cost(for: s.kind)))
+                                    .font(.num(11, .semibold))
+                            }
+                            .foregroundStyle(blocker == nil ? .white : Palette.inkFaint)
+                            .frame(width: 76, height: 40)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(blocker == nil ? Palette.sign : Palette.cardDeep))
+                        }
+                        .buttonStyle(PressStyle())
+                        .disabled(blocker != nil)
+                    }
+                }
+                .padding(.vertical, 8)
+                if imp.id != list.last?.id { Divider().overlay(Palette.line) }
+            }
+        }
+        .paperCard()
     }
 
     // MARK: 숫자
@@ -92,8 +194,10 @@ struct StoreDetailView: View {
         let plan = game.upgradePlan(s)
         let affordable = plan.count > 0 && game.cash >= plan.cost
         let gain = plan.count > 0
-            ? game.baseIncome(kind: s.kind, level: s.level + plan.count, staff: s.staff, district: s.district)
-              - game.baseIncome(kind: s.kind, level: s.level, staff: s.staff, district: s.district)
+            ? (game.baseIncome(kind: s.kind, level: s.level + plan.count, staff: s.staff, district: s.district)
+              - game.baseIncome(kind: s.kind, level: s.level, staff: s.staff, district: s.district))
+              * game.improvementFactor(s)
+              * game.modifier(kind: s.kind, district: s.district, delivery: s.has("delivery"))
             : 0
 
         return VStack(alignment: .leading, spacing: 12) {
@@ -219,7 +323,7 @@ struct SellSheet: View {
                         offerRow(o)
                     }
 
-                    Text("중개수수료와 세금 \(Int(Economy.tradeFee * 100))%를 떼고 입금됩니다. 지금 들인 돈은 \(Won.full(store.invested))입니다.")
+                    Text("중개수수료와 세금 \(Int(game.tradeFee * 100))%를 떼고 입금됩니다. 지금 들인 돈은 \(Won.full(store.invested))입니다.")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.inkSoft)
                         .padding(.top, 4)
@@ -247,7 +351,7 @@ struct SellSheet: View {
     }
 
     private func offerRow(_ o: SaleOffer) -> some View {
-        let proceeds = o.price * (1 - Economy.tradeFee)
+        let proceeds = o.price * (1 - game.tradeFee)
         let profit = proceeds - store.invested
         return Button {
             picked = o
