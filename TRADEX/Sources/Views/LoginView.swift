@@ -94,7 +94,7 @@ struct WelcomeBonusView: View {
             Text("\(TradexRules.signupBonus) TRADEX")
                 .font(.system(size: 40, weight: .heavy))
                 .monospacedDigit()
-            Text("자산 탭에서 TRADEX를 업비트·빗썸 지갑에 충전해\n바로 거래를 시작해 보세요.\n1 TRADEX = \(Fmt.krw(TradexRules.krwPerTradex))")
+            Text("자산 탭에서 TRADEX를 업비트 지갑에 충전해\n바로 거래를 시작해 보세요.\n1 TRADEX = \(Fmt.krw(TradexRules.krwPerTradex))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

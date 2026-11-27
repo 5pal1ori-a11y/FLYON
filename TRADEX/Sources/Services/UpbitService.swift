@@ -1,6 +1,6 @@
 import Foundation
 
-/// 거래소 공개 시세(Quotation) API — API 키 불필요. 업비트와 빗썸이 같은 v1 형식을 쓴다.
+/// 업비트 공개 시세(Quotation) API — API 키 불필요.
 /// 출시 전 각 거래소 Open API 이용약관에서 제3자 앱 표시 허용 범위를 반드시 확인할 것.
 /// (미니게임 판정·서버 시간은 항상 업비트 기준)
 enum UpbitAPI {

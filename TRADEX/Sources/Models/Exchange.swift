@@ -4,7 +4,12 @@ import SwiftUI
 /// ⚠️ 출시 전 각 거래소 Open API 이용약관에서 제3자 앱 시세 표시 허용 범위를 확인할 것.
 /// 거래소 로고는 상표이므로 쓰지 않고 이름 글자 배지로 표시한다.
 enum ExchangeID: String, Codable, CaseIterable, Identifiable, Sendable {
-    case upbit, bithumb
+    case upbit
+    /// 더 이상 쓰지 않음. 예전 저장 기록을 읽기 위해서만 남겨 두고, 계좌는 업비트로 합친다.
+    case bithumb
+
+    /// 앱에서 쓰는 거래소 (업비트만)
+    static var allCases: [ExchangeID] { [.upbit] }
 
     var id: String { rawValue }
     var name: String { self == .upbit ? "업비트" : "빗썸" }

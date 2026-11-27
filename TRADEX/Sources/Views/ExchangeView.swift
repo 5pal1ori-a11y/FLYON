@@ -59,7 +59,7 @@ struct ExchangeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    ExchangePicker(selection: Binding(get: { store.exchange }, set: { new in Task { await store.select(new) } }))
+                    TradexLogo(height: 18, showsWordmark: true)
                 }
                 ToolbarItem(placement: .topBarTrailing) { LiveIndicator(isLive: store.isConnected) }
             }

@@ -45,7 +45,7 @@ struct SettingsView: View {
                     if ranking.isJoined {
                         Button("랭킹 참가 해제 (서버 기록 삭제)", role: .destructive) { confirmLeave = true }
                     }
-                    LabeledContent("시세 제공", value: "업비트 · 빗썸 Open API")
+                    LabeledContent("시세 제공", value: "업비트 Open API")
                     LabeledContent("버전", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                 }
 

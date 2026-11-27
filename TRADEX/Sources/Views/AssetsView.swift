@@ -28,7 +28,10 @@ struct AssetsView: View {
             .navigationTitle("자산")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ExchangePicker(selection: Binding(get: { store.exchange }, set: { new in Task { await store.select(new) } }))
+                    HStack(spacing: 6) {
+                        ExchangeBadge(exchange: .upbit, size: 18)
+                        Text("업비트").font(.subheadline.weight(.semibold))
+                    }
                 }
             }
             .navigationDestination(for: Market.self) { CoinDetailView(market: $0) }

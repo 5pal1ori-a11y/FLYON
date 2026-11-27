@@ -44,7 +44,8 @@ final class MarketStore {
 
     init() {
         favorites = Set(UserDefaults.standard.stringArray(forKey: "favorites") ?? ["KRW-BTC", "KRW-ETH", "KRW-XRP"])
-        exchange = ExchangeID(rawValue: UserDefaults.standard.string(forKey: "exchange") ?? "") ?? .upbit
+        exchange = .upbit   // 빗썸은 뺐다 (예전에 빗썸을 골라 둔 경우도 업비트로)
+        UserDefaults.standard.removeObject(forKey: "exchange")
     }
 
     /// 거래소별 시세 (선택된 거래소는 실시간, 아니면 마지막 스냅샷)

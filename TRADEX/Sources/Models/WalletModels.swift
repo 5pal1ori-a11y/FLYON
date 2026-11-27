@@ -192,6 +192,26 @@ struct ExchangeAccount: Codable, Equatable {
 
     init() {}
 
+    /// 다른 계좌를 이 계좌로 합친다 (빗썸 계좌 정리용)
+    mutating func merge(_ other: ExchangeAccount) {
+        krw += other.krw
+        futuresKRW += other.futuresKRW
+        for (code, h) in other.holdings {
+            if var mine = holdings[code] {
+                mine.averagePrice = (mine.averagePrice * mine.quantity + h.averagePrice * h.quantity) / (mine.quantity + h.quantity)
+                mine.quantity += h.quantity
+                holdings[code] = mine
+            } else {
+                holdings[code] = h
+            }
+        }
+        trades = (trades + other.trades).sorted { $0.date > $1.date }
+        futuresHistory = (futuresHistory + other.futuresHistory).sorted { $0.closedAt > $1.closedAt }
+        positions += other.positions
+        orders += other.orders
+        plans += other.plans
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         krw = try c.decodeIfPresent(Double.self, forKey: .krw) ?? 0
@@ -242,6 +262,13 @@ struct WalletState: Codable {
         xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? 0
         rewardedLevel = try c.decodeIfPresent(Int.self, forKey: .rewardedLevel) ?? 0
         season = try c.decodeIfPresent(SeasonState.self, forKey: .season) ?? SeasonState()
+        // 빗썸을 뺀 버전: 빗썸 계좌의 원화·코인·포지션·주문·적립식을 업비트 계좌로 합친다
+        if let bithumb = accounts[ExchangeID.bithumb.rawValue] {
+            var upbit = accounts[ExchangeID.upbit.rawValue] ?? ExchangeAccount()
+            upbit.merge(bithumb)
+            accounts[ExchangeID.upbit.rawValue] = upbit
+            accounts[ExchangeID.bithumb.rawValue] = nil
+        }
         if accounts.isEmpty {
             var legacy = ExchangeAccount()
             legacy.krw = try c.decodeIfPresent(Double.self, forKey: .krw) ?? 0

@@ -115,36 +115,6 @@ struct AllocationBar: View {
     }
 }
 
-/// 업비트 | 빗썸 전환용 캡슐 세그먼트
-struct ExchangeSegment: View {
-    let selection: ExchangeID
-    let onSelect: (ExchangeID) -> Void
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(ExchangeID.allCases) { ex in
-                Button {
-                    onSelect(ex)
-                } label: {
-                    HStack(spacing: 6) {
-                        ExchangeBadge(exchange: ex, size: 18)
-                        Text(ex.name).font(.subheadline.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .foregroundStyle(selection == ex ? .primary : .secondary)
-                    .background(selection == ex ? Theme.card : .clear, in: Capsule())
-                    .shadow(color: .black.opacity(selection == ex ? 0.06 : 0), radius: 4, y: 1)
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selection == ex ? .isSelected : [])
-            }
-        }
-        .padding(4)
-        .background(Color.primary.opacity(0.06), in: Capsule())
-    }
-}
-
 // MARK: - 흑백 버튼 · 세그먼트 · 등장 애니메이션
 
 /// 흑백 버튼: 선택·주요 = 검정 채움 + 흰 글자, 나머지 = 흰 바탕 + 검정 테두리 (다크 모드는 반전)
