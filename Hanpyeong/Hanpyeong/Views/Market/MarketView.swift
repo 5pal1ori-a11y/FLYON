@@ -58,7 +58,7 @@ struct ListingsList: View {
             get: { confirm != nil }, set: { if !$0 { confirm = nil } }
         ), titleVisibility: .visible) {
             if let l = confirm {
-                Button("\(Won.full(l.price))에 인수") { game.buy(l) }
+                Button("권리금 \(Won.short(l.price)) + 보증금 \(Won.short(game.newDeposit(l.kind, l.district)))에 인수") { game.buy(l) }
             }
             Button("취소", role: .cancel) { confirm = nil }
         } message: {
@@ -116,10 +116,19 @@ struct ListingCard: View {
                 StatCell(label: "초당 매출", value: Won.short(income), tint: Palette.up)
             }
 
+            let deposit = game.newDeposit(l.kind, l.district)
+            let monthly = game.baseRent(l.kind, l.district) * Lease.daysPerMonth
+            Text(deposit > 0
+                 ? "보증금 \(Won.short(deposit)) / 월세 \(Won.short(monthly)) / 권리금 \(Won.short(l.price))"
+                 : "내 건물 입점 · 보증금·월세 없음 / 권리금 \(Won.short(l.price))")
+                .font(.mono(11, .semibold))
+                .foregroundStyle(Palette.ink)
+
             DashedLine()
 
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
+                    Text("권리금").font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.inkSoft)
                     Text(Won.full(l.price))
                         .font(.myeongjo(19))
                         .foregroundStyle(Palette.ink)

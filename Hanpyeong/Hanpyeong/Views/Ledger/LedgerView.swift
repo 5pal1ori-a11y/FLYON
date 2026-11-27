@@ -10,6 +10,7 @@ struct LedgerView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     TodayReceipt()
+                    TaxCard()
                     profitChart
                     loanCard
                     entries
@@ -70,7 +71,7 @@ struct LedgerView: View {
             HStack {
                 Text("은행").sectionLabel()
                 Spacer()
-                Text("일 이자 \(String(format: "%.2f", game.loanRate * 100))%")
+                Text("기준금리 \(String(format: "%.2f", game.baseRate))% · 대출 연 \(String(format: "%.2f", game.loanAnnualRate))%")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Palette.inkSoft)
             }
@@ -130,13 +131,14 @@ struct TodayReceipt: View {
         let building = game.dailyBuildingIncome
         let interest = game.dailyInterest
         let revenue = game.today.revenue
+        let gross = max(revenue, game.today.gross ?? revenue)
         let expected = revenue + building - rent - wages - interest - game.dailySalaries
 
         VStack(spacing: 10) {
             VStack(spacing: 2) {
-                Text(game.companyName)
+                Text(game.legalName)
                     .font(.myeongjo(20))
-                Text("\(game.day)일차 영업 중 · \(game.dayPhase)")
+                Text("\(GameCalendar.text(game.day)) · \(game.dayPhase)")
                     .font(.mono(11))
                     .foregroundStyle(Palette.inkSoft)
             }
@@ -144,10 +146,17 @@ struct TodayReceipt: View {
 
             DashedLine()
 
-            line("매출 (지금까지)", revenue)
-            line("건물 월세", building)
+            line("총매출 (지금까지)", gross)
+            line("원가 (재료·상품·소모품)", -(gross - revenue))
+            HStack {
+                Text("매출총이익").font(.mono(12, .bold))
+                Spacer()
+                Text(Won.signed(revenue)).font(.mono(12, .bold))
+            }
+            DashedLine()
+            line("건물 월세 수입", building)
             line("임대료", -rent)
-            line("인건비", -wages)
+            line("인건비 (4대보험 포함)", -wages)
             if game.dailySalaries > 0 { line("인재 급여", -game.dailySalaries) }
             line("대출 이자", -interest)
 
@@ -163,7 +172,7 @@ struct TodayReceipt: View {
                     .contentTransition(.numericText())
             }
 
-            Text("고정비는 마감 때 한꺼번에 빠져나갑니다")
+            Text("고정비는 마감 때 빠지고, 세금은 따로 냅니다")
                 .font(.mono(10))
                 .foregroundStyle(Palette.inkFaint)
                 .padding(.bottom, 14)
@@ -247,5 +256,81 @@ struct LoanSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - 세금
+
+struct TaxCard: View {
+    @Environment(Game.self) private var game
+    @State private var confirmCorp = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("세금").sectionLabel()
+                Spacer()
+                Tag(text: game.isCorporation ? "법인사업자" : "개인사업자",
+                    color: game.isCorporation ? Palette.gold : Palette.inkSoft)
+            }
+
+            if let bill = game.taxBill {
+                HStack(spacing: 10) {
+                    Image(systemName: "envelope.badge.fill")
+                        .foregroundStyle(Palette.sign)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(bill.title) 고지서").font(.system(size: 14, weight: .bold))
+                        Text("과세표준 \(Won.short(bill.taxable)) · \(GameCalendar.shortText(bill.dueDay)) 자동 납부")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Palette.inkSoft)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(Won.short(bill.amount)).font(.num(15, .bold)).foregroundStyle(Palette.sign)
+                        Text("D-\(max(0, bill.dueDay - game.day))").font(.num(11, .semibold)).foregroundStyle(Palette.inkSoft)
+                    }
+                }
+                .padding(12)
+                .background(Palette.sign.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            }
+
+            HStack {
+                StatCell(label: "다음 부가세 (D-\(game.daysToVAT))", value: Won.short(game.projectedVAT))
+                StatCell(label: "올해 과세 소득", value: Won.short(game.incomeTaxBase))
+            }
+            HStack {
+                StatCell(label: game.isCorporation ? "예상 법인세" : "예상 종합소득세", value: Won.short(game.projectedIncomeTax))
+                StatCell(label: "지금 세율 구간", value: "\(String(format: "%.1f", game.marginalRate * 100))%")
+            }
+            StatCell(label: "지금까지 낸 세금", value: Won.full(game.taxesPaid))
+
+            Text("부가세는 1·4·7·10월 25일, \(game.isCorporation ? "법인세는 3월 말" : "종합소득세는 5월 말")에 냅니다. 세율에는 지방소득세 10%가 포함돼 있어요. 1년은 게임 속 120일입니다.")
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.inkFaint)
+
+            if game.canIncorporate {
+                DashedLine()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("법인 전환").font(.system(size: 14, weight: .bold))
+                    Text("개인 종합소득세는 최고 49.5%, 법인세는 최고 26.4%(지방세 포함)예요. 소득이 크면 법인이 유리하고, 작을 땐 개인이 낫습니다. 한 번 바꾸면 되돌릴 수 없어요.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.inkSoft)
+                    Button("주식회사 설립 · \(Won.short(Tax.incorporationCost))") { confirmCorp = true }
+                        .buttonStyle(SignButtonStyle(enabled: game.cash >= Tax.incorporationCost))
+                        .disabled(game.cash < Tax.incorporationCost)
+                }
+            } else if !game.isCorporation {
+                Text("다점포 사장님(직함 4단계)이 되면 법인으로 전환할 수 있어요.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.inkFaint)
+            }
+        }
+        .paperCard()
+        .confirmationDialog("법인으로 전환할까요?", isPresented: $confirmCorp, titleVisibility: .visible) {
+            Button("설립 등기하기") { game.incorporate() }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("올해 소득부터 법인세율이 적용됩니다. 되돌릴 수 없어요.")
+        }
     }
 }

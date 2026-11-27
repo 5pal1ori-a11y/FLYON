@@ -38,7 +38,7 @@ struct CompanyView: View {
     private var identity: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(game.highestRank >= 4 ? "\(game.companyName)그룹" : game.companyName)
+                Text(game.highestRank >= 4 ? "\(game.companyName)그룹" : game.legalName)
                     .font(.myeongjo(28))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)

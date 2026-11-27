@@ -37,7 +37,8 @@ extension Game {
 
     var tradeFee: Double { hasTalent("malsun") ? 0.02 : Economy.tradeFee }
     var listingsPerDay: Int { Economy.listingsPerDay + (hasTalent("malsun") ? 3 : 0) }
-    var loanRate: Double { hasTalent("banker") ? Economy.loanDailyRate / 2 : Economy.loanDailyRate }
+    /// 하루 이자율 = 연 금리 ÷ 게임 1년(120일)
+    var loanRate: Double { loanAnnualRate / 100 / Money.daysPerYear }
     var loanLimitRatio: Double { hasTalent("banker") ? 0.7 : Economy.loanLimitRatio }
 
     var offlineRate: Double {
@@ -90,6 +91,7 @@ extension Game {
         cash -= cost
         stores[i].improvements.append(imp.id)
         stores[i].invested += cost
+        if imp.id == "interior" || imp.id == "premium" { stores[i].wear = 0 }
         adjustReputation(imp.reputation)
         stats.improvementsBought += 1
         progress.improvements += 1
@@ -106,6 +108,7 @@ extension Game {
 
     func startNewDay() {
         weather = Weather.roll(for: season)
+        realismStep()
 
         // 평판은 천천히 50으로 돌아간다. 인플루언서가 있으면 매일 +1
         if reputation > 50 { adjustReputation(-0.4) } else if reputation < 50 { adjustReputation(0.4) }

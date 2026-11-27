@@ -46,8 +46,12 @@ struct StoreDetailView: View {
                 numbers(s)
                 levelCard(s)
                 improvementsCard(s)
+                conditionCard(s)
                 if s.kind.info.maxStaff > 0 {
                     staffCard(s)
+                }
+                if !game.ownsBuilding(in: s.district) {
+                    leaseCard(s)
                 }
                 sellCard(s)
             }
@@ -95,6 +99,76 @@ struct StoreDetailView: View {
                 .foregroundStyle(trendColor(v - 1))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: 시설 상태
+
+    private func conditionCard(_ s: Store) -> some View {
+        let health = 100 - s.wear
+        let cost = game.repairCost(s)
+        let factor = game.wearFactor(s)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("시설 상태").sectionLabel()
+                Spacer()
+                Text(factor < 1 ? "매출 \(Won.percent(factor - 1))" : "정상")
+                    .font(.num(12, .bold))
+                    .foregroundStyle(factor < 1 ? Palette.down : Palette.inkSoft)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Palette.line)
+                    Capsule().fill(health > 60 ? Color(hex: 0x3E8E5B) : health > 30 ? Palette.gold : Palette.sign)
+                        .frame(width: max(4, geo.size.width * health / 100))
+                }
+            }
+            .frame(height: 8)
+            Text(wearText(s.wear))
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.inkSoft)
+            Button {
+                game.repair(s.id)
+            } label: {
+                Text(s.wear < 1 ? "고칠 곳 없음" : "보수 공사 · \(Won.short(cost))")
+            }
+            .buttonStyle(LineButtonStyle())
+            .disabled(s.wear < 1 || game.cash < cost)
+        }
+        .paperCard()
+    }
+
+    private func wearText(_ wear: Double) -> String {
+        switch wear {
+        case ..<20: return "새것처럼 깔끔하다."
+        case ..<40: return "슬슬 손때가 묻었다."
+        case ..<60: return "의자 하나가 삐걱거린다. 손님이 눈치채기 시작했다."
+        case ..<80: return "냉장고 소리가 요란하고 벽지가 들떴다."
+        default: return "간판 불이 반쯤 나갔다. 손님이 발길을 돌린다."
+        }
+    }
+
+    // MARK: 임대차
+
+    private func leaseCard(_ s: Store) -> some View {
+        let left = game.leaseDaysLeft(s)
+        let right = game.renewalRightLeft(s)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("임대차 계약").sectionLabel()
+            HStack {
+                StatCell(label: "보증금", value: Won.short(s.deposit))
+                StatCell(label: "월세", value: Won.short(game.monthlyRent(s)))
+                StatCell(label: "다음 갱신", value: "D-\(left)")
+            }
+            Text(right > 0
+                 ? "갱신요구권 남은 기간 \(right)일. 그 안에는 갱신 때 임대료를 5% 넘게 올릴 수 없어요(상가건물 임대차보호법)."
+                 : "10년 갱신요구권이 끝났어요. 다음 갱신 때 건물주가 임대료를 크게 올릴 수 있습니다.")
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.inkSoft)
+            Text("가게를 팔면 보증금은 돌려받아요. 이 지역 건물을 사면 임대료가 없어지고 보증금도 바로 돌려받습니다.")
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.inkFaint)
+        }
+        .paperCard()
     }
 
     // MARK: 시설 투자
@@ -175,8 +249,12 @@ struct StoreDetailView: View {
                 StatCell(label: "하루 순이익", value: Won.signed(net), tint: trendColor(net))
             }
             HStack {
-                StatCell(label: "임대료/일",
-                         value: rent == 0 ? "내 건물 · 0" : Won.short(rent))
+                StatCell(label: "총매출/초", value: Won.short(game.grossIncome(s)))
+                StatCell(label: "원가율 (\(s.kind.cogsLabel))", value: "\(Int(s.kind.cogsRatio * 100))%")
+            }
+            HStack {
+                StatCell(label: "월세 (10일)",
+                         value: rent == 0 ? "내 건물 · 0" : Won.short(game.monthlyRent(s)))
                 StatCell(label: "인건비/일", value: Won.short(wages))
             }
             HStack {
@@ -246,7 +324,7 @@ struct StoreDetailView: View {
             HStack {
                 Text("직원").sectionLabel()
                 Spacer()
-                Text("1명당 매출 +\(Int(Economy.staffBoost * 100))% · 일당 \(Won.short(info.wage))")
+                Text("1명당 매출 +\(Int(Economy.staffBoost * 100))% · 일당 \(Won.short(info.wage * game.wageIndex))")
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.inkSoft)
             }
@@ -274,6 +352,9 @@ struct StoreDetailView: View {
                 .buttonStyle(SignButtonStyle(enabled: canHire))
                 .disabled(!canHire)
             }
+            Text("일당 \(Won.short(info.wage * game.wageIndex)) = 기본급 + 주휴수당 \(Int(Labor.weeklyHolidayPay * 100))% + 4대보험 사업주 부담 약 \(String(format: "%.1f", Labor.insuranceRate * 100))%. 올해 최저시급 \(Won.full(game.minimumWage)).")
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.inkSoft)
             Text("직원 일당이 늘어난 매출보다 크면 손해예요. 레벨이 낮을 땐 혼자 버티는 게 낫습니다.")
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.inkFaint)
@@ -323,7 +404,7 @@ struct SellSheet: View {
                         offerRow(o)
                     }
 
-                    Text("중개수수료와 세금 \(Int(game.tradeFee * 100))%를 떼고 입금됩니다. 지금 들인 돈은 \(Won.full(store.invested))입니다.")
+                    Text("중개수수료 \(Int(game.tradeFee * 100))%를 떼고 입금되고, 보증금 \(Won.full(store.deposit))은 따로 돌려받아요. 매각 차익은 올해 과세 소득에 더해집니다. 지금까지 들인 돈은 \(Won.full(store.invested))입니다.")
                         .font(.system(size: 12))
                         .foregroundStyle(Palette.inkSoft)
                         .padding(.top, 4)

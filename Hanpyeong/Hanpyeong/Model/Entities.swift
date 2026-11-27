@@ -10,6 +10,14 @@ struct Store: Identifiable, Codable, Hashable {
     var invested: Double = 0
     var openedDay: Int = 1
     var improvements: [String] = []
+    /// 임대차 갱신 때마다 누적되는 임대료 배율
+    var rentFactor: Double = 1
+    /// 현재 임대차 계약을 시작한 날
+    var leaseStart: Int = 1
+    /// 건물주에게 맡긴 보증금 (팔거나 건물을 사면 돌려받음)
+    var deposit: Double = 0
+    /// 시설 노후도 0~100
+    var wear: Double = 0
 
     var displayName: String {
         kind == .holdings ? name : "\(name) \(district.info.short)점"
@@ -21,6 +29,7 @@ struct Store: Identifiable, Codable, Hashable {
 extension Store {
     private enum CodingKeys: String, CodingKey {
         case id, kind, district, name, level, staff, invested, openedDay, improvements
+        case rentFactor, leaseStart, deposit, wear
     }
 
     // 예전 저장 파일에는 improvements가 없다
@@ -35,6 +44,10 @@ extension Store {
         invested = try c.decode(Double.self, forKey: .invested)
         openedDay = try c.decode(Int.self, forKey: .openedDay)
         improvements = try c.decodeIfPresent([String].self, forKey: .improvements) ?? []
+        rentFactor = try c.decodeIfPresent(Double.self, forKey: .rentFactor) ?? 1
+        leaseStart = try c.decodeIfPresent(Int.self, forKey: .leaseStart) ?? openedDay
+        deposit = try c.decodeIfPresent(Double.self, forKey: .deposit) ?? 0
+        wear = try c.decodeIfPresent(Double.self, forKey: .wear) ?? 0
     }
 }
 
@@ -95,6 +108,8 @@ struct NewsItem: Identifiable, Codable, Hashable {
 struct DayReport: Identifiable, Codable, Hashable {
     var day: Int
     var revenue: Double = 0
+    /// 원가 포함 총매출 (예전 저장 파일엔 없음)
+    var gross: Double? = 0
     var buildingIncome: Double = 0
     var rent: Double = 0
     var wages: Double = 0
@@ -211,4 +226,13 @@ struct SaveData: Codable {
     var missions: [Mission]?
     var progress: DailyProgress?
     var claimedAchievements: [String]?
+    // v0.3 — 현실 규칙
+    var isCorporation: Bool?
+    var baseRate: Double?
+    var minimumWage: Double?
+    var wageIndex: Double?
+    var vatBase: Double?
+    var incomeTaxBase: Double?
+    var taxBill: TaxBill?
+    var taxesPaid: Double?
 }

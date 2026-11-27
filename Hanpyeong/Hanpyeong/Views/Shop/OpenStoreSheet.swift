@@ -99,8 +99,10 @@ struct OpenStoreSheet: View {
                     if info.trait != .normal { Tag(text: info.trait.title, color: k.color) }
                 }
                 if unlocked {
-                    Text("개업비 \(Won.full(cost))").font(.num(12, .semibold)).foregroundStyle(Palette.ink)
-                    Text("Lv.1 초당 \(Won.short(firstIncome)) · 임대료 \(Won.short(rent))/일")
+                    let deposit = game.newDeposit(k, district)
+                    Text(deposit > 0 ? "개업비 \(Won.short(cost)) + 보증금 \(Won.short(deposit))" : "개업비 \(Won.short(cost))")
+                        .font(.num(12, .semibold)).foregroundStyle(Palette.ink)
+                    Text("Lv.1 초당 \(Won.short(firstIncome)) · 월세 \(Won.short(rent * Lease.daysPerMonth)) · 원가율 \(Int(k.cogsRatio * 100))%")
                         .font(.system(size: 11)).foregroundStyle(Palette.inkSoft)
                     Text(info.blurb)
                         .font(.system(size: 11)).foregroundStyle(Palette.inkFaint)

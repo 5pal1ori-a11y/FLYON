@@ -117,7 +117,7 @@ struct Talent: Identifiable, Hashable {
                effectText: "자리 비운 동안 수익 50% → 90%", symbol: "briefcase.fill", unlockRank: 5,
                cost: 800_000_000_000, effect: .offline(0.9)),
         Talent(id: "banker", name: "조만석", role: "전직 은행장 고문", quote: "은행 문턱, 제가 낮춰드리죠.",
-               effectText: "대출 이자 절반, 대출 한도 순자산의 70%", symbol: "building.columns.fill", unlockRank: 6,
+               effectText: "대출 가산금리 3%p → 1%p, 대출 한도 순자산의 70%", symbol: "building.columns.fill", unlockRank: 6,
                cost: 15_000_000_000_000, effect: .banker),
         Talent(id: "sera", name: "윤세라", role: "투자은행 출신 CFO", quote: "건물은 잠들지 않는 직원이에요.",
                effectText: "건물 월세 ×2", symbol: "building.2.fill", unlockRank: 6,

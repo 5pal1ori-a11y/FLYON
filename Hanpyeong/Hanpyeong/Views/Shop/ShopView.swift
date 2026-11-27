@@ -14,6 +14,7 @@ struct ShopView: View {
                 VStack(spacing: 14) {
                     DecisionBanner { showDecision = true }
                     ConditionsStrip()
+                    HolidayStrip()
                     NewsStrip { showNews = true }
                     CounterCard()
                     MissionPeek()
@@ -195,7 +196,7 @@ struct StoreRow: View {
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(Palette.ink)
                                 .lineLimit(1)
-                            Text("\(store.kind.info.title) · Lv.\(store.level) · 직원 \(store.staff)명")
+                            Text("\(store.kind.info.title) · Lv.\(store.level) · 직원 \(store.staff)명\(store.wear >= 60 ? " · 수리 필요" : "")")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Palette.inkSoft)
                                 .lineLimit(1)
@@ -414,5 +415,28 @@ struct MissionPeek: View {
             }
         }
         .paperCard(padding: 14)
+    }
+}
+
+// MARK: - 명절·시즌 띠
+
+struct HolidayStrip: View {
+    @Environment(Game.self) private var game
+
+    var body: some View {
+        if let h = game.holidays.first {
+            HStack(spacing: 8) {
+                Image(systemName: "party.popper.fill")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(h.name).font(.system(size: 13, weight: .heavy))
+                    Text(h.note).font(.system(size: 11)).opacity(0.9)
+                }
+                Spacer()
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Palette.sign, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
     }
 }
