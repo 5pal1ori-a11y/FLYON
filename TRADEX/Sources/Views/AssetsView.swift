@@ -71,7 +71,6 @@ struct AssetsView: View {
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Icon3D(name: "briefcase", size: 28)
                 Text("내 보유자산").font(.title3.weight(.bold))
                 Spacer()
                 Text("단위 KRW").font(.caption2).foregroundStyle(.secondary)
@@ -141,7 +140,10 @@ struct AssetsView: View {
                 showChargeMenu = true
             } label: {
                 HStack(spacing: 14) {
-                    Icon3D(name: "moneybag", size: 44, float: true)
+                    Image("Logo").resizable().scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .padding(9)
+                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(wallet.state.tradex) TRADEX").font(.headline).monospacedDigit()
                         Text("\(wallet.state.tradex) TRADEX → \(Fmt.krw(Double(wallet.state.tradex) * TradexRules.krwPerTradex)) 충전 가능")
@@ -327,21 +329,21 @@ struct AssetsView: View {
                 NavigationLink {
                     PortfolioAnalysisView()
                 } label: {
-                    listRow("sparkles", "AI 투자 분석", "Apple Intelligence", icon3D: true)
+                    listRow("sparkles", "AI 투자 분석", "Apple Intelligence")
                 }
                 .buttonStyle(.plain)
                 Divider().padding(.leading, 44)
                 NavigationLink {
                     RecurringPlansView()
                 } label: {
-                    listRow("repeat", "적립식 자동 매수", "\(a.plans.filter { !$0.paused }.count)개 진행 중", icon3D: true)
+                    listRow("repeat", "적립식 자동 매수", "\(a.plans.filter { !$0.paused }.count)개 진행 중")
                 }
                 .buttonStyle(.plain)
                 Divider().padding(.leading, 44)
                 NavigationLink {
                     TradeHistoryView()
                 } label: {
-                    listRow("receipt", "\(store.exchange.name) 거래 내역", "\(a.trades.count + a.futuresHistory.count)건", icon3D: true)
+                    listRow("list.bullet.rectangle", "\(store.exchange.name) 거래 내역", "\(a.trades.count + a.futuresHistory.count)건")
                 }
                 .buttonStyle(.plain)
             }
@@ -349,9 +351,9 @@ struct AssetsView: View {
         }
     }
 
-    private func listRow(_ icon: String, _ title: String, _ detail: String, icon3D: Bool = false) -> some View {
+    private func listRow(_ icon: String, _ title: String, _ detail: String) -> some View {
         HStack(spacing: 14) {
-            if icon3D { Icon3D(name: icon, size: 30) } else { Image(systemName: icon).font(.body).frame(width: 28) }
+            Image(systemName: icon).font(.body).frame(width: 28)
             Text(title).font(.subheadline.weight(.semibold))
             Spacer()
             Text(detail).font(.subheadline).foregroundStyle(.secondary)

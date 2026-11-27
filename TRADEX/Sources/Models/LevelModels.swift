@@ -30,9 +30,6 @@ struct TraderLevel: Identifiable, Equatable {
 
     var next: TraderLevel? { index + 1 < TraderLevel.all.count ? TraderLevel.all[index + 1] : nil }
 
-    /// 3D 아이콘
-    var emoji3D: String { ["seedling", "magnifier", "map", "brain", "crown"][min(index, 4)] }
-
     /// 다음 등급까지 진행률 (0~1)
     func progress(xp: Int) -> Double {
         guard let next else { return 1 }
@@ -179,15 +176,6 @@ enum SeasonTier: Int, Codable, CaseIterable, Comparable {
         case .bronze: return "medal"
         case .silver: return "medal"
         case .gold: return "trophy"
-        case .diamond: return "diamond"
-        }
-    }
-    var emoji3D: String {
-        switch self {
-        case .none: return "star"
-        case .bronze: return "bronze"
-        case .silver: return "silver"
-        case .gold: return "gold"
         case .diamond: return "diamond"
         }
     }

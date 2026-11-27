@@ -66,14 +66,6 @@ struct Mission: Identifiable, Hashable {
     let title: String
     let icon: String
     let goal: Int
-    var icon3D: String {
-        switch id {
-        case "buy": return "cart"
-        case "predict": return "up"
-        case "chart": return "barchart"
-        default: return "grad"
-        }
-    }
     let reward: Double
 
     static let all: [Mission] = [

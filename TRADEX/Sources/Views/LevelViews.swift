@@ -11,7 +11,7 @@ struct LevelSummaryView: View {
             LevelListView()
         } label: {
             HStack(spacing: 14) {
-                LevelBadge(level: level, size: 52, float: true)
+                LevelBadge(level: level, size: 48)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(level.name).font(.title3.weight(.bold))
@@ -32,15 +32,19 @@ struct LevelSummaryView: View {
     }
 }
 
-/// 등급 배지 (3D 아이콘). filled=false면 아직 못 오른 등급 → 흑백
+/// 등급 배지 (검정 외곽선 원 + 아이콘)
 struct LevelBadge: View {
     let level: TraderLevel
     var size: CGFloat = 40
-    var filled = true
-    var float = false
+    var filled = false
 
     var body: some View {
-        Icon3D(name: level.emoji3D, size: size, float: float, dim: !filled)
+        Image(systemName: level.icon)
+            .font(.system(size: size * 0.42, weight: .medium))
+            .foregroundStyle(filled ? Color(.systemBackground) : .primary)
+            .frame(width: size, height: size)
+            .background(Circle().fill(filled ? Color.primary : .clear))
+            .overlay(Circle().strokeBorder(Color.primary, lineWidth: filled ? 0 : 1.2))
             .accessibilityLabel(level.name)
     }
 }
@@ -126,9 +130,9 @@ struct LevelUpOverlay: View {
                             .opacity(rings ? 0 : 1)
                             .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false).delay(Double(i) * 0.25), value: rings)
                     }
-                    LevelBadge(level: level, size: 104, filled: true, float: true)
-                        .flipIn(delay: 0.1)
-                    Icon3D(name: "party", size: 44).offset(x: 62, y: -48).flipIn(delay: 0.45)
+                    LevelBadge(level: level, size: 96, filled: true)
+                        .scaleEffect(pop ? 1 : 0.3)
+                        .rotationEffect(.degrees(pop ? 0 : -30))
                 }
                 .frame(height: 150)
                 Text("등급 상승!").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)

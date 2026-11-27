@@ -75,10 +75,7 @@ struct PortfolioAnalysisView: View {
 
     private var aiCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Icon3D(name: "sparkles", size: 26, float: true)
-                Text("Apple Intelligence 분석").font(.headline)
-            }
+            Label("Apple Intelligence 분석", systemImage: "sparkles").font(.headline)
             switch AIAvailability.current {
             case .available:
                 if output.isEmpty && !running {
