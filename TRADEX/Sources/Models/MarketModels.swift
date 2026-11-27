@@ -146,6 +146,25 @@ struct Orderbook: Decodable {
     enum CodingKeys: String, CodingKey { case market, units = "orderbook_units" }
 }
 
+/// 봉(캔들) 차트용: 시가·고가·저가·종가·거래량
+struct OHLCCandle: Decodable, Identifiable, Equatable {
+    let candleDateTimeUtc: String
+    var open: Double
+    var high: Double
+    var low: Double
+    var close: Double
+    let volume: Double
+    var id: String { candleDateTimeUtc }
+    var date: Date { Candle(candleDateTimeUtc: candleDateTimeUtc, tradePrice: close).date }
+    var isUp: Bool { close >= open }
+
+    enum CodingKeys: String, CodingKey {
+        case candleDateTimeUtc = "candle_date_time_utc"
+        case open = "opening_price", high = "high_price", low = "low_price", close = "trade_price"
+        case volume = "candle_acc_trade_volume"
+    }
+}
+
 /// 차트 기간
 enum ChartRange: String, CaseIterable, Identifiable {
     case hour = "1H", day = "1D", week = "1W", month = "1M", year = "1Y"

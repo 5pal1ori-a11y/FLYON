@@ -103,6 +103,16 @@ enum UpbitAPI {
         return rows.compactMap(\.value).map { ChartPoint(date: $0.date, price: $0.tradePrice) }.sorted { $0.date < $1.date }
     }
 
+    /// 봉 차트용 캔들 (오래된 순)
+    static func ohlc(market: String, range: ChartRange, on ex: ExchangeID = .upbit) async throws -> [OHLCCandle] {
+        let (path, count) = range.request
+        let rows: [Lossy<OHLCCandle>] = try await get(path, query: [
+            URLQueryItem(name: "market", value: market),
+            URLQueryItem(name: "count", value: String(count)),
+        ], on: ex)
+        return rows.compactMap(\.value).sorted { $0.date < $1.date }
+    }
+
     /// 차트용 캔들 (오래된 순으로 정렬해서 반환)
     static func candles(market: String, range: ChartRange, on ex: ExchangeID = .upbit) async throws -> [ChartPoint] {
         let (path, count) = range.request

@@ -7,6 +7,8 @@ struct CoinDetailView: View {
 
     @State private var range: ChartRange = .day
     @State private var points: [ChartPoint] = []
+    @State private var candles: [OHLCCandle] = []
+    @AppStorage("chartStyle") private var chartStyle = "candle"
     @State private var selected: ChartPoint?
     @State private var chartError = false
     @State private var orderSide: TradeSide?
@@ -16,6 +18,15 @@ struct CoinDetailView: View {
     private var holding: Holding? { wallet.account(store.exchange).holdings[market.market] }
     @State private var showFutures = false
     @State private var showPlan = false
+
+    /// 마지막 봉을 실시간 가격으로 갱신
+    private var liveCandles: [OHLCCandle] {
+        guard let t = ticker, var last = candles.last, range == .hour || range == .day else { return candles }
+        last.close = t.tradePrice
+        last.high = max(last.high, t.tradePrice)
+        last.low = min(last.low, t.tradePrice)
+        return Array(candles.dropLast()) + [last]
+    }
 
     /// 차트 마지막 점을 실시간 가격으로 이어 붙인다.
     private var livePoints: [ChartPoint] {
@@ -153,11 +164,22 @@ struct CoinDetailView: View {
                     Text("차트를 불러오지 못했어요").font(.footnote).foregroundStyle(.secondary)
                 } else if points.isEmpty {
                     ProgressView()
+                } else if chartStyle == "candle" {
+                    CandleChart(candles: liveCandles, selected: $selected)
+                        .transition(.opacity)
                 } else {
                     PriceChart(points: livePoints, selected: $selected)
+                        .transition(.opacity)
                 }
             }
-            .frame(height: 220)
+            .frame(height: chartStyle == "candle" ? 280 : 220)
+            .animation(.easeInOut(duration: 0.25), value: chartStyle)
+
+            HStack {
+                Spacer()
+                BWSegmented(options: [("candle", "캔들"), ("line", "라인")], selection: $chartStyle, compact: true, outlined: false)
+                    .frame(width: 140)
+            }
 
             BWSegmented(options: ChartRange.allCases.map { ($0, $0.rawValue) }, selection: $range, compact: true, outlined: false)
         }
@@ -301,8 +323,11 @@ struct CoinDetailView: View {
         chartError = false
         selected = nil
         do {
-            let result = try await UpbitAPI.candles(market: market.market, range: range, on: store.exchange)
-            withAnimation { points = result }
+            let result = try await UpbitAPI.ohlc(market: market.market, range: range, on: store.exchange)
+            withAnimation {
+                candles = result
+                points = result.map { ChartPoint(date: $0.date, price: $0.close) }
+            }
         } catch is CancellationError {
         } catch {
             if (error as? URLError)?.code != .cancelled { chartError = true }
