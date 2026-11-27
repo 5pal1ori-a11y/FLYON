@@ -13,6 +13,7 @@ permissions:
 env:
   TEAM_ID: F5XL8B63NU
   BUNDLE_ID: com.flight.flyon
+  WIDGET_BUNDLE_ID: com.flight.flyon.tradexwidget
   CAPABILITIES: "APPLE_ID_AUTH"   # Sign in with Apple
 
 jobs:
@@ -55,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           export ASC_KEY_PATH="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
-          "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/ci/apple_signing.py" setup "$RUNNER_TEMP/signing"
+          BUNDLE_IDS="$BUNDLE_ID,$WIDGET_BUNDLE_ID" "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/TRADEX/ci/apple_signing.py" setup "$RUNNER_TEMP/signing"
 
       - name: Install signing assets into a temporary keychain
         run: |
@@ -85,15 +86,23 @@ jobs:
           IDENTITY="$(security find-identity -v -p codesigning "$KC" | awk '/[0-9A-F]{40}/ {print $2; exit}')"
           if [ -z "$IDENTITY" ]; then echo "No valid signing identity found" >&2; exit 1; fi
 
+          # 앱·위젯 프로파일 설치
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          PROFILE_UUID="$(python3 -c "import json;print(json.load(open('$SIGN/signing.json'))['profile_uuid'])")"
-          PROFILE_NAME="$(python3 -c "import json;print(json.load(open('$SIGN/signing.json'))['profile_name'])")"
-          cp "$SIGN/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          python3 - "$SIGN" <<'PY'
+          import json, os, shutil, sys
+          sign = sys.argv[1]
+          state = json.load(open(os.path.join(sign, "signing.json")))
+          dest = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
+          for p in state["profiles"]:
+              shutil.copy(os.path.join(sign, p["file"]), os.path.join(dest, p["uuid"] + ".mobileprovision"))
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"APP_PROFILE={state['profiles'][0]['name']}\n")
+              f.write(f"WIDGET_PROFILE={state['profiles'][1]['name']}\n")
+          PY
 
           {
             echo "KC=$KC"
             echo "IDENTITY=$IDENTITY"
-            echo "PROFILE_NAME=$PROFILE_NAME"
           } >> "$GITHUB_ENV"
 
       - name: Archive
@@ -110,7 +119,8 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$IDENTITY" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            TRADEX_APP_PROFILE="$APP_PROFILE" \
+            TRADEX_WIDGET_PROFILE="$WIDGET_PROFILE" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KC" \
             CURRENT_PROJECT_VERSION="$((20000 + ${{ github.run_number }}))" \
             SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
@@ -132,7 +142,10 @@ jobs:
             <key>signingStyle</key><string>manual</string>
             <key>signingCertificate</key><string>${IDENTITY}</string>
             <key>provisioningProfiles</key>
-            <dict><key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string></dict>
+            <dict>
+              <key>${BUNDLE_ID}</key><string>${APP_PROFILE}</string>
+              <key>${WIDGET_BUNDLE_ID}</key><string>${WIDGET_PROFILE}</string>
+            </dict>
             <key>uploadSymbols</key><true/>
           </dict>
           </plist>
@@ -153,7 +166,7 @@ jobs:
         run: |
           export ASC_KEY_PATH="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
           if [ -f "$ASC_KEY_PATH" ] && [ -x "$RUNNER_TEMP/venv/bin/python" ]; then
-            "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/ci/apple_signing.py" cleanup "$RUNNER_TEMP/signing" || echo "::warning::Cleanup failed; delete 'FLYON CI' certificates/profiles in the developer portal"
+            "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/TRADEX/ci/apple_signing.py" cleanup "$RUNNER_TEMP/signing" || echo "::warning::Cleanup failed; delete 'FLYON CI' certificates/profiles in the developer portal"
           fi
           [ -n "${KC:-}" ] && security delete-keychain "$KC" || true
           rm -rf "$RUNNER_TEMP/keys" "$RUNNER_TEMP/signing"
