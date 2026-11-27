@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(Session.self) private var session
     @Environment(RankingStore.self) private var ranking
     @State private var confirmLeave = false
+    @AppStorage("liveActivityEnabled") private var liveActivity = true
     @Environment(Wallet.self) private var wallet
     @State private var confirmReset = false
     @State private var confirmDelete = false
@@ -35,6 +36,9 @@ struct SettingsView: View {
                     LabeledContent("보유 TRADEX", value: "\(wallet.state.tradex)")
                     LabeledContent("TRADEX 가치", value: "1 TRADEX = \(Fmt.krw(TradexRules.krwPerTradex))")
                     LabeledContent("매매 수수료", value: String(format: "%.2f%%", TradexRules.feeRate * 100))
+                    Toggle("선물 포지션 잠금화면 표시", isOn: $liveActivity)
+                        .tint(.primary)
+                        .onChange(of: liveActivity) { _, on in if !on { Task { await LiveActivityManager.endAll() } } }
                     Button("모의투자 초기화", role: .destructive) { confirmReset = true }
                 }
 

@@ -5,6 +5,21 @@
 	<!-- 표준 HTTPS만 사용 → 수출 규정 문서 불필요 (TestFlight 업로드 시 매번 묻지 않게) -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- 잠금화면·다이내믹 아일랜드 포지션 표시 -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<!-- 위젯을 누르면 해당 코인 화면으로: tradex://coin/KRW-BTC -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>tradex</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tradex</string>
+			</array>
+		</dict>
+	</array>
 	<!-- 랭킹 서버 (빌드 시 GitHub Secrets에서 주입, 공개 anon 키) -->
 	<key>SupabaseProjectRef</key>
 	<string>$(SUPABASE_PROJECT_REF)</string>

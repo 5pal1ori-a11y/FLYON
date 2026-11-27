@@ -71,6 +71,8 @@ struct ExchangeView: View {
         .onChange(of: store.markets) { reorder() }
         .onReceive(reorderTimer) { _ in reorder() }
         .onAppear { reorder() }
+        .onChange(of: store.pendingCoin) { _, code in openPending(code) }
+        .onChange(of: store.markets) { openPending(store.pendingCoin) }
         #if DEBUG
         // 화면 캡처용: 실행 인자 -screenshotCoin KRW-BTC 이면 그 코인 상세 화면을 연다
         .onChange(of: store.markets) {
@@ -213,6 +215,12 @@ struct ExchangeView: View {
             .background(Capsule().fill(column == c ? Theme.tossBackground : .clear))
         }
         .buttonStyle(.plain)
+    }
+
+    private func openPending(_ code: String?) {
+        guard let code, let m = store.market(code) else { return }
+        path = [m]
+        store.pendingCoin = nil
     }
 
     private func reorder() {

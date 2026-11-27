@@ -31,6 +31,8 @@ final class MarketStore {
     private(set) var favorites: Set<String> = []
     /// 지금 시세를 보고 있는 거래소
     private(set) var exchange: ExchangeID = .upbit
+    /// 위젯에서 열 코인 (거래소 탭이 처리 후 nil)
+    var pendingCoin: String?
     /// 다른 거래소의 마지막 시세 (자산 평가용)
     private(set) var otherTickers: [ExchangeID: [String: Ticker]] = [:]
 

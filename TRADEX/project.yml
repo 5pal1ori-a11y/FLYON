@@ -8,7 +8,9 @@ targets:
   TRADEX:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources: [Sources, Shared]
+    dependencies:
+      - target: TRADEXWidget
     scheme: {}
     settings:
       base:
@@ -27,5 +29,27 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Sources/TRADEX.entitlements
+        TRADEX_APP_PROFILE: ""
+        PROVISIONING_PROFILE_SPECIFIER: $(TRADEX_APP_PROFILE)       # CI에서 주입 (없으면 비어 있음)
         SUPABASE_PROJECT_REF: ""   # 빌드 시 주입 (GitHub Secrets)
         SUPABASE_ANON_KEY: ""      # 빌드 시 주입 (공개 anon 키)
+
+  # 홈 화면·잠금화면 위젯 + 선물 포지션 잠금화면(Live Activity)
+  TRADEXWidget:
+    type: app-extension
+    platform: iOS
+    sources: [Widget, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon.tradexwidget
+        PRODUCT_NAME: TRADEXWidget
+        MARKETING_VERSION: "1.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Widget/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: TRADEX
+        SKIP_INSTALL: YES
+        TRADEX_WIDGET_PROFILE: ""
+        PROVISIONING_PROFILE_SPECIFIER: $(TRADEX_WIDGET_PROFILE)    # CI에서 주입

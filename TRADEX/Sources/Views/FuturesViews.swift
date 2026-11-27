@@ -214,6 +214,7 @@ struct FuturesOrderSheet: View {
         errorText = nil
         do {
             try wallet.openPosition(market: market, side: side, leverage: leverage, margin: margin, price: price, on: ex)
+            if let p = wallet.account(ex).positions.first { LiveActivityManager.start(p, price: price) }
             marginText = ""
             done.toggle()
         } catch {

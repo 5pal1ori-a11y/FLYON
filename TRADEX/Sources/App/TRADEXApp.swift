@@ -44,6 +44,11 @@ struct RootView: View {
             withAnimation(.easeInOut(duration: 0.45)) { showSplash = false }
         }
         .task { await market.bootstrap() }
+        // 위젯·잠금화면을 누르면 tradex://coin/KRW-BTC 로 열림 → 거래소 탭에서 그 코인 화면
+        .onOpenURL { url in
+            guard url.scheme == "tradex", url.host == "coin" else { return }
+            market.pendingCoin = url.lastPathComponent
+        }
         .onChange(of: scenePhase) { _, phase in
             // 백그라운드에서는 실시간 연결을 끊어 배터리·데이터를 아낀다.
             if phase == .active { market.startLive() } else if phase == .background { market.stopLive() }
@@ -106,6 +111,7 @@ struct MainTabView: View {
             }
         }
         // 선물 청산 감시: 앱을 연 동안은 1초마다 현재가로, 거래소를 바꾸거나 앱을 열 때는 꺼져 있던 동안의 고가·저가로 확인
+        .onChange(of: market.pendingCoin) { _, code in if code != nil { tab = "exchange" } }
         // 예약 주문(지정가·손절·익절)과 적립식도 같이 처리
         .task(id: market.exchange) {
             let ex = market.exchange
@@ -120,6 +126,9 @@ struct MainTabView: View {
                 tick += 1
                 let done = wallet.checkLiquidations(prices: market.tickers, on: ex)
                 if !done.isEmpty { liquidated = done }
+                if tick % 5 == 0 {
+                    await LiveActivityManager.sync(positions: wallet.account(ex).positions, prices: market.tickers)
+                }
                 let fills = wallet.checkOrders(prices: market.tickers, on: ex)
                 if !fills.isEmpty { notices += fills.map(fillText) }
                 if tick % 60 == 0 {   // 1분마다 적립식 실행일 확인 (오전 9시가 지나면 실행)
