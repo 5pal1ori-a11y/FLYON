@@ -138,6 +138,74 @@ extension XPRule {
 struct SeasonRecord: Codable, Identifiable, Equatable {
     let id: String      // "2026-Q4"
     let ap: Int
+
+    var displayName: String { id.replacingOccurrences(of: "-Q", with: " 시즌 ") }
+}
+
+/// 시즌 종료 등급 (그 시즌 AP 기준)
+enum SeasonTier: Int, Codable, CaseIterable, Comparable {
+    case none = 0, bronze, silver, gold, diamond
+
+    static func < (a: SeasonTier, b: SeasonTier) -> Bool { a.rawValue < b.rawValue }
+
+    static func tier(for ap: Int) -> SeasonTier {
+        allCases.last { ap >= $0.minAP } ?? .none
+    }
+
+    var minAP: Int {
+        switch self {
+        case .none: return 0
+        case .bronze: return 300
+        case .silver: return 1_000
+        case .gold: return 3_000
+        case .diamond: return 6_000
+        }
+    }
+    var name: String {
+        switch self {
+        case .none: return "참가"
+        case .bronze: return "브론즈"
+        case .silver: return "실버"
+        case .gold: return "골드"
+        case .diamond: return "다이아"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .none: return "circle.dashed"
+        case .bronze: return "medal"
+        case .silver: return "medal"
+        case .gold: return "trophy"
+        case .diamond: return "diamond"
+        }
+    }
+    var rewardTradex: Int {
+        switch self {
+        case .none: return 0
+        case .bronze: return 1
+        case .silver: return 2
+        case .gold: return 3
+        case .diamond: return 5
+        }
+    }
+
+    /// 최종 순위 보너스 (랭킹 참가자)
+    static func rankBonus(_ rank: Int?) -> Int {
+        guard let rank else { return 0 }
+        if rank == 1 { return 5 }
+        if rank <= 10 { return 3 }
+        if rank <= 100 { return 1 }
+        return 0
+    }
+}
+
+/// 받은 시즌 보상 (배지로 표시)
+struct SeasonResult: Codable, Identifiable, Equatable {
+    let id: String
+    let ap: Int
+    let tier: SeasonTier
+    let rank: Int?
+    let rewardTradex: Int
 }
 
 struct SeasonState: Codable, Equatable {
@@ -146,6 +214,7 @@ struct SeasonState: Codable, Equatable {
     var apDay: String = ""
     var apToday: Int = 0
     var history: [SeasonRecord] = []
+    var results: [SeasonResult] = []   // 보상 받은 시즌
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -155,5 +224,6 @@ struct SeasonState: Codable, Equatable {
         apDay = try c.decodeIfPresent(String.self, forKey: .apDay) ?? ""
         apToday = try c.decodeIfPresent(Int.self, forKey: .apToday) ?? 0
         history = try c.decodeIfPresent([SeasonRecord].self, forKey: .history) ?? []
+        results = try c.decodeIfPresent([SeasonResult].self, forKey: .results) ?? []
     }
 }

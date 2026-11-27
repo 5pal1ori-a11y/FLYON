@@ -55,6 +55,12 @@ final class RankingStore {
         }
     }
 
+    /// 지난 시즌 최종 순위 (랭킹 참가자만, 서버에 기록이 있을 때)
+    func finalRank(seasonID: String) async -> Int? {
+        guard isConfigured, let session else { return nil }
+        return try? await RankingAPI.leaderboard(season: seasonID, session: session).me?.rank
+    }
+
     func rename(_ newName: String) async throws {
         guard let session else { return }
         try await RankingAPI.rename(newName, session: session)

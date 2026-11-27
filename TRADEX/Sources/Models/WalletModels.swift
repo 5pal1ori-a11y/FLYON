@@ -39,7 +39,7 @@ struct TradeRecord: Codable, Identifiable, Equatable {
 }
 
 struct TradexRecord: Codable, Identifiable, Equatable {
-    enum Kind: String, Codable { case signupBonus, exchange, levelReward }
+    enum Kind: String, Codable { case signupBonus, exchange, levelReward, seasonReward }
     var id = UUID()
     let kind: Kind
     let amount: Int   // +지급 / -교환

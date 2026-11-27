@@ -89,13 +89,21 @@ struct SeasonView: View {
                 }
                 .tossCard()
 
-                // 지난 시즌
+                SeasonRewardGuide()
+
+                // 지난 시즌 (등급 배지 · 순위 · 받은 보상)
                 if !wallet.state.season.history.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("지난 시즌").font(.title3.weight(.bold))
                         ForEach(wallet.state.season.history) { h in
-                            HStack {
-                                Text(h.id.replacingOccurrences(of: "-Q", with: " 시즌 ")).font(.subheadline)
+                            let result = wallet.state.season.results.first { $0.id == h.id }
+                            HStack(spacing: 12) {
+                                SeasonTierBadge(tier: result?.tier ?? SeasonTier.tier(for: h.ap), size: 38)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(h.displayName).font(.subheadline.weight(.semibold))
+                                    Text(result.map { r in "\(r.tier.name)\(r.rank.map { " · \($0)위" } ?? "") · \(r.rewardTradex) TRADEX 받음" } ?? "보상 받기 전")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                                 Spacer()
                                 Text("\(Fmt.number(Double(h.ap))) AP").font(.subheadline.weight(.semibold)).monospacedDigit()
                             }
@@ -296,6 +304,116 @@ struct JoinRankingSheet: View {
             dismiss()
         } catch {
             errorText = error.localizedDescription
+        }
+    }
+}
+
+/// 시즌 등급 배지
+struct SeasonTierBadge: View {
+    let tier: SeasonTier
+    var size: CGFloat = 44
+    var body: some View {
+        Image(systemName: tier.icon)
+            .font(.system(size: size * 0.42, weight: .medium))
+            .foregroundStyle(tier == .none ? Color.secondary : Color(.systemBackground))
+            .frame(width: size, height: size)
+            .background(Circle().fill(tier == .none ? Color.clear : Color.primary))
+            .overlay(Circle().strokeBorder(Color.primary.opacity(tier == .none ? 0.3 : 0), lineWidth: 1))
+            .overlay(alignment: .bottom) {
+                if tier == .silver || tier == .gold || tier == .diamond {
+                    Text(tier.name).font(.system(size: size * 0.17, weight: .heavy))
+                        .padding(.horizontal, 4).padding(.vertical, 1)
+                        .background(Capsule().fill(Color(.systemBackground)))
+                        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 0.8))
+                        .offset(y: size * 0.12)
+                }
+            }
+            .accessibilityLabel("\(tier.name) 등급")
+    }
+}
+
+/// 시즌 보상 안내 카드
+struct SeasonRewardGuide: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("시즌 종료 보상").font(.title3.weight(.bold))
+            ForEach(SeasonTier.allCases.filter { $0 != .none }, id: \.self) { t in
+                HStack(spacing: 12) {
+                    SeasonTierBadge(tier: t, size: 32)
+                    Text(t.name).font(.subheadline.weight(.semibold))
+                    Text("\(Fmt.number(Double(t.minAP))) AP 이상").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(t.rewardTradex) TRADEX").font(.subheadline.weight(.semibold))
+                }
+            }
+            Divider()
+            Text("랭킹 참가자 최종 순위 보너스: 1위 +5 · 10위 안 +3 · 100위 안 +1 TRADEX")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("시즌이 끝나면 다음에 앱을 열 때 결과와 보상을 받을 수 있어요. 보상은 앱 안의 모의투자금(TRADEX)뿐이에요.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .tossCard()
+    }
+}
+
+/// 시즌 종료 결과 화면 (보상 받기)
+struct SeasonResultOverlay: View {
+    let record: SeasonRecord
+    let onClose: () -> Void
+
+    @Environment(Wallet.self) private var wallet
+    @Environment(RankingStore.self) private var ranking
+    @State private var rank: Int?
+    @State private var loadingRank = true
+    @State private var claimed: SeasonResult?
+    @State private var pop = false
+
+    var body: some View {
+        let tier = SeasonTier.tier(for: record.ap)
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Text("\(record.displayName) 종료").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                SeasonTierBadge(tier: tier, size: 96)
+                    .scaleEffect(pop ? 1 : 0.3)
+                    .rotationEffect(.degrees(pop ? 0 : -20))
+                Text(tier == .none ? "다음 시즌엔 등급에 도전해요" : "\(tier.name) 달성!")
+                    .font(.system(size: 28, weight: .heavy))
+                HStack(spacing: 24) {
+                    stat("AP", Fmt.number(Double(record.ap)))
+                    stat("최종 순위", loadingRank ? "…" : (rank.map { "\($0)위" } ?? "-"))
+                }
+                let reward = tier.rewardTradex + SeasonTier.rankBonus(rank)
+                Text(reward > 0 ? "보상 \(reward) TRADEX" : "이번 시즌 보상은 없어요")
+                    .font(.headline)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
+                Button(claimed == nil ? (reward > 0 ? "보상 받기" : "확인") : "확인") {
+                    if claimed == nil {
+                        claimed = wallet.claimSeasonReward(record, rank: rank)
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    }
+                    onClose()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(loadingRank)
+            }
+            .padding(28)
+            .frame(maxWidth: 340)
+            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(24)
+        }
+        .task {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) { pop = true }
+            rank = await ranking.finalRank(seasonID: record.id)
+            loadingRank = false
+        }
+    }
+
+    private func stat(_ t: String, _ v: String) -> some View {
+        VStack(spacing: 2) {
+            Text(t).font(.caption).foregroundStyle(.secondary)
+            Text(v).font(.title3.weight(.bold)).monospacedDigit()
         }
     }
 }

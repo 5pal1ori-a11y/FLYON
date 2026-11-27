@@ -59,6 +59,7 @@ struct MainTabView: View {
     @State private var liquidated: [FuturesRecord] = []
     /// 주문 체결·적립식 실행 알림
     @State private var notices: [String] = []
+    @State private var showSeasonResult = false
 
     private func fillText(_ f: OrderFill) -> String {
         "\(f.koreanName) \(f.kind.title) 체결 · \(Fmt.qty(f.quantity))개 @ \(Fmt.price(f.price))"
@@ -147,6 +148,21 @@ struct MainTabView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: wallet.pendingLevelUp)
+        // 시즌이 끝났으면 결과·보상 화면
+        .overlay {
+            if showSeasonResult, let record = wallet.pendingSeasonRecord, wallet.pendingLevelUp == nil, !session.showWelcome {
+                SeasonResultOverlay(record: record) {
+                    withAnimation(.easeOut(duration: 0.25)) { showSeasonResult = false }
+                }
+                .transition(.opacity)
+                .zIndex(3)
+            }
+        }
+        .task {
+            wallet.rollSeasonIfNeeded()
+            try? await Task.sleep(for: .seconds(2))
+            if wallet.pendingSeasonRecord != nil { withAnimation { showSeasonResult = true } }
+        }
         .sheet(isPresented: $session.showWelcome) {
             WelcomeBonusView()
                 .presentationDetents([.medium])

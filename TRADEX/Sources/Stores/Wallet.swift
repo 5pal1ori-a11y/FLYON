@@ -741,6 +741,29 @@ final class Wallet {
         state.season.ap += amount
     }
 
+    /// 아직 보상을 받지 않은 지난 시즌 (가장 최근 것)
+    var pendingSeasonRecord: SeasonRecord? {
+        let done = Set(state.season.results.map(\.id))
+        return state.season.history.first { !done.contains($0.id) }
+    }
+
+    /// 시즌 보상 받기: 등급 보상 + 최종 순위 보너스(랭킹 참가 시). 받은 TRADEX 수를 돌려준다.
+    @discardableResult
+    func claimSeasonReward(_ record: SeasonRecord, rank: Int?) -> SeasonResult? {
+        guard !state.season.results.contains(where: { $0.id == record.id }) else { return nil }
+        let tier = SeasonTier.tier(for: record.ap)
+        let reward = tier.rewardTradex + SeasonTier.rankBonus(rank)
+        let result = SeasonResult(id: record.id, ap: record.ap, tier: tier, rank: rank, rewardTradex: reward)
+        state.season.results.insert(result, at: 0)
+        if reward > 0 {
+            state.tradex += reward
+            state.grantedTradex += reward
+            state.tradexHistory.insert(TradexRecord(kind: .seasonReward, amount: reward, date: .now), at: 0)
+        }
+        save()
+        return result
+    }
+
     // MARK: - 과거 차트 맞히기
 
     func chartGameRewardedLeft(today: String) -> Int {
