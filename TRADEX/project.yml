@@ -27,3 +27,5 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Sources/TRADEX.entitlements
+        SUPABASE_PROJECT_REF: ""   # 빌드 시 주입 (GitHub Secrets)
+        SUPABASE_ANON_KEY: ""      # 빌드 시 주입 (공개 anon 키)

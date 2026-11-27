@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 /// 혜택 탭: 이번 시즌 카드 (시즌명, 남은 기간, 내 AP)
 struct SeasonSummaryView: View {
@@ -46,6 +47,7 @@ extension Season {
 /// 시즌 화면: 내 AP, AP 얻는 법, 랭킹, 지난 시즌
 struct SeasonView: View {
     @Environment(Wallet.self) private var wallet
+    @Environment(RankingStore.self) private var ranking
 
     var body: some View {
         let season = wallet.season
@@ -69,27 +71,7 @@ struct SeasonView: View {
                 .tossCard()
 
                 // 랭킹
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("시즌 랭킹").font(.title3.weight(.bold))
-                        Spacer()
-                        Text("준비 중").font(.caption.weight(.bold))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 1))
-                    }
-                    ForEach(1...3, id: \.self) { rank in
-                        HStack(spacing: 14) {
-                            Text("\(rank)").font(.headline.weight(.heavy)).frame(width: 24)
-                            Circle().fill(Color.primary.opacity(0.06)).frame(width: 36, height: 36)
-                            RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.06)).frame(width: 110, height: 12)
-                            Spacer()
-                            RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.06)).frame(width: 60, height: 12)
-                        }
-                    }
-                    Text("다른 트레이더와 AP로 경쟁하는 랭킹은 서버가 연결되면 열려요. 지금 쌓은 AP는 그대로 반영돼요.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                .tossCard()
+                RankingCard()
 
                 // AP 얻는 법
                 VStack(alignment: .leading, spacing: 10) {
@@ -127,5 +109,193 @@ struct SeasonView: View {
         }
         .background(Theme.tossBackground)
         .navigationTitle("시즌")
+        .task { await ranking.sync(season: wallet.season, ap: wallet.seasonAP, force: true) }
+        .refreshable { await ranking.sync(season: wallet.season, ap: wallet.seasonAP, force: true) }
+    }
+}
+
+
+/// 시즌 랭킹 카드: 내 순위 + 상위 100명
+struct RankingCard: View {
+    @Environment(Wallet.self) private var wallet
+    @Environment(RankingStore.self) private var ranking
+    @State private var showJoin = false
+    @State private var showAll = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("시즌 랭킹").font(.title3.weight(.bold))
+                Spacer()
+                if let total = ranking.board?.total, total > 0 {
+                    Text("\(Fmt.number(Double(total)))명 참여").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if !ranking.isConfigured {
+                Text("랭킹 서버가 아직 연결되지 않은 빌드예요.").font(.subheadline).foregroundStyle(.secondary)
+            } else {
+                if let me = ranking.board?.me {
+                    myRow(me)
+                } else if !ranking.isJoined {
+                    joinPrompt
+                }
+                if let top = ranking.board?.top, !top.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(top.prefix(showAll ? 100 : 10)) { e in
+                            entryRow(e, isMe: e.nickname == ranking.nickname)
+                        }
+                    }
+                    if top.count > 10 {
+                        Button(showAll ? "접기" : "전체 순위 보기 (\(top.count)위까지)") {
+                            withAnimation(.snappy) { showAll.toggle() }
+                        }
+                        .buttonStyle(BWButtonStyle(verticalPadding: 7))
+                        .frame(maxWidth: .infinity)
+                    }
+                } else if ranking.loading {
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
+                } else if ranking.board != nil {
+                    Text("아직 이번 시즌 참가자가 없어요. 첫 번째가 되어 보세요!")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                if let err = ranking.errorText {
+                    Text(err).font(.caption).foregroundStyle(Theme.rise)
+                }
+            }
+        }
+        .tossCard()
+        .sheet(isPresented: $showJoin) {
+            JoinRankingSheet().presentationDetents([.large])
+        }
+    }
+
+    private var joinPrompt: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("닉네임을 정하고 랭킹에 참가하면 이번 시즌 AP로 다른 트레이더와 순위를 겨뤄요.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Button("랭킹 참가하기") { showJoin = true }
+                .buttonStyle(PrimaryButtonStyle())
+        }
+    }
+
+    private func myRow(_ me: RankingAPI.Me) -> some View {
+        HStack(spacing: 14) {
+            LevelBadge(level: wallet.level, size: 40, filled: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(me.nickname).font(.headline)
+                Text("내 순위").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(me.rank.map { "\($0)위" } ?? "순위 없음").font(.title3.weight(.heavy)).monospacedDigit()
+                Text("\(Fmt.number(Double(me.ap))) AP").font(.caption.weight(.semibold)).foregroundStyle(.secondary).monospacedDigit()
+            }
+        }
+        .padding(12)
+        .background(Theme.tossBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func entryRow(_ e: RankingAPI.Entry, isMe: Bool) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                if e.rank <= 3 {
+                    Image(systemName: "crown").font(.caption2).offset(y: -14)
+                }
+                Text("\(e.rank)").font(.headline.weight(e.rank <= 3 ? .heavy : .semibold)).monospacedDigit()
+            }
+            .frame(width: 30)
+            Text(e.nickname).font(.subheadline.weight(isMe ? .bold : .medium))
+            if isMe {
+                Text("나").font(.caption2.weight(.bold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .bwBackground(selected: true)
+            }
+            Spacer()
+            Text("\(Fmt.number(Double(e.ap))) AP").font(.subheadline.weight(.semibold)).monospacedDigit()
+        }
+        .padding(.vertical, 9)
+    }
+}
+
+/// 랭킹 참가: 닉네임 · 만 14세 이상 확인 · 공개 정보 동의 · Apple 계정 확인
+struct JoinRankingSheet: View {
+    @Environment(Wallet.self) private var wallet
+    @Environment(RankingStore.self) private var ranking
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var nickname = ""
+    @State private var ageOK = false
+    @State private var consentOK = false
+    @State private var working = false
+    @State private var errorText: String?
+
+    private var nicknameValid: Bool {
+        nickname.range(of: "^[가-힣A-Za-z0-9_]{2,12}$", options: .regularExpression) != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("닉네임 (한글·영문·숫자 2~12자)", text: $nickname)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("랭킹에 보일 닉네임")
+                } footer: {
+                    Text("실명·연락처 등 개인을 알아볼 수 있는 닉네임은 쓰지 마세요.")
+                }
+                Section {
+                    Toggle("만 14세 이상이에요", isOn: $ageOK)
+                    Toggle("닉네임·시즌 AP·순위 공개에 동의해요", isOn: $consentOK)
+                } footer: {
+                    Text("서버에는 닉네임, 시즌별 AP, Apple 계정을 알아볼 수 없게 바꾼 값만 저장돼요. 설정에서 언제든 랭킹 참가를 해제하면 서버 기록이 모두 삭제돼요. 랭킹 보상은 앱 안의 혜택뿐이며 현금·상품은 없어요.")
+                }
+                Section {
+                    if working {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else {
+                        SignInWithAppleButton(.continue) { req in
+                            req.requestedScopes = []
+                        } onCompletion: { result in
+                            Task { await handle(result) }
+                        }
+                        .signInWithAppleButtonStyle(.black)
+                        .frame(height: 48)
+                        .disabled(!(nicknameValid && ageOK && consentOK))
+                        .opacity(nicknameValid && ageOK && consentOK ? 1 : 0.4)
+                    }
+                } footer: {
+                    Text("본인 확인을 위해 Apple 계정으로 한 번 더 확인해요. (Apple로 로그인한 계정만 참가할 수 있어요)")
+                }
+                if let errorText {
+                    Text(errorText).foregroundStyle(Theme.rise)
+                }
+            }
+            .navigationTitle("랭킹 참가")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("닫기") { dismiss() } } }
+        }
+    }
+
+    private func handle(_ result: Result<ASAuthorization, Error>) async {
+        errorText = nil
+        guard case .success(let auth) = result,
+              let cred = auth.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = cred.identityToken, let token = String(data: tokenData, encoding: .utf8) else {
+            if case .failure(let e) = result, (e as? ASAuthorizationError)?.code == .canceled { return }
+            errorText = "Apple 계정 확인에 실패했어요."
+            return
+        }
+        working = true
+        defer { working = false }
+        do {
+            try await ranking.join(identityToken: token, nickname: nickname)
+            await ranking.sync(season: wallet.season, ap: wallet.seasonAP, force: true)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        } catch {
+            errorText = error.localizedDescription
+        }
     }
 }

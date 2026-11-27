@@ -4,12 +4,14 @@ import SwiftUI
 struct TRADEXApp: App {
     @State private var session = Session()
     @State private var market = MarketStore()
+    @State private var ranking = RankingStore()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(session)
                 .environment(market)
+                .environment(ranking)
         }
     }
 }
@@ -51,6 +53,7 @@ struct RootView: View {
 
 struct MainTabView: View {
     @Environment(Session.self) private var session
+    @Environment(RankingStore.self) private var ranking
     @Environment(MarketStore.self) private var market
     @Environment(Wallet.self) private var wallet
     @State private var liquidated: [FuturesRecord] = []
@@ -90,6 +93,17 @@ struct MainTabView: View {
         #if DEBUG
         .task { await DebugDemo.seedIfRequested(wallet: wallet, market: market) }
         #endif
+        // 랭킹: 로그인한 사용자 연결, 5분마다 이번 시즌 AP 전송
+        .task(id: session.user?.id) {
+            ranking.bind(userID: session.user?.id)
+            while !Task.isCancelled {
+                if ranking.isJoined {
+                    wallet.rollSeasonIfNeeded()
+                    await ranking.sync(season: wallet.season, ap: wallet.seasonAP)
+                }
+                try? await Task.sleep(for: .seconds(300))
+            }
+        }
         // 선물 청산 감시: 앱을 연 동안은 1초마다 현재가로, 거래소를 바꾸거나 앱을 열 때는 꺼져 있던 동안의 고가·저가로 확인
         // 예약 주문(지정가·손절·익절)과 적립식도 같이 처리
         .task(id: market.exchange) {

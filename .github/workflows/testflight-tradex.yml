@@ -97,6 +97,9 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Archive
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
           xcodebuild archive \
@@ -109,7 +112,8 @@ jobs:
             CODE_SIGN_IDENTITY="$IDENTITY" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KC" \
-            CURRENT_PROJECT_VERSION="$((20000 + ${{ github.run_number }}))"
+            CURRENT_PROJECT_VERSION="$((20000 + ${{ github.run_number }}))" \
+            SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
       - name: Export and upload to App Store Connect
         env:

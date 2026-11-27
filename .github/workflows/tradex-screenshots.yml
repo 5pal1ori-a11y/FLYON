@@ -21,6 +21,9 @@ jobs:
           cd TRADEX && xcodegen generate
 
       - name: Build for simulator (Debug, no signing)
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -o pipefail
           xcodebuild build \
@@ -30,7 +33,8 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO | tail -5
+            CODE_SIGNING_ALLOWED=NO \
+            SUPABASE_PROJECT_REF="$SUPABASE_PROJECT_REF" SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" | tail -5
 
       - name: Boot simulator and capture
         run: |

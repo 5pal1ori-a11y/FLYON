@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(Session.self) private var session
+    @Environment(RankingStore.self) private var ranking
+    @State private var confirmLeave = false
     @Environment(Wallet.self) private var wallet
     @State private var confirmReset = false
     @State private var confirmDelete = false
@@ -40,6 +42,9 @@ struct SettingsView: View {
                     Link("개인정보처리방침", destination: privacyURL)
                     Link("이용약관", destination: termsURL)
                     NavigationLink("오픈소스 라이선스") { OpenSourceView() }
+                    if ranking.isJoined {
+                        Button("랭킹 참가 해제 (서버 기록 삭제)", role: .destructive) { confirmLeave = true }
+                    }
                     LabeledContent("시세 제공", value: "업비트 · 빗썸 Open API")
                     LabeledContent("버전", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                 }
@@ -66,8 +71,16 @@ struct SettingsView: View {
             .confirmationDialog("모든 거래소의 코인·원화·포지션이 사라지고, 지급받은 TRADEX만 다시 돌려받아요.", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("초기화", role: .destructive) { wallet.reset() }
             }
+            .confirmationDialog("랭킹에서 내 닉네임과 시즌 기록이 서버에서 모두 삭제돼요.", isPresented: $confirmLeave, titleVisibility: .visible) {
+                Button("참가 해제", role: .destructive) { Task { await ranking.leave() } }
+            }
             .confirmationDialog("계정과 모든 모의투자 기록이 삭제돼요. 되돌릴 수 없어요.", isPresented: $confirmDelete, titleVisibility: .visible) {
-                Button("계정 삭제", role: .destructive) { session.deleteAccount() }
+                Button("계정 삭제", role: .destructive) {
+                    Task {
+                        await ranking.leave()   // 서버의 랭킹 기록도 함께 삭제
+                        session.deleteAccount()
+                    }
+                }
             }
         }
     }

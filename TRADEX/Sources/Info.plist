@@ -5,6 +5,11 @@
 	<!-- 표준 HTTPS만 사용 → 수출 규정 문서 불필요 (TestFlight 업로드 시 매번 묻지 않게) -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- 랭킹 서버 (빌드 시 GitHub Secrets에서 주입, 공개 anon 키) -->
+	<key>SupabaseProjectRef</key>
+	<string>$(SUPABASE_PROJECT_REF)</string>
+	<key>SupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
 	<!-- 시작 화면: 가운데 TRADEX 로고 (라이트 흰 바탕/검정 로고, 다크 검정 바탕/흰 로고) -->
 	<key>UILaunchScreen</key>
 	<dict>
