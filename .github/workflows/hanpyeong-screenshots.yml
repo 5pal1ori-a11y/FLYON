@@ -75,6 +75,7 @@ jobs:
               shoot 7-decision -screenshotTab shop -screenshotSheet decision
               shoot 8-open -screenshotTab shop -screenshotSheet open
               shoot 9-talents -screenshotTab company -screenshotSheet talents
+              shoot 10-daily -screenshotTab shop -screenshotSheet daily
             fi
           done
           ls -la shots

@@ -26,6 +26,8 @@ struct DebugSheetView: View {
             OpenStoreSheet()
         case "talents":
             NavigationStack { TalentsView() }
+        case "daily":
+            EmptyView()
         default:
             NavigationStack {
                 if let s = game.stores.max(by: { $0.kind.info.tier < $1.kind.info.tier }) {
@@ -125,6 +127,16 @@ extension Game {
         pendingRankUp = nil
         offlineReport = nil
         suppressOffline = true
+        generation = 2
+        legacy = 3
+        streak = 4
+        let p = VIPVisit.pool[1]
+        vip = VIPVisit(title: p.title, symbol: p.symbol, line: p.line, reward: p.reward,
+                       expires: Date().addingTimeInterval(120), x: 0.12)
+        rushUntil = Date().addingTimeInterval(90)
+        if ScreenshotArgs.sheet == "daily" {
+            dailyReward = DailyRewardOffer(streak: 4, dayIndex: 3, amount: 2.7e8)
+        }
     }
 }
 #endif
