@@ -58,6 +58,7 @@ jobs:
           supabase functions deploy alerts --project-ref "$PROJECT_REF" --yes
           supabase functions deploy live --project-ref "$PROJECT_REF" --yes
           supabase functions deploy schedule --project-ref "$PROJECT_REF" --yes
+          supabase functions deploy tradex-ranking --project-ref "$PROJECT_REF" --yes
           supabase functions deploy collect --project-ref "$PROJECT_REF" --no-verify-jwt --yes
 
       - name: Sync push notification secrets
@@ -123,4 +124,8 @@ jobs:
           sched=$(curl -sS -o /tmp/body -w "%{http_code}" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
             "$base/schedule?origin=GMP&destination=CJU&date=$day")
           echo "$sched  $(wc -c < /tmp/body) bytes  schedule (503 = AirLabs key not set)"
+          rank=$(curl -sS -o /tmp/body -w "%{http_code}" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" \
+            "$base/tradex-ranking/leaderboard")
+          echo "$rank  $(wc -c < /tmp/body) bytes  tradex-ranking/leaderboard"
+          [ "$rank" = "200" ] || fail=1
           exit $fail
