@@ -18,6 +18,12 @@ struct RootView: View {
                     .transition(.opacity)
             }
 
+            if let offer = game.dailyReward, game.pendingRankUp == nil, game.started {
+                DailyRewardOverlay(offer: offer)
+                    .transition(.opacity)
+                    .zIndex(9)
+            }
+
             if let rank = game.pendingRankUp {
                 RankUpOverlay(rank: rank) {
                     withAnimation(.easeOut(duration: 0.25)) { game.pendingRankUp = nil }
@@ -28,6 +34,7 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.35), value: game.started)
         .animation(.easeOut(duration: 0.25), value: game.pendingRankUp?.id)
+        .animation(.easeOut(duration: 0.25), value: game.dailyReward?.id)
         .overlay(alignment: .bottom) { ToastView() }
         .sheet(item: $game.offlineReport) { report in
             OfflineSheet(report: report)

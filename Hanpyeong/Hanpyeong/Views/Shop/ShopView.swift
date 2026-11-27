@@ -137,8 +137,9 @@ struct TodayChips: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(highlight ? .clear : Palette.line.opacity(0.7))
+                .strokeBorder(Palette.hairline)
         )
+        .shadow(color: Color(hex: 0x5A4632).opacity(highlight ? 0.2 : 0.06), radius: 10, y: 4)
     }
 }
 
@@ -150,6 +151,9 @@ struct CounterCard: View {
     @State private var coins: [CoinItem] = []
     @State private var taps = 0
     @State private var pressed = false
+    @State private var combo = 0
+    @State private var lastTap = Date.distantPast
+    @State private var vipServed = 0
 
     private struct FloatItem: Identifiable {
         let id = UUID()
@@ -188,6 +192,45 @@ struct CounterCard: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { ring() }
+            .overlay(alignment: .top) {
+                HStack {
+                    if let until = game.rushUntil, game.isRushing {
+                        RushBadge(until: until)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    Spacer()
+                    if combo >= 5 {
+                        Text("콤보 \(combo) · ×\(String(format: "%.2f", comboMultiplier))")
+                            .font(.num(13, .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Palette.sign))
+                            .scaleEffect(combo % 10 == 0 ? 1.15 : 1)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+                .padding(10)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: combo)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: game.isRushing)
+            }
+            .overlay {
+                GeometryReader { geo in
+                    if let v = game.vip {
+                        VIPBubble(visit: v) {
+                            if game.serveVIP() != nil { vipServed += 1 }
+                        }
+                        .id(v.id)
+                        .position(x: geo.size.width * (0.5 + v.x), y: geo.size.height * 0.62)
+                    }
+                }
+            }
+            .sensoryFeedback(.success, trigger: vipServed) { _, _ in game.hapticsOn }
+            .task(id: combo) {
+                guard combo > 0 else { return }
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                if Date().timeIntervalSince(lastTap) > 0.8 { combo = 0 }
+            }
 
             Button(action: ring) {
                 HStack(spacing: 14) {
@@ -206,9 +249,9 @@ struct CounterCard: View {
                 .padding(.horizontal, 20)
                 .frame(minHeight: 70)
                 .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Palette.sign)
-                        .shadow(color: Color(hex: 0x7A1F15), radius: 0, x: 0, y: 4)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(game.isRushing ? Palette.gold : Palette.sign)
+                        .shadow(color: (game.isRushing ? Palette.gold : Palette.sign).opacity(0.35), radius: 14, x: 0, y: 8)
                 )
             }
             .buttonStyle(PressStyle())
@@ -253,8 +296,14 @@ struct CounterCard: View {
         }
     }
 
+    private var comboMultiplier: Double { 1 + Double(min(combo, 50)) / 50 }
+
     private func ring() {
-        let v = game.tap()
+        let now = Date()
+        combo = now.timeIntervalSince(lastTap) < 0.6 ? combo + 1 : 1
+        lastTap = now
+        if combo % 10 == 0 { game.noteCombo(combo) }
+        let v = game.tap(multiplier: comboMultiplier)
         taps += 1
         let item = FloatItem(text: "+" + Won.short(v), x: CGFloat.random(in: -90...90))
         floats.append(item)

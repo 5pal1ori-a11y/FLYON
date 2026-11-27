@@ -13,6 +13,7 @@ struct CompanyView: View {
                     worthCard
                     talentsLink
                     LeaderboardCard()
+                    PassDownCard()
                     ladder
                     statsCard
                     settings
@@ -269,6 +270,21 @@ struct CompanyView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .tint(Palette.sign)
                 .padding(.vertical, 10)
+            Divider().overlay(Palette.line)
+            Toggle("알림", isOn: Binding(
+                get: { game.notificationsOn },
+                set: { on in
+                    if on {
+                        Notifier.request { ok in game.notificationsOn = ok }
+                    } else {
+                        game.notificationsOn = false
+                        Notifier.clear()
+                    }
+                }
+            ))
+            .font(.system(size: 16, weight: .semibold))
+            .tint(Palette.sign)
+            .padding(.vertical, 10)
             Divider().overlay(Palette.line)
             Button {
                 showCredits = true

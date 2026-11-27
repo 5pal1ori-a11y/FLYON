@@ -29,9 +29,11 @@ extension Color {
 }
 
 enum Palette {
-    static let paper    = Color(light: 0xF2EDE3, dark: 0x131416)
-    static let card     = Color(light: 0xFFFDF8, dark: 0x1D1F23)
-    static let cardDeep = Color(light: 0xEAE3D6, dark: 0x25282D)
+    static let paper    = Color(light: 0xF3F0EA, dark: 0x0F1012)
+    static let card     = Color(light: 0xFFFFFF, dark: 0x1B1C20)
+    static let cardDeep = Color(light: 0xF0ECE4, dark: 0x26282D)
+    /// 다크 모드에서만 보이는 카드 테두리
+    static let hairline = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: 0x2A2C31) : .clear })
     static let ink      = Color(light: 0x1C222A, dark: 0xECE6DA)
     static let inkSoft  = Color(light: 0x6D685F, dark: 0x9C978D)
     static let inkFaint = Color(light: 0xA39D92, dark: 0x5E5B55)
@@ -106,12 +108,12 @@ struct PaperCard: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(Palette.line.opacity(0.7), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Palette.hairline, lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.04), radius: 10, y: 4)
+            .shadow(color: Color(hex: 0x5A4632).opacity(0.07), radius: 18, x: 0, y: 8)
     }
 }
 

@@ -45,6 +45,11 @@ final class Game {
     var incomeTaxBase: Double = 0
     var taxBill: TaxBill?
     var taxesPaid: Double = 0
+    var streak = 0
+    var lastLoginDay = ""
+    var legacy = 0
+    var generation = 1
+    var notificationsOn = false
 
     // MARK: - 화면용 임시 상태
 
@@ -53,6 +58,9 @@ final class Game {
     var toast: String?
     var bulk: BulkMode = .one
     var decisionResult: DecisionResult?
+    var rushUntil: Date?
+    var vip: VIPVisit?
+    var dailyReward: DailyRewardOffer?
 
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var lastActive = Date()
@@ -150,6 +158,8 @@ final class Game {
         m *= adj(w)
         m *= adj(holidayFactor(kind, district))
         m *= kind.hitFactor(day: day)
+        m *= legacyFactor
+        if isRushing { m *= 1.5 }
         m *= reputationFactor
         m *= talentIncomeFactor(kind)
         m *= phaseFactor(kind)
@@ -274,8 +284,8 @@ final class Game {
     }
 
     @discardableResult
-    func tap() -> Double {
-        let v = tapValue
+    func tap(multiplier: Double = 1) -> Double {
+        let v = tapValue * multiplier * (isRushing ? 3 : 1)
         cash += v
         today.revenue += v
         today.gross = (today.gross ?? 0) + v
@@ -527,6 +537,8 @@ final class Game {
         today.gross = (today.gross ?? 0) + grossPerSec * dt
         stats.totalRevenue += earned
 
+        liveEvents(dt)
+
         dayClock += dt
         if dayClock >= Economy.dayLength {
             dayClock -= Economy.dayLength
@@ -692,8 +704,50 @@ final class Game {
         weather = .sunny
         refreshListings()
         generateMissions()
+        if lastLoginDay.isEmpty {
+            lastLoginDay = Game.dayKey(Date())
+            streak = 1
+        }
         lastActive = Date()
         save()
+    }
+
+    // MARK: - 가업 승계 (다시 시작하며 영구 보너스)
+
+    /// 승계하면 얻는 명성: 최고 순자산 1,000억마다 √ 비례
+    var legacyGain: Int { max(0, Int(sqrt(max(0, stats.peakNetWorth) / 1e11))) }
+    var canPassDown: Bool { highestRank >= 5 && legacyGain > 0 }
+    var legacyFactor: Double { 1 + 0.05 * Double(legacy) }
+
+    func passDown() {
+        guard canPassDown else { return }
+        let name = companyName
+        let newLegacy = legacy + legacyGain
+        let newGeneration = generation + 1
+        let keepClaimed = claimedAchievements
+        let keepHaptics = hapticsOn
+        let keepNotify = notificationsOn
+        let keepStreak = streak
+        let keepLogin = lastLoginDay
+        stopLoop()
+        apply(Game.blank())
+        legacy = newLegacy
+        generation = newGeneration
+        claimedAchievements = keepClaimed
+        hapticsOn = keepHaptics
+        notificationsOn = keepNotify
+        streak = keepStreak
+        lastLoginDay = keepLogin
+        begin(name: name)
+        cash = Economy.startingCash * Double(1 + legacy)
+        news.insert(NewsItem(day: 1, headline: "\(name) \(generation)대 사장 취임",
+                             detail: "명성 \(legacy) · 전 점포 매출 +\(legacy * 5)%", tone: .good), at: 0)
+        pendingRankUp = nil
+        rushUntil = nil
+        vip = nil
+        toast = "\(generation)대 사장으로 새 출발"
+        save()
+        startLoop()
     }
 
     func reset() {
@@ -711,12 +765,18 @@ final class Game {
 
     func becameActive() {
         applyOffline()
+        Notifier.clear()
+        if !suppressOffline { checkDailyReward() }
         startLoop()
     }
 
     func wentBackground() {
         stopLoop()
         save()
+        if notificationsOn && started {
+            let perSec = incomePerSec + (dailyBuildingIncome - dailyStoreCosts - dailyInterest - dailySalaries) / Economy.dayLength
+            Notifier.schedule(perSec: max(0, perSec) * offlineRate, company: companyName)
+        }
     }
 
     private func applyOffline() {
@@ -787,7 +847,9 @@ final class Game {
                  claimedAchievements: claimedAchievements,
                  isCorporation: isCorporation, baseRate: baseRate, minimumWage: minimumWage,
                  wageIndex: wageIndex, vatBase: vatBase, incomeTaxBase: incomeTaxBase,
-                 taxBill: taxBill, taxesPaid: taxesPaid)
+                 taxBill: taxBill, taxesPaid: taxesPaid,
+                 streak: streak, lastLoginDay: lastLoginDay, legacy: legacy,
+                 generation: generation, notificationsOn: notificationsOn)
     }
 
     private func apply(_ s: SaveData) {
@@ -826,6 +888,11 @@ final class Game {
         incomeTaxBase = s.incomeTaxBase ?? 0
         taxBill = s.taxBill
         taxesPaid = s.taxesPaid ?? 0
+        streak = s.streak ?? 0
+        lastLoginDay = s.lastLoginDay ?? ""
+        legacy = s.legacy ?? 0
+        generation = s.generation ?? 1
+        notificationsOn = s.notificationsOn ?? false
         if stats.kindsOwned.isEmpty { stats.kindsOwned = Array(Set(stores.map(\.kind.rawValue))) }
         if started && missions.isEmpty { generateMissions() }
     }

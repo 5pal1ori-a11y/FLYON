@@ -6,12 +6,22 @@ struct CashHeader: View {
     @Environment(Game.self) private var game
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(game.rank.title)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Palette.gold)
+        VStack(spacing: 10) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(game.rank.title)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Palette.gold)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Palette.gold.opacity(0.14)))
+                        if game.generation > 1 {
+                            Text("\(game.generation)대")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Palette.inkSoft)
+                        }
+                    }
                     Text(Won.full(game.cash))
                         .font(.myeongjo(30))
                         .foregroundStyle(game.cash < 0 ? Palette.down : Palette.ink)
@@ -29,18 +39,25 @@ struct CashHeader: View {
                     }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.inkSoft)
-                    Text("\(Won.signed(game.incomePerSec))/초")
-                        .font(.num(18, .bold))
-                        .foregroundStyle(Palette.up)
+                    HStack(spacing: 4) {
+                        if game.isRushing {
+                            Image(systemName: "bolt.fill").foregroundStyle(Palette.gold)
+                        }
+                        Text("\(Won.signed(game.incomePerSec))/초")
+                    }
+                    .font(.num(16, .bold))
+                    .foregroundStyle(game.isRushing ? Palette.gold : Palette.up)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill((game.isRushing ? Palette.gold : Palette.up).opacity(0.1)))
                 }
             }
             DayBar(fraction: game.dayFraction)
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 12)
-        .background(Palette.paper)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.line).frame(height: 1) }
+        .background(Palette.paper.opacity(0.97))
     }
 }
 

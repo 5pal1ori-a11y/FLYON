@@ -142,12 +142,15 @@ struct Stats: Codable, Hashable {
     var missionsDone: Int = 0
     var bestDailyNet: Double = 0
     var kindsOwned: [String] = []
+    var vipServed: Int = 0
+    var bestCombo: Int = 0
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case taps, tapEarnings, totalRevenue, trades, tradeProfit, storesOpened, peakNetWorth
         case sells, decisionsMade, improvementsBought, missionsDone, bestDailyNet, kindsOwned
+        case vipServed, bestCombo
     }
 
     init(from decoder: Decoder) throws {
@@ -165,6 +168,8 @@ struct Stats: Codable, Hashable {
         missionsDone = try c.decodeIfPresent(Int.self, forKey: .missionsDone) ?? 0
         bestDailyNet = try c.decodeIfPresent(Double.self, forKey: .bestDailyNet) ?? 0
         kindsOwned = try c.decodeIfPresent([String].self, forKey: .kindsOwned) ?? []
+        vipServed = try c.decodeIfPresent(Int.self, forKey: .vipServed) ?? 0
+        bestCombo = try c.decodeIfPresent(Int.self, forKey: .bestCombo) ?? 0
     }
 }
 
@@ -235,4 +240,10 @@ struct SaveData: Codable {
     var incomeTaxBase: Double?
     var taxBill: TaxBill?
     var taxesPaid: Double?
+    // v0.4 — 재미 장치
+    var streak: Int?
+    var lastLoginDay: String?
+    var legacy: Int?
+    var generation: Int?
+    var notificationsOn: Bool?
 }

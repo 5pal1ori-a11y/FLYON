@@ -147,3 +147,71 @@ struct CoinBurst: View {
             .allowsHitTesting(false)
     }
 }
+
+/// 가게 앞에 나타나는 VIP 손님 말풍선
+struct VIPBubble: View {
+    let visit: VIPVisit
+    let onTap: () -> Void
+    @State private var bob = false
+    @State private var appear = false
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: visit.symbol)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Palette.gold))
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(visit.title).font(.system(size: 13, weight: .heavy)).foregroundStyle(Palette.ink)
+                        Text(visit.line).font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.inkSoft)
+                    }
+                }
+                .padding(.leading, 6)
+                .padding(.trailing, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(.white))
+                .overlay(Capsule().strokeBorder(Palette.gold, lineWidth: 2))
+                .shadow(color: Palette.gold.opacity(0.45), radius: 10, y: 3)
+                Text("눌러서 모시기")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Palette.gold))
+            }
+            .offset(y: bob ? -5 : 3)
+            .scaleEffect(appear ? 1 : 0.3)
+            .opacity(appear ? 1 : 0)
+        }
+        .buttonStyle(PressStyle())
+        .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) { appear = true }
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { bob = true }
+        }
+    }
+}
+
+/// 러시 타임 띠 (남은 시간 표시)
+struct RushBadge: View {
+    let until: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { ctx in
+            let left = max(0, until.timeIntervalSince(ctx.date))
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill")
+                Text("러시 타임 · 계산 ×3")
+                Text("\(Int(left.rounded(.up)))초").monospacedDigit()
+            }
+            .font(.system(size: 13, weight: .heavy))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Palette.gold))
+            .shadow(color: Palette.gold.opacity(0.5), radius: 8, y: 2)
+        }
+    }
+}

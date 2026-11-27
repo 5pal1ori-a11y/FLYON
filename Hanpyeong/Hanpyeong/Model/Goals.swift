@@ -135,6 +135,14 @@ struct Achievement: Identifiable {
                     target: Double(DistrictID.allCases.count), days: 5, floor: 1e12) { g in
                         Double(Set(g.stores.map(\.district)).count)
                     },
+        Achievement(id: "vip10", title: "VIP 전담 사장", detail: "VIP 손님 10명 모시기", symbol: "crown.fill",
+                    target: 10, days: 2, floor: 5_000_000) { Double($0.stats.vipServed) },
+        Achievement(id: "combo50", title: "손이 안 보인다", detail: "콤보 50", symbol: "bolt.fill",
+                    target: 50, days: 1, floor: 1_000_000) { Double($0.stats.bestCombo) },
+        Achievement(id: "streak7", title: "개근상", detail: "7일 연속 출석", symbol: "calendar.badge.checkmark",
+                    target: 7, days: 3, floor: 10_000_000) { Double($0.streak) },
+        Achievement(id: "gen2", title: "가업을 잇다", detail: "2대 사장 취임", symbol: "figure.2.and.child.holdinghands",
+                    target: 2, days: 5, floor: 1e9) { Double($0.generation) },
         Achievement(id: "top1", title: "재계 1위", detail: "재계 순위 1위", symbol: "trophy.fill",
                     target: 1, days: 10, floor: 1e14) { $0.leaderboardPosition == 1 ? 1 : 0 }
     ]
