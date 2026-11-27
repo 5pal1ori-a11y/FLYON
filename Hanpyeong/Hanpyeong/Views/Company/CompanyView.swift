@@ -17,7 +17,7 @@ struct CompanyView: View {
                     statsCard
                     settings
                 }
-                .padding(16)
+                .padding(.horizontal, 18).padding(.vertical, 14)
                 .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)

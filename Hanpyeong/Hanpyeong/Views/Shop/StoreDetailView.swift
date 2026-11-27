@@ -33,9 +33,9 @@ struct StoreDetailView: View {
     private func content(_ s: Store) -> some View {
         ScrollView {
             VStack(spacing: 14) {
-                Storefront(kind: s.kind, name: s.name, height: 196)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 6)
+                StoreScene(kind: s.kind, name: s.name, dayFraction: game.dayFraction,
+                           weather: game.weather, walkers: 3 + min(3, s.staff), height: 230)
+                    .padding(.top, 4)
 
                 Text(s.kind.info.blurb)
                     .font(.myeongjo(14, bold: false))
@@ -55,7 +55,7 @@ struct StoreDetailView: View {
                 }
                 sellCard(s)
             }
-            .padding(16)
+            .padding(.horizontal, 18).padding(.vertical, 14)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)

@@ -15,7 +15,8 @@ struct CashHeader: View {
                     Text(Won.full(game.cash))
                         .font(.myeongjo(30))
                         .foregroundStyle(game.cash < 0 ? Palette.down : Palette.ink)
-                        .contentTransition(.numericText())
+                        .contentTransition(.numericText(value: game.cash))
+                        .animation(.snappy(duration: 0.25), value: game.cash)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
