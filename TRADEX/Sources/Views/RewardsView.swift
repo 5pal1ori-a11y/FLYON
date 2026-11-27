@@ -85,7 +85,11 @@ struct RewardsView: View {
         let total = 1 + Mission.all.count + DailyRules.quizPerDay + 1
         let done = (checked ? 1 : 0) + (Mission.all.count - missionsLeft.count) + (DailyRules.quizPerDay - quizLeft) + (predicted ? 1 : 0)
         return VStack(alignment: .leading, spacing: 10) {
-            Text("오늘 받을 수 있는 혜택").font(.subheadline).foregroundStyle(.secondary)
+            HStack(alignment: .top) {
+                Text("오늘 받을 수 있는 혜택").font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                Icon3D(name: "gift", size: 46, float: true).padding(.top, -6)
+            }
             Text(left > 0 ? "최대 \(Fmt.krw(left))" : "오늘 혜택을 모두 받았어요")
                 .font(.system(size: 28, weight: .bold))
                 .monospacedDigit()
@@ -105,7 +109,14 @@ struct RewardsView: View {
         let streak = wallet.currentStreak(today: today)
         let inWeek = streak == 0 ? 0 : ((streak - 1) % DailyRules.streakBonusEvery) + 1
         return VStack(alignment: .leading, spacing: 16) {
-            sectionTitle("출석체크", trailing: "\(streak)일 연속")
+            HStack(spacing: 10) {
+                Icon3D(name: "calendar", size: 30)
+                Text("출석체크").font(.title3.weight(.bold))
+                Spacer()
+                if streak > 0 { Icon3D(name: "fire", size: 20) }
+                Text("\(streak)일 연속").font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+            }
+            .padding(.bottom, 6)
             HStack(spacing: 0) {
                 ForEach(1...DailyRules.streakBonusEvery, id: \.self) { i in
                     let filled = i <= inWeek
@@ -117,8 +128,7 @@ struct RewardsView: View {
                                 .scaleEffect(i == inWeek && done ? 1.08 : 1)
                                 .animation(.spring(response: 0.4, dampingFraction: 0.5).delay(Double(i) * 0.04), value: inWeek)
                             if bonus {
-                                Image(systemName: "gift").font(.footnote)
-                                    .foregroundStyle(filled ? Color(.systemBackground) : .primary)
+                                Icon3D(name: "gift", size: 24, dim: false)
                             } else if filled {
                                 Image(systemName: "checkmark").font(.footnote.bold()).foregroundStyle(Color(.systemBackground))
                                     .transition(.scale.combined(with: .opacity))
@@ -157,8 +167,7 @@ struct RewardsView: View {
             NavigationLink {
                 PredictionGameView()
             } label: {
-                gameRow(icon: AnyView(coin.map { AnyView(CoinIcon(symbol: $0.symbol, size: 40)) }
-                                      ?? AnyView(Image(systemName: "chart.line.uptrend.xyaxis").font(.title3).frame(width: 40, height: 40))),
+                gameRow(icon: AnyView(Icon3D(name: "alarm", size: 40)),
                         title: "내일 오를까? 내릴까?",
                         subtitle: "\(coin?.koreanName ?? "오늘의 코인") 맞히면 \(Fmt.krw(TradexRules.predictionRewardKRW))",
                         status: mine.map { "\($0.choice.title) 참여" } ?? "참여하기",
@@ -169,8 +178,7 @@ struct RewardsView: View {
             NavigationLink {
                 QuizView()
             } label: {
-                gameRow(icon: AnyView(Image(systemName: "graduationcap").font(.title3).frame(width: 40, height: 40)
-                                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1))),
+                gameRow(icon: AnyView(Icon3D(name: "grad", size: 40)),
                         title: "오늘의 투자 퀴즈",
                         subtitle: "맞히면 문제당 \(Fmt.krw(DailyRules.quizReward))",
                         status: "\(answered)/\(questions.count)",
@@ -182,8 +190,7 @@ struct RewardsView: View {
                 ChartGameView()
             } label: {
                 let left = wallet.chartGameRewardedLeft(today: today)
-                gameRow(icon: AnyView(Image(systemName: "chart.xyaxis.line").font(.title3).frame(width: 40, height: 40)
-                                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1))),
+                gameRow(icon: AnyView(Icon3D(name: "chart", size: 40)),
                         title: "과거 차트 맞히기",
                         subtitle: "지난 차트의 다음 10시간 맞히면 \(Fmt.krw(ChartGameRules.reward))",
                         status: left > 0 ? "\(left)판 남음" : "연습",
@@ -217,7 +224,13 @@ struct RewardsView: View {
     private var missionsSection: some View {
         let claimedCount = Mission.all.filter { wallet.missionClaimed($0, today: today) }.count
         return VStack(alignment: .leading, spacing: 0) {
-            sectionTitle("오늘의 미션", trailing: "\(claimedCount)/\(Mission.all.count)")
+            HStack(spacing: 10) {
+                Icon3D(name: "target", size: 30)
+                Text("오늘의 미션").font(.title3.weight(.bold))
+                Spacer()
+                Text("\(claimedCount)/\(Mission.all.count)").font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+            }
+            .padding(.bottom, 6)
             ForEach(Mission.all) { m in
                 missionRow(m)
                 if m.id != Mission.all.last?.id { Divider().padding(.leading, 54) }
@@ -230,11 +243,7 @@ struct RewardsView: View {
         let claimed = wallet.missionClaimed(m, today: today)
         let ready = progress >= m.goal && !claimed
         return HStack(spacing: 14) {
-            Image(systemName: m.icon)
-                .font(.body)
-                .frame(width: 40, height: 40)
-                .overlay(Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1))
-                .opacity(claimed ? 0.4 : 1)
+            Icon3D(name: m.icon3D, size: 38, dim: claimed)
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(m.title).font(.subheadline.weight(.semibold))

@@ -6,6 +6,7 @@ struct SplashView: View {
     @State private var logoPop = false
     @State private var showWordmark = false
     @State private var tracking: CGFloat = 14
+    @State private var spin: Double = 0
 
     var body: some View {
         ZStack {
@@ -16,6 +17,7 @@ struct SplashView: View {
                 .frame(width: 120)
                 .foregroundStyle(.primary)
                 .scaleEffect(logoPop ? 1.08 : 1)
+                .rotation3DEffect(.degrees(spin), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
                 .overlay(alignment: .bottom) {
                     Text("TRADEX")
                         .font(.system(size: 26, weight: .heavy))
@@ -29,6 +31,7 @@ struct SplashView: View {
         .accessibilityLabel("TRADEX")
         .task {
             try? await Task.sleep(for: .milliseconds(150))
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.75)) { spin = 360 }
             withAnimation(.spring(response: 0.35, dampingFraction: 0.5)) { logoPop = true }
             try? await Task.sleep(for: .milliseconds(220))
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { logoPop = false }

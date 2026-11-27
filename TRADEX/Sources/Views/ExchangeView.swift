@@ -151,7 +151,11 @@ struct ExchangeView: View {
             .sorted { $0.1.signedChangeRate > $1.1.signedChangeRate }
             .prefix(5)
         return VStack(alignment: .leading, spacing: 10) {
-            Text("지금 많이 오른 코인").font(.headline).padding(.horizontal, 20)
+            HStack(spacing: 8) {
+                Icon3D(name: "rocket", size: 26, float: true)
+                Text("지금 많이 오른 코인").font(.headline)
+            }
+            .padding(.horizontal, 20)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(Array(movers), id: \.0.id) { m, t in

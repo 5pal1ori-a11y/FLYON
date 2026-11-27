@@ -1,5 +1,8 @@
 # 서드파티 고지
 
+## 3D 아이콘 (`Sources/Assets.xcassets/Emoji3D`)
+- **Fluent Emoji** (https://github.com/microsoft/fluentui-emoji, npm 배포판 @lobehub/fluent-emoji-3d) — MIT License, Copyright (c) Microsoft Corporation
+
 ## 코인 아이콘 (`Sources/Assets.xcassets/CoinIcons`)
 - **web3icons** (https://github.com/0xa3k5/web3icons) — MIT License, Copyright (c) 0xa3k5 (원문: https://github.com/0xa3k5/web3icons/blob/main/LICENSE)
 - **cryptocurrency-icons** (https://github.com/spothq/cryptocurrency-icons) — CC0 1.0

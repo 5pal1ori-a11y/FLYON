@@ -14,7 +14,8 @@ struct SeasonSummaryView: View {
             SeasonView()
         } label: {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
+                HStack(spacing: 12) {
+                    Icon3D(name: "trophy", size: 44, float: true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(season.name).font(.title3.weight(.bold))
                         Text("\(season.monthsText) · \(season.daysLeft())일 남음").font(.caption).foregroundStyle(.secondary)
@@ -205,13 +206,14 @@ struct RankingCard: View {
 
     private func entryRow(_ e: RankingAPI.Entry, isMe: Bool) -> some View {
         HStack(spacing: 12) {
-            ZStack {
+            Group {
                 if e.rank <= 3 {
-                    Image(systemName: "crown").font(.caption2).offset(y: -14)
+                    Icon3D(name: ["gold", "silver", "bronze"][e.rank - 1], size: 30)
+                } else {
+                    Text("\(e.rank)").font(.headline.weight(.semibold)).monospacedDigit()
                 }
-                Text("\(e.rank)").font(.headline.weight(e.rank <= 3 ? .heavy : .semibold)).monospacedDigit()
             }
-            .frame(width: 30)
+            .frame(width: 32)
             Text(e.nickname).font(.subheadline.weight(isMe ? .bold : .medium))
             if isMe {
                 Text("나").font(.caption2.weight(.bold))
@@ -308,26 +310,13 @@ struct JoinRankingSheet: View {
     }
 }
 
-/// 시즌 등급 배지
+/// 시즌 등급 배지 (3D 메달·다이아)
 struct SeasonTierBadge: View {
     let tier: SeasonTier
     var size: CGFloat = 44
+    var float = false
     var body: some View {
-        Image(systemName: tier.icon)
-            .font(.system(size: size * 0.42, weight: .medium))
-            .foregroundStyle(tier == .none ? Color.secondary : Color(.systemBackground))
-            .frame(width: size, height: size)
-            .background(Circle().fill(tier == .none ? Color.clear : Color.primary))
-            .overlay(Circle().strokeBorder(Color.primary.opacity(tier == .none ? 0.3 : 0), lineWidth: 1))
-            .overlay(alignment: .bottom) {
-                if tier == .silver || tier == .gold || tier == .diamond {
-                    Text(tier.name).font(.system(size: size * 0.17, weight: .heavy))
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(Capsule().fill(Color(.systemBackground)))
-                        .overlay(Capsule().strokeBorder(Color.primary, lineWidth: 0.8))
-                        .offset(y: size * 0.12)
-                }
-            }
+        Icon3D(name: tier.emoji3D, size: size, float: float, dim: tier == .none)
             .accessibilityLabel("\(tier.name) 등급")
     }
 }
@@ -374,9 +363,8 @@ struct SeasonResultOverlay: View {
             Color.black.opacity(0.45).ignoresSafeArea()
             VStack(spacing: 16) {
                 Text("\(record.displayName) 종료").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                SeasonTierBadge(tier: tier, size: 96)
-                    .scaleEffect(pop ? 1 : 0.3)
-                    .rotationEffect(.degrees(pop ? 0 : -20))
+                SeasonTierBadge(tier: tier, size: 104, float: true)
+                    .flipIn(delay: 0.1)
                 Text(tier == .none ? "다음 시즌엔 등급에 도전해요" : "\(tier.name) 달성!")
                     .font(.system(size: 28, weight: .heavy))
                 HStack(spacing: 24) {
