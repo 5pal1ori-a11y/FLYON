@@ -7,6 +7,7 @@ struct OpenSourceView: View {
         ("@iconify-json/token-branded", "MIT License (원본 web3icons)"),
         ("@ledgerhq/crypto-icons-ui", "MIT License · Copyright (c) 2022 Ledger"),
         ("cryptocurrency-icons", "CC0 1.0"),
+        ("Fluent Emoji (3D 아이콘)", "MIT License · Copyright (c) Microsoft Corporation"),
     ]
 
     private let mit = """
@@ -27,7 +28,7 @@ struct OpenSourceView: View {
                     }
                 }
             } header: {
-                Text("코인 아이콘")
+                Text("아이콘")
             } footer: {
                 Text("각 코인 로고는 해당 프로젝트의 상표일 수 있으며, 해당 코인을 표시하는 용도로만 사용해요.")
             }
