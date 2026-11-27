@@ -17,7 +17,7 @@ targets:
         # 지금은 FLYON 앱 레코드(com.flight.flyon)로 TestFlight 업로드. 정식 출시 땐 TRADEX 전용 번들 ID로 변경.
         PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon
         PRODUCT_NAME: TRADEX
-        MARKETING_VERSION: "1.1"   # 구독온(1.0)·FLYON(0.1.0)과 빌드 번호가 겹치지 않게 별도 버전
+        MARKETING_VERSION: "2.0"   # 같은 FLYON 앱 자리를 쓰는 다른 앱(1.x)보다 높게 → TestFlight 기본 빌드가 TRADEX
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
@@ -43,7 +43,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon.tradexwidget
         PRODUCT_NAME: TRADEXWidget
-        MARKETING_VERSION: "1.1"
+        MARKETING_VERSION: "2.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
