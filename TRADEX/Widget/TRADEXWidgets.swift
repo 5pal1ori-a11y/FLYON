@@ -15,7 +15,7 @@ struct TRADEXWidgets: WidgetBundle {
 
 private let rise = Color(red: 0.898, green: 0.196, blue: 0.176)
 private let fall = Color(red: 0.122, green: 0.384, blue: 0.839)
-private func tint(_ v: Double) -> Color { v > 0 ? rise : (v < 0 ? fall : .secondary) }
+private func changeColor(_ v: Double) -> Color { v > 0 ? rise : (v < 0 ? fall : .secondary) }
 
 // MARK: - 코인 시세 위젯 (홈 화면 작은·중간, 잠금화면)
 
@@ -109,7 +109,7 @@ struct CoinWidgetView: View {
     let entry: CoinEntry
 
     var body: some View {
-        let color = tint(entry.rate)
+        let color = changeColor(entry.rate)
         switch family {
         case .accessoryInline:
             Text("\(entry.coin.symbol) \(entry.price.map(SharedFmt.price) ?? "-") \(SharedFmt.rate(entry.rate))")
@@ -184,8 +184,8 @@ struct PositionLiveActivity: Widget {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(SharedFmt.rate(s.roe)).font(.title2.weight(.heavy)).foregroundStyle(tint(s.pnl))
-                    Text(SharedFmt.signedKRW(s.pnl)).font(.caption.weight(.semibold)).foregroundStyle(tint(s.pnl))
+                    Text(SharedFmt.rate(s.roe)).font(.title2.weight(.heavy)).foregroundStyle(changeColor(s.pnl))
+                    Text(SharedFmt.signedKRW(s.pnl)).font(.caption.weight(.semibold)).foregroundStyle(changeColor(s.pnl))
                 }
             }
             .padding(16)
@@ -201,8 +201,8 @@ struct PositionLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(SharedFmt.rate(s.roe)).font(.headline).foregroundStyle(tint(s.pnl))
-                        Text(SharedFmt.signedKRW(s.pnl)).font(.caption2).foregroundStyle(tint(s.pnl))
+                        Text(SharedFmt.rate(s.roe)).font(.headline).foregroundStyle(changeColor(s.pnl))
+                        Text(SharedFmt.signedKRW(s.pnl)).font(.caption2).foregroundStyle(changeColor(s.pnl))
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -212,9 +212,9 @@ struct PositionLiveActivity: Widget {
             } compactLeading: {
                 Text(a.symbol).font(.caption2.weight(.bold))
             } compactTrailing: {
-                Text(SharedFmt.rate(s.roe)).font(.caption2.weight(.bold)).foregroundStyle(tint(s.pnl))
+                Text(SharedFmt.rate(s.roe)).font(.caption2.weight(.bold)).foregroundStyle(changeColor(s.pnl))
             } minimal: {
-                Image(systemName: s.pnl >= 0 ? "arrow.up" : "arrow.down").foregroundStyle(tint(s.pnl))
+                Image(systemName: s.pnl >= 0 ? "arrow.up" : "arrow.down").foregroundStyle(changeColor(s.pnl))
             }
             .widgetURL(URL(string: "tradex://coin/\(a.market)"))
         }
