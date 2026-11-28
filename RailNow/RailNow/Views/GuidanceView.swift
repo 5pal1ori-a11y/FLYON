@@ -332,3 +332,23 @@ struct GuidanceBar: View {
         }
     }
 }
+
+/// 탭 화면마다 붙인다. 안내 중이면 화면 위쪽에 표시줄을 끼워 넣어 내용을 아래로 민다.
+private struct GuidanceBarInset: ViewModifier {
+    @EnvironmentObject private var guide: RideGuide
+    @EnvironmentObject private var store: TrainStore
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .top, spacing: 0) {
+            if guide.isActive && !store.showGuide {
+                GuidanceBar { store.showGuide = true }
+            }
+        }
+    }
+}
+
+extension View {
+    func guidanceBar() -> some View {
+        modifier(GuidanceBarInset())
+    }
+}

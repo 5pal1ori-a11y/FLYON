@@ -32,25 +32,25 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $store.tab) {
             HomeView()
+                .guidanceBar()
                 .tabItem { Label("홈", systemImage: "square.grid.2x2.fill") }
                 .tag(AppTab.home)
             NetworkMapView()
+                .guidanceBar()
                 .tabItem { Label("노선도", systemImage: "map.fill") }
                 .tag(AppTab.map)
             SubwayView()
+                .guidanceBar()
                 .tabItem { Label("실시간", systemImage: "tram.fill") }
                 .tag(AppTab.subway)
             RailView()
+                .guidanceBar()
                 .tabItem { Label("기차", systemImage: "train.side.front.car") }
                 .tag(AppTab.rail)
             SettingsView()
+                .guidanceBar()
                 .tabItem { Label("설정", systemImage: "gearshape.fill") }
                 .tag(AppTab.settings)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if guide.isActive && !store.showGuide {
-                GuidanceBar { store.showGuide = true }
-            }
         }
         .sheet(isPresented: $store.showGuide) {
             GuidanceView()
