@@ -323,8 +323,8 @@ extension World {
     }
 
     func apply(_ s: Snapshot) {
-        if s.floor != floorNum { setFloor(s.floor) }
         let teleported = s.serial != roomSerial
+        if s.floor != floorNum { setFloor(s.floor) }
         if s.room != roomIndex { loadRoom(s.room) }
         roomSerial = s.serial
         cleared = unmask(s.cleared)
