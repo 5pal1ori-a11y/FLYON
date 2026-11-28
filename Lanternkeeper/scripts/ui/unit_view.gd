@@ -55,6 +55,7 @@ func _draw() -> void:
 	var opts := {"t": t, "facing": facing, "aura": aura, "still": still}
 	if kind == "player":
 		opts["skin"] = Color.from_hsv(fmod(t * 0.15, 1.0), 0.6, 1.0) if prism else skin_col
+		opts["who"] = Game.run.character if Game.run != null else "keeper"
 	var sc := 1.0
 	if boss and kind != "mirrorlord":
 		sc = 1.25
@@ -73,34 +74,38 @@ func _draw() -> void:
 	if kind == "beacon" or kind == "player":
 		return
 	# 체력
-	var y := cell * 0.42
+	var y := cell * 0.4
 	if max_hp <= 8:
 		var w := 9.0
 		var total := max_hp * w + (max_hp - 1) * 3.0
+		draw_rect(Rect2(-total / 2.0 - 4, y - 3, total + 8, 13), Color(0, 0, 0, 0.55))
 		for i in max_hp:
 			var x := -total / 2.0 + i * (w + 3.0)
-			draw_rect(Rect2(x, y, w, 7), Color(1, 0.35, 0.3) if i < hp else Color(0.25, 0.2, 0.2))
+			draw_rect(Rect2(x, y, w, 7), Color(1, 0.38, 0.32) if i < hp else Color(1, 1, 1, 0.14))
 	else:
-		var bw := cell * 0.7
-		draw_rect(Rect2(-bw / 2, y, bw, 8), Color(0.25, 0.2, 0.2))
-		draw_rect(Rect2(-bw / 2, y, bw * clampf(hp / float(max_hp), 0, 1), 8), Color(1, 0.35, 0.3))
-		draw_string(UI.font_bold, Vector2(-bw / 2, y - 4), "%d/%d" % [hp, max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1, 0.8, 0.75))
-	# 상태 아이콘
-	var ix := cell * 0.28
-	var iy := -cell * 0.42
+		var bw := cell * 0.74
+		draw_rect(Rect2(-bw / 2 - 3, y - 3, bw + 6, 14), Color(0, 0, 0, 0.55))
+		draw_rect(Rect2(-bw / 2, y, bw, 8), Color(1, 1, 1, 0.14))
+		draw_rect(Rect2(-bw / 2, y, bw * clampf(hp / float(max_hp), 0, 1), 8), Color(1, 0.38, 0.32))
+	# 상태 표시
+	var ix := cell * 0.3
+	var iy := -cell * 0.36
 	for key in ["burn", "poison", "shield"]:
 		var n := int(st.get(key, 0))
 		if n <= 0:
 			continue
 		var col := Color(1, 0.55, 0.2)
-		var glyph := "화"
+		var glyph := "flame"
 		if key == "poison":
 			col = Color(0.5, 0.95, 0.45)
-			glyph = "독"
+			glyph = "poison"
 		elif key == "shield":
-			col = Color(0.8, 0.8, 0.85)
-			glyph = "막"
-		draw_circle(Vector2(ix, iy), 13, Color(0.05, 0.05, 0.07, 0.9))
-		draw_arc(Vector2(ix, iy), 13, 0, TAU, 16, col, 2)
-		draw_string(UI.font_bold, Vector2(ix - 9, iy + 6), glyph if n == 1 else str(n), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, col)
-		iy += 28
+			col = Color(0.82, 0.84, 0.9)
+			glyph = "shield"
+		draw_circle(Vector2(ix, iy), 13, Color(0.05, 0.05, 0.08, 0.92))
+		draw_arc(Vector2(ix, iy), 13, 0, TAU, 18, col, 2, true)
+		Icon.paint(self, glyph, Vector2(ix, iy), 15, col)
+		if n > 1:
+			draw_string_outline(UI.font_bold, Vector2(ix + 8, iy + 14), str(n), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Color(0, 0, 0, 0.9))
+			draw_string(UI.font_bold, Vector2(ix + 8, iy + 14), str(n), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, col)
+		iy += 30

@@ -33,12 +33,28 @@ static func unit(ci: CanvasItem, kind: String, s: float, opts: Dictionary) -> vo
 	match kind:
 		"player":
 			var lantern_col: Color = opts.get("skin", Color(1.0, 0.72, 0.35))
+			var who: String = opts.get("who", "keeper")
+			var cloak := Color(0.24, 0.2, 0.36)
+			var hood := Color(0.28, 0.23, 0.4)
+			var fold := Color(0.18, 0.14, 0.27)
+			if who == "thief":
+				cloak = Color(0.15, 0.17, 0.2)
+				hood = Color(0.19, 0.21, 0.25)
+				fold = Color(0.1, 0.11, 0.14)
+			elif who == "priest":
+				cloak = Color(0.84, 0.8, 0.7)
+				hood = Color(0.92, 0.89, 0.8)
+				fold = Color(0.68, 0.63, 0.52)
 			ci.draw_circle(Vector2(0, s * 0.3), s * 0.28, Color(0, 0, 0, 0.35))
-			poly(ci, [Vector2(-22, 34) * k, Vector2(22, 34) * k, Vector2(14, -6) * k, Vector2(-14, -6) * k], Color(0.22, 0.18, 0.3))
-			ci.draw_circle(Vector2(0, -14 + bob) * k, 17 * k, Color(0.25, 0.2, 0.34))
+			poly(ci, [Vector2(-22, 34) * k, Vector2(22, 34) * k, Vector2(14, -6) * k, Vector2(-14, -6) * k], cloak)
+			ci.draw_circle(Vector2(0, -14 + bob) * k, 17 * k, hood)
 			ci.draw_circle(Vector2(0, -11 + bob) * k, 11 * k, Color(0.05, 0.04, 0.07))
 			eyes(ci, Vector2(0, -11 + bob) * k, 4.5 * k, 1.8 * k, Color(1, 0.9, 0.7))
-			poly(ci, [Vector2(-22, 34) * k, Vector2(-6, 34) * k, Vector2(-12, 0) * k], Color(0.17, 0.13, 0.24))
+			poly(ci, [Vector2(-22, 34) * k, Vector2(-6, 34) * k, Vector2(-12, 0) * k], fold)
+			if who == "thief":
+				poly(ci, [Vector2(-12, -3) * k, Vector2(12, -3) * k, Vector2(16, 4) * k, Vector2(-9, 3) * k], Color(0.72, 0.2, 0.18))
+			elif who == "priest":
+				ci.draw_line(Vector2(0, 2) * k, Vector2(0, 30) * k, Color(0.85, 0.62, 0.25), 3 * k)
 			var lp := Vector2(24, 8 + bob) * k
 			ci.draw_line(Vector2(12, 2) * k, lp + Vector2(0, -8) * k, Color(0.3, 0.25, 0.2), 2.5 * k)
 			ci.draw_circle(lp, 14 * k, Color(lantern_col, 0.25))

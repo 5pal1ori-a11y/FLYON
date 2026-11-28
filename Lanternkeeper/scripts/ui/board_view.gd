@@ -81,6 +81,7 @@ func setup(board: Board) -> void:
 	dark.material = mat
 	root.add_child(dark)
 	shadow_layer = _layer(_draw_shadows)
+	shadow_layer.clip_contents = true
 	units_layer = Control.new()
 	units_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	units_layer.size = custom_minimum_size
@@ -193,7 +194,7 @@ func _update_lights() -> void:
 	if p != null and not p.dead:
 		var pv: UnitView = views.get(p.id)
 		var pp: Vector2 = pv.position if pv != null else center(p.pos)
-		add.call(pp, 1.8, 1.0, skin_color)
+		add.call(pp, 2.4, 1.0, skin_color)
 	for c in b.cells_of(Board.BRAZIER):
 		add.call(center(c), 1.9, 1.0, Color(1, 0.55, 0.25))
 	for c in b.cells_of(Board.CANDLE_LIT):
@@ -228,35 +229,97 @@ func _update_lights() -> void:
 	mat.set_shader_parameter("rect_size", custom_minimum_size)
 	mat.set_shader_parameter("ambient", ambient)
 	var dc: Color = biome.get("fog", Color(0.02, 0.02, 0.04))
-	dc.a = 0.88 if b.flags.get("fog", false) else 0.82
+	dc.a = 0.7 if b.flags.get("fog", false) else 0.6
 	mat.set_shader_parameter("dark_color", dc)
 
 
 # ───────────────────── 그리기 ─────────────────────
+var _sb_cell := StyleBoxFlat.new()
+var _sb_frame := StyleBoxFlat.new()
+
+
+func _hash(c: Vector2i) -> float:
+	var h := (c.x * 73856093) ^ (c.y * 19349663) ^ 0x5bd1e995
+	return float(h & 0xffff) / 65535.0
+
+
+func _cell_box(ci: CanvasItem, c: Vector2i, fill: Color, border: Color, bw: int = 2, inset: float = 5.0, radius: int = 10) -> void:
+	_sb_cell.bg_color = fill
+	_sb_cell.draw_center = fill.a > 0.0
+	_sb_cell.border_color = border
+	_sb_cell.set_border_width_all(bw if border.a > 0.0 else 0)
+	_sb_cell.set_corner_radius_all(radius)
+	_sb_cell.anti_aliasing = true
+	ci.draw_style_box(_sb_cell, Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-inset))
+
+
+func _decor(ci: CanvasItem, c: Vector2i, r: Rect2, h: float) -> void:
+	var acc: Color = biome.get("accent", Color.WHITE)
+	var k := cell / 96.0
+	var o := r.position
+	match b.biome:
+		"fog":
+			if h > 0.6:
+				var g := o + Vector2(18 + h * 40, 62 + (h - 0.6) * 50) * k
+				for i in 3:
+					ci.draw_line(g + Vector2(i * 6 - 6, 0) * k, g + Vector2(i * 9 - 9, -14 - i % 2 * 5) * k, Color(acc, 0.3), 2 * k, true)
+			elif h < 0.16:
+				ci.draw_circle(o + Vector2(30 + h * 200, 34) * k, 5 * k, Color(0, 0, 0, 0.18))
+				ci.draw_circle(o + Vector2(44 + h * 200, 42) * k, 3 * k, Color(0, 0, 0, 0.14))
+		"mirror":
+			var m := r.get_center()
+			var d := 20.0 * k
+			ci.draw_polyline(PackedVector2Array([m + Vector2(0, -d), m + Vector2(d, 0), m + Vector2(0, d), m + Vector2(-d, 0), m + Vector2(0, -d)]),
+				Color(1, 1, 1, 0.045), 1.5, true)
+			if h > 0.72:
+				ci.draw_line(o + Vector2(14, 70) * k, o + Vector2(70, 14) * k, Color(1, 1, 1, 0.05), 3 * k, true)
+		"library":
+			for i in 2:
+				var y := o.y + (30 + i * 32) * k
+				ci.draw_line(Vector2(o.x + 3, y), Vector2(r.end.x - 3, y), Color(0, 0, 0, 0.16), 1.5)
+			ci.draw_line(Vector2(o.x + (20 + h * 50) * k, o.y + 2), Vector2(o.x + (20 + h * 50) * k, o.y + 30 * k), Color(0, 0, 0, 0.12), 1.5)
+			if h > 0.84:
+				ci.draw_rect(Rect2(o + Vector2(52, 58) * k, Vector2(20, 14) * k), Color(0.9, 0.85, 0.7, 0.16))
+		"eclipse":
+			if h > 0.58:
+				var a := o + Vector2(12 + h * 30, 16) * k
+				var pulse := 0.22 + 0.12 * sin(t * 2.0 + h * 20.0)
+				ci.draw_polyline(PackedVector2Array([a, a + Vector2(16, 18) * k, a + Vector2(8, 34) * k, a + Vector2(26, 56) * k]),
+					Color(1.0, 0.42, 0.16, pulse), 2 * k, true)
+
+
 func _draw_tiles(ci: CanvasItem) -> void:
 	var f1: Color = biome.get("floor", Color(0.1, 0.1, 0.12))
 	var f2: Color = biome.get("floor2", Color(0.12, 0.12, 0.14))
+	var full := Rect2(Vector2.ZERO, custom_minimum_size)
+	# 놋쇠 테를 두른 나무 틀
+	_sb_frame.bg_color = Color("1a120c")
+	_sb_frame.border_color = Color(UI.BRASS, 0.55)
+	_sb_frame.set_border_width_all(2)
+	_sb_frame.set_corner_radius_all(12)
+	_sb_frame.shadow_color = Color(0, 0, 0, 0.5)
+	_sb_frame.shadow_size = 14
+	_sb_frame.shadow_offset = Vector2(0, 6)
+	ci.draw_style_box(_sb_frame, full.grow(9))
+	ci.draw_rect(full, Color(0.025, 0.025, 0.045))
 	for y in b.h:
 		for x in b.w:
 			var c := Vector2i(x, y)
-			var r := Rect2(Vector2(c) * cell, Vector2(cell, cell))
-			ci.draw_rect(r, f1 if (x + y) % 2 == 0 else f2)
-			ci.draw_rect(r, Color(1, 1, 1, 0.025), false, 1)
+			var h := _hash(c)
+			var r := Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-1.5)
+			ci.draw_rect(r, f1.lerp(f2, h))
+			ci.draw_line(r.position + Vector2(0, 0.75), Vector2(r.end.x, r.position.y + 0.75), Color(1, 1, 1, 0.075), 1.5)
+			ci.draw_line(r.position + Vector2(0.75, 0), Vector2(r.position.x + 0.75, r.end.y), Color(1, 1, 1, 0.04), 1.5)
+			ci.draw_line(Vector2(r.position.x, r.end.y - 0.75), Vector2(r.end.x, r.end.y - 0.75), Color(0, 0, 0, 0.3), 1.5)
+			ci.draw_line(Vector2(r.end.x - 0.75, r.position.y), Vector2(r.end.x - 0.75, r.end.y), Color(0, 0, 0, 0.2), 1.5)
+			if b.tile(c) == Board.FLOOR:
+				_decor(ci, c, r, h)
 	for y in b.h:
 		for x in b.w:
 			var c2 := Vector2i(x, y)
 			var tt := b.tile(c2)
 			if tt != Board.FLOOR:
 				Art.tile(ci, tt, Rect2(Vector2(c2) * cell, Vector2(cell, cell)), biome, t, c2)
-
-
-func _shadow_cell(ci: CanvasItem, c: Vector2i, col: Color, hatch: bool) -> void:
-	var r := Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-5)
-	ci.draw_rect(r, col)
-	if hatch:
-		for i in 4:
-			var o := i * cell * 0.25
-			ci.draw_line(r.position + Vector2(o, 0), r.position + Vector2(0, o), Color(1, 1, 1, 0.25), 2)
 
 
 func _draw_shadows(ci: CanvasItem) -> void:
@@ -269,27 +332,52 @@ func _draw_shadows(ci: CanvasItem) -> void:
 		a = 1.0
 	if sets.is_empty() or a <= 0.01:
 		return
+	# 1) 길게 뻗는 그림자 줄기
 	for s in sets:
 		var n: int = s["cells"].size()
 		var shown := int(ceil(n * k))
 		var ally: bool = s["caster"]["team"] == Unit.TEAM_PLAYER
+		var from := center(s["caster"]["cell"])
+		var dir: Vector2 = s["dir"]
+		var reach := 0.0
 		for i in shown:
+			if s["dists"][i] != 99:
+				reach = maxf(reach, (center(s["cells"][i]) - from).dot(dir))
+		if reach <= 0.0:
+			continue
+		reach += cell * 0.42
+		var perp := Vector2(-dir.y, dir.x)
+		var col := Color(0.09, 0.03, 0.2, 0.82 * a) if ally else Color(0.3, 0.03, 0.06, 0.4 * a)
+		var tip := Color(col, col.a * 0.45)
+		ci.draw_polygon(PackedVector2Array([from + perp * cell * 0.2, from - perp * cell * 0.2, from + dir * reach - perp * cell * 0.4, from + dir * reach + perp * cell * 0.4]),
+			PackedColorArray([col, col, tip, tip]))
+	# 2) 그림자가 닿는 칸
+	for s in sets:
+		var n2: int = s["cells"].size()
+		var shown2 := int(ceil(n2 * k))
+		var ally2: bool = s["caster"]["team"] == Unit.TEAM_PLAYER
+		for i in shown2:
 			var c: Vector2i = s["cells"][i]
-			if ally:
-				var col := Color(0.42, 0.2, 0.7, 0.55 * a) if s["dists"][i] != 99 else Color(0.32, 0.4, 0.85, 0.55 * a)
-				_shadow_cell(ci, c, col, colorblind)
+			if ally2:
+				var flood: bool = s["dists"][i] == 99
+				var fill := Color(0.3, 0.42, 0.95, 0.3 * a) if flood else Color(0.5, 0.26, 0.9, 0.3 * a)
+				var line := Color(0.6, 0.75, 1.0, 0.85 * a) if flood else Color(0.76, 0.58, 1.0, 0.85 * a)
+				_cell_box(ci, c, fill, line, 2, 5.0, 10)
+				if colorblind:
+					var r := Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-8)
+					for j in 4:
+						var o := (j + 1) * cell * 0.2
+						ci.draw_line(r.position + Vector2(o, 0), r.position + Vector2(0, o), Color(1, 1, 1, 0.3 * a), 2)
 			else:
-				var r := Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-12)
-				ci.draw_rect(r, Color(0.8, 0.2, 0.25, 0.4 * a), false, 2)
+				_cell_box(ci, c, Color(0, 0, 0, 0), Color(0.95, 0.3, 0.3, 0.5 * a), 2, 13.0, 8)
 
 
 func _lantern_glyph(ci: CanvasItem, c: Vector2, alpha: float = 1.0) -> void:
-	ci.draw_circle(c, cell * 0.36, Color(lantern_color, 0.25 * alpha))
-	ci.draw_rect(Rect2(c - Vector2(12, 16), Vector2(24, 30)), Color(0.15, 0.1, 0.07, alpha))
-	ci.draw_rect(Rect2(c - Vector2(8, 12), Vector2(16, 22)), Color(lantern_color, alpha))
-	ci.draw_line(c + Vector2(-10, -18), c + Vector2(10, -18), Color(0.15, 0.1, 0.07, alpha), 4)
-	var fl := 1.0 + 0.15 * sin(t * 10)
-	ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-4, 4), c + Vector2(4, 4), c + Vector2(0, -8 * fl)]), Color(1, 1, 0.85, alpha))
+	for i in 8:
+		ci.draw_circle(c, cell * 0.5 * (i + 1) / 8.0, Color(lantern_color, 0.06 * alpha))
+	ci.draw_circle(c, cell * 0.27, Color(0.1, 0.07, 0.05, 0.92 * alpha))
+	ci.draw_arc(c, cell * 0.27, 0, TAU, 28, Color(lantern_color, alpha), 2.5, true)
+	Icon.paint(ci, "lantern", c + Vector2(0, 1), cell * 0.34, Color(lantern_color.lerp(Color.WHITE, 0.3), alpha))
 
 
 func _txt(ci: CanvasItem, c: Vector2, s: String, size: int, col: Color) -> void:
@@ -300,28 +388,34 @@ func _txt(ci: CanvasItem, c: Vector2, s: String, size: int, col: Color) -> void:
 
 
 func _draw_marks(ci: CanvasItem) -> void:
-	# 이동 가능 칸
+	# 이동할 수 있는 칸: 옅은 바탕 + 모서리 꺾쇠
 	for c in move_cells.keys():
 		var info: Dictionary = move_cells[c]
-		var r := Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-8)
-		var col := Color(0.45, 0.7, 1.0)
+		var col := Color(0.55, 0.72, 1.0)
 		if info["type"] == "step":
-			col = Color(0.7, 0.5, 1.0)
+			col = Color(0.76, 0.58, 1.0)
 		elif info["type"] == "push" or info["type"] == "douse":
 			col = Color(1, 0.8, 0.4)
-		ci.draw_rect(r, Color(col, 0.13 + 0.05 * sin(t * 3)))
-		ci.draw_rect(r, Color(col, 0.6), false, 2)
+		_cell_box(ci, c, Color(col, 0.1 + 0.04 * sin(t * 3)), Color(0, 0, 0, 0), 0, 6.0, 10)
+		var r := Rect2(Vector2(c) * cell, Vector2(cell, cell)).grow(-9)
+		var L := cell * 0.17
+		for corner in [[r.position, Vector2(1, 0), Vector2(0, 1)], [Vector2(r.end.x, r.position.y), Vector2(-1, 0), Vector2(0, 1)],
+				[r.end, Vector2(-1, 0), Vector2(0, -1)], [Vector2(r.position.x, r.end.y), Vector2(1, 0), Vector2(0, -1)]]:
+			var o: Vector2 = corner[0]
+			ci.draw_polyline(PackedVector2Array([o + corner[1] * L, o, o + corner[2] * L]), Color(col, 0.9), 2.5, true)
 		if info["type"] == "push":
-			_txt(ci, center(c) + Vector2(0, cell * 0.32), "밀기", 18, col)
+			_txt(ci, center(c) + Vector2(0, cell * 0.3), "밀기", 18, col)
 		elif info["type"] == "douse":
-			_txt(ci, center(c) + Vector2(0, cell * 0.32), "끄기", 18, col)
-	# 등불 놓을 수 있는 칸
+			_txt(ci, center(c) + Vector2(0, cell * 0.3), "끄기", 18, col)
+	# 등불을 놓을 수 있는 칸
 	for c in lantern_cells:
-		ci.draw_circle(center(c), 5, Color(lantern_color, 0.55))
+		var m := center(c)
+		var d := 5.0 + 1.2 * sin(t * 3.0 + c.x + c.y)
+		ci.draw_colored_polygon(PackedVector2Array([m + Vector2(0, -d), m + Vector2(d, 0), m + Vector2(0, d), m + Vector2(-d, 0)]), Color(lantern_color, 0.7))
 	for c in locked_cells:
 		_lantern_glyph(ci, center(c))
 	for c in preview_cells:
-		_lantern_glyph(ci, center(c), 0.9)
+		_lantern_glyph(ci, center(c), 0.95)
 	# 적의 의도
 	if show_intents and not animating:
 		_draw_intents(ci)

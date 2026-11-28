@@ -6,7 +6,7 @@ var runs_left := 2
 var main: Control
 var log_lines: Array = []
 var steps := 0
-var max_steps := 4000
+var max_steps := 4000 if OS.get_environment("AUTOPLAY_STEPS") == "" else int(OS.get_environment("AUTOPLAY_STEPS"))
 var screenshot_dir := ""
 var shots := 0
 
@@ -33,7 +33,8 @@ func _shot(tag: String) -> void:
 func _loop() -> void:
 	var modes := ["normal", "normal", "daily", "weekly", "endless"]
 	var mi := 0
-	Game.new_run(modes[mi], "keeper", GearData.LANTERN_ORDER[randi() % 6], 0)
+	var first: String = OS.get_environment("AUTOPLAY_LANTERN") if OS.get_environment("AUTOPLAY_LANTERN") != "" else GearData.LANTERN_ORDER[randi() % 6]
+	Game.new_run(modes[mi], "keeper", first, 0)
 	while steps < max_steps:
 		steps += 1
 		await get_tree().create_timer(0.05).timeout
@@ -42,6 +43,13 @@ func _loop() -> void:
 			continue
 		var script_path: String = cur.get_script().resource_path
 		var name := script_path.get_file().get_basename()
+		if steps % 150 == 0:
+			var extra := ""
+			if name == "battle_screen":
+				extra = " busy=%s phase=%s result=%s turn=%d obj=%s p=%s hp=%d" % [cur.busy, cur.bt.phase, cur.bt.result, cur.bt.b.turn, cur.bt.b.objective, cur.bt.player().pos, cur.bt.player().hp]
+				for e in cur.bt.b.enemies():
+					extra += " [%s %s hp%d st%s]" % [e.kind, e.pos, e.hp, e.st]
+			_log("단계 %d 화면 %s%s" % [steps, name, extra])
 		match name:
 			"map_screen":
 				if Game.run == null:
@@ -58,10 +66,14 @@ func _loop() -> void:
 				var bt: Battle = cur.bt
 				if bt.result != "":
 					continue
+				if bt.b.turn > 90:
+					_log("봇이 방을 끝내지 못해 탐험을 접음 (%s)" % [bt.b.objective.get("type", "")])
+					Game.end_run(false, true)
+					continue
 				await _play_turn(cur, bt)
 			"reward_screen":
 				await _shot("reward")
-				if not cur.choices.is_empty() and cur.body.get_child_count() > 0 and cur.body.get_child(0) is Label and cur.body.get_child(0).text.begins_with("각인"):
+				if cur.step_kind == "insc" and not cur.choices.is_empty():
 					Game.gain_inscription(cur.choices[0])
 					cur.choices = []
 					cur._next()
@@ -142,10 +154,37 @@ func _play_turn(cur, bt: Battle) -> void:
 				best_score = sc
 				best_move = mv
 				best_cells = choice
-	if best_move != p.pos and reach.has(best_move):
-		await cur._do_move(best_move)
-	else:
-		cur._on_skip_move()
+	# 화로 곁의 적은 그림자가 닿지 않는다. 오래 끌면 화로를 끄러 간다.
+	var braziers := bt.b.cells_of(Board.BRAZIER)
+	if bt.b.turn > 12 and not braziers.is_empty():
+		for c in reach.keys():
+			if reach[c]["type"] == "douse":
+				await cur._do_move(c)
+				best_move = p.pos
+				break
+		if bt.phase == "move":
+			var bd := 999
+			for c in reach.keys():
+				if reach[c]["type"] == "walk" and Board.manhattan(c, braziers[0]) < bd:
+					bd = Board.manhattan(c, braziers[0])
+					best_move = c
+	elif best_score <= 0.5 and not bt.b.enemies().is_empty():
+		# 얻을 게 없는 턴이면 가장 가까운 적 쪽으로 걸어간다
+		var best_d := 999
+		for c in reach.keys():
+			if reach[c]["type"] != "walk":
+				continue
+			var d := 999
+			for e in bt.b.enemies():
+				d = min(d, abs(Board.manhattan(c, e.pos) - 2))
+			if d < best_d:
+				best_d = d
+				best_move = c
+	if bt.phase == "move":
+		if best_move != p.pos and reach.has(best_move):
+			await cur._do_move(best_move)
+		else:
+			cur._on_skip_move()
 	if bt.result != "" or best_cells.is_empty():
 		if bt.result == "" and best_cells.is_empty():
 			best_cells = [bt.lantern_cells()[0]]

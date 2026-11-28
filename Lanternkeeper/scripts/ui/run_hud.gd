@@ -1,35 +1,30 @@
 class_name RunHud
-extends VBoxContainer
-## 탐험 중 상단 정보 줄: 체력, 기름, 층, 되돌리기, 가방·메뉴 버튼.
+extends HBoxContainer
+## 탐험 중 상단 줄: 체력, 기름, 현재 위치, 가방·메뉴.
 
 var screen: Screen
-var hp_label: Label
-var info_label: Label
+var hp_chip: PanelContainer
+var oil_chip: PanelContainer
+var place: Label
 
 
 static func make(s: Screen) -> RunHud:
 	var h := RunHud.new()
 	h.screen = s
-	h.add_theme_constant_override("separation", 6)
-	var row := UI.hbox(10)
-	h.add_child(row)
-	h.hp_label = UI.label("", 30, UI.RED, true)
-	h.hp_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	h.hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(h.hp_label)
-	h.info_label = UI.label("", 22, UI.AMBER)
-	h.info_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	h.info_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	h.info_label.clip_text = true
-	h.info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h.info_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(h.info_label)
-	var bag := UI.button("가방", func(): h.show_bag(), 24, false, 62)
-	bag.custom_minimum_size = Vector2(96, 62)
-	row.add_child(bag)
-	var menu := UI.button("≡", func(): h.show_menu(), 30, false, 62)
-	menu.custom_minimum_size = Vector2(72, 62)
-	row.add_child(menu)
+	h.add_theme_constant_override("separation", 8)
+	h.hp_chip = UI.chip("heart", "", UI.RED, 24)
+	h.add_child(h.hp_chip)
+	h.oil_chip = UI.chip("oil", "", UI.AMBER, 24)
+	h.add_child(h.oil_chip)
+	h.place = UI.tag("", 20, UI.SUB, true)
+	h.place.clip_text = true
+	h.place.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	h.place.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.place.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	h.place.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h.add_child(h.place)
+	h.add_child(UI.icon_button("bag", func(): h.show_bag(), 58, 24))
+	h.add_child(UI.icon_button("menu", func(): h.show_menu(), 58, 22))
 	h.refresh()
 	return h
 
@@ -40,7 +35,8 @@ func refresh(hp_override: int = -1, max_override: int = -1) -> void:
 		return
 	var hp := hp_override if hp_override >= 0 else r.hp
 	var mx := max_override if max_override >= 0 else r.max_hp()
-	hp_label.text = "♥ %d/%d" % [hp, mx]
+	UI.chip_set(hp_chip, "%d/%d" % [hp, mx])
+	UI.chip_set(oil_chip, str(r.oil))
 	var fl := "%d층" % (r.floor + 1)
 	if r.mode == "daily":
 		fl = "일일 도전"
@@ -48,47 +44,64 @@ func refresh(hp_override: int = -1, max_override: int = -1) -> void:
 		fl = "주간 %d/%d층" % [r.floor + 1, r.floors_total]
 	elif r.mode == "endless":
 		fl = "끝없는 탑 %d층" % (r.floor + 1)
-	info_label.text = "기름 %d · %s · %s" % [r.oil, fl, BiomeData.get_def(r.biome())["name"]]
+	place.text = "%s  %s" % [fl, BiomeData.get_def(r.biome())["name"]]
+
+
+func _line(v: VBoxContainer, icon: String, col: Color, head: String, body: String) -> void:
+	var row := UI.hbox(12)
+	var ic := Icon.make_badge(icon, 40, Color(col, 0.2), col)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(ic)
+	var t := UI.vbox(2)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.add_child(UI.label(head, 22, UI.TEXT, true))
+	t.add_child(UI.label(body, 20, UI.SUB))
+	row.add_child(t)
+	v.add_child(row)
 
 
 func show_bag() -> void:
 	var r := Game.run
-	var v := UI.vbox(12)
+	var v := UI.vbox(14)
 	var cd: Dictionary = GearData.CHARACTERS[r.character]
 	var ld: Dictionary = GearData.LANTERNS[r.lantern]
-	v.add_child(UI.label("%s · %s · 그을음 %d단계 · 되돌리기 %d" % [cd["name"], ld["name"], r.asc, r.undo], 24, UI.AMBER))
-	if not r.weekly.is_empty():
-		for w in r.weekly:
-			var wm: Dictionary = RunState.WEEKLY_MODS[int(w)]
-			v.add_child(UI.label("주간 규칙 · %s: %s" % [wm["name"], wm["desc"]], 22, UI.BLUE))
+	var top := UI.hbox(8)
+	top.add_child(UI.chip("person", cd["name"], UI.TEXT, 20))
+	top.add_child(UI.chip("lantern", ld["name"], UI.AMBER, 20))
+	top.add_child(UI.chip("undo", "되돌리기 %d" % r.undo, UI.BLUE, 20))
+	v.add_child(top)
+	if r.asc > 0:
+		v.add_child(UI.label("그을음 %d단계" % r.asc, 20, UI.AMBER, true))
+	for w in r.weekly:
+		var wm: Dictionary = RunState.WEEKLY_MODS[int(w)]
+		_line(v, "calendar", UI.BLUE, "주간 규칙: " + wm["name"], wm["desc"])
 	var sets := Mods.active_sets(r.inscriptions)
 	if not sets.is_empty():
-		v.add_child(UI.label("세트 효과", 26, UI.VIOLET, true))
+		v.add_child(UI.title("켜진 세트 효과", 24, UI.VIOLET))
 		for s in sets:
-			v.add_child(UI.label("· %s %d: %s" % [UI.tag_name(s["tag"]), s["n"], s["desc"]], 22, UI.tag_color(s["tag"])))
-	var counts := Mods.tag_counts(r.inscriptions)
-	var ct := ""
-	for tg in UpgradeData.TAG_ORDER:
-		if counts.has(tg):
-			ct += "%s %d  " % [UI.tag_name(tg), counts[tg]]
-	v.add_child(UI.label("각인 %d개   %s" % [r.inscriptions.size(), ct], 26, UI.AMBER, true))
+			_line(v, UI.TAG_ICON.get(s["tag"], "star"), UI.tag_color(s["tag"]), "%s %d개" % [UI.tag_name(s["tag"]), s["n"]], s["desc"])
+	v.add_child(UI.title("각인 %d" % r.inscriptions.size(), 24, UI.AMBER))
+	if r.inscriptions.is_empty():
+		v.add_child(UI.label("아직 새긴 각인이 없습니다. 방을 정복하면 하나씩 고를 수 있습니다.", 20, UI.SUB))
 	for id in r.inscriptions:
 		var d := UpgradeData.inscription(id)
-		v.add_child(UI.label("· %s — %s" % [d["name"], d["desc"]], 22, UI.tag_color(d["tag"])))
-	v.add_child(UI.label("유물 %d개" % r.relics.size(), 26, UI.AMBER, true))
+		_line(v, UI.TAG_ICON.get(d["tag"], "star"), UI.tag_color(d["tag"]), d["name"], d["desc"])
+	v.add_child(UI.title("유물 %d" % r.relics.size(), 24, UI.AMBER))
+	if r.relics.is_empty():
+		v.add_child(UI.label("엘리트와 보스, 보물 방에서 유물을 얻습니다.", 20, UI.SUB))
 	for id in r.relics:
 		var rd := UpgradeData.relic(id)
-		v.add_child(UI.label("· %s — %s" % [rd["name"], rd["desc"]], 22, UI.RED if rd.get("curse", false) else UI.TEXT))
+		var curse: bool = rd.get("curse", false)
+		_line(v, "horn" if curse else "star", UI.RED if curse else UI.BRASS, rd["name"], rd["desc"])
 	screen.sheet("가방", v)
 
 
 func show_menu() -> void:
 	var v := UI.vbox(12)
-	var dim: Control
-	v.add_child(UI.button("설정", func(): Game.goto("settings", {"back": "map"}), 28))
+	v.add_child(UI.button("설정", func(): Game.goto("settings", {"back": "map"}), 26, false, 72, "gear"))
 	v.add_child(UI.button("저장하고 오두막으로", func():
 		Game.save_run()
 		Game.run = null
-		Game.goto("hub"), 28))
-	v.add_child(UI.button("탐험 포기", func(): screen.confirm("정말 포기할까요? 불씨는 절반만 받습니다.", "포기", func(): Game.end_run(false, true)), 28))
-	dim = screen.sheet("메뉴", v)
+		Game.goto("hub"), 26, false, 72, "house"))
+	v.add_child(UI.button("탐험 포기", func(): screen.confirm("정말 포기할까요?\n불씨는 절반만 받습니다.", "포기", func(): Game.end_run(false, true)), 26, false, 72, "close"))
+	screen.sheet("메뉴", v)

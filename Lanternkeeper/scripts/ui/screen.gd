@@ -13,39 +13,42 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 
-## 확인 창
-func confirm(text: String, yes: String, on_yes: Callable, no: String = "취소") -> void:
+func _dim() -> ColorRect:
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
+	dim.color = Color(0.02, 0.02, 0.05, 0.0)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
+	dim.create_tween().tween_property(dim, "color:a", 0.72, 0.15)
+	return dim
+
+
+## 확인 창
+func confirm(text: String, yes: String, on_yes: Callable, no: String = "취소") -> void:
+	var dim := _dim()
 	var c := CenterContainer.new()
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.add_child(c)
-	var p := UI.panel(28, UI.PANEL, UI.AMBER_DIM)
-	p.custom_minimum_size = Vector2(560, 0)
+	var p := UI.panel(30)
+	p.custom_minimum_size = Vector2(580, 0)
 	c.add_child(p)
-	var v := UI.vbox(20)
+	var v := UI.vbox(24)
 	p.add_child(v)
-	v.add_child(UI.label(text, 28, UI.TEXT, false, HORIZONTAL_ALIGNMENT_CENTER))
-	var h := UI.hbox(16)
+	v.add_child(UI.label(text, 26, UI.TEXT, false, HORIZONTAL_ALIGNMENT_CENTER))
+	var h := UI.hbox(14)
 	v.add_child(h)
 	h.add_child(UI.expand(UI.button(no, func(): dim.queue_free())))
 	h.add_child(UI.expand(UI.button(yes, func():
 		dim.queue_free()
-		on_yes.call(), 28, true)))
+		on_yes.call(), 26, true)))
 
 
 ## 아래에서 올라오는 정보 창
-func sheet(title: String, body: Control) -> Control:
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(dim)
+func sheet(title_text: String, body: Control) -> Control:
+	var dim := _dim()
 	dim.gui_input.connect(func(e):
-		if (e is InputEventScreenTouch and e.pressed) or (e is InputEventMouseButton and e.pressed):
+		if UI.is_tap(e):
 			dim.queue_free())
-	var p := UI.panel(24, UI.PANEL, UI.AMBER_DIM)
+	var p := UI.panel(26)
 	p.anchor_left = 0
 	p.anchor_right = 1
 	p.anchor_top = 1
@@ -58,10 +61,15 @@ func sheet(title: String, body: Control) -> Control:
 	var v := UI.vbox(14)
 	p.add_child(v)
 	var h := UI.hbox()
-	h.add_child(UI.expand(UI.label(title, 32, UI.AMBER, true)))
-	h.add_child(UI.button("닫기", func(): dim.queue_free(), 24, false, 60))
+	var tl := UI.title(title_text, 32, UI.AMBER)
+	tl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	h.add_child(UI.expand(tl))
+	h.add_child(UI.icon_button("close", func(): dim.queue_free(), 54, 20))
 	v.add_child(h)
+	v.add_child(UI.divider())
 	var sc := UI.scroll(body)
-	sc.custom_minimum_size = Vector2(0, min(body.get_combined_minimum_size().y + 20, 820))
+	sc.custom_minimum_size = Vector2(0, min(body.get_combined_minimum_size().y + 44, 820))
 	v.add_child(sc)
+	p.modulate.a = 0.0
+	p.create_tween().tween_property(p, "modulate:a", 1.0, 0.15)
 	return dim

@@ -33,13 +33,13 @@ func _ready() -> void:
 	add_child(toast_layer)
 	var m := MarginContainer.new()
 	m.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	m.add_theme_constant_override("margin_top", 96 + Game.safe_top)
+	m.add_theme_constant_override("margin_top", 14 + Game.safe_top)
 	m.add_theme_constant_override("margin_left", 30)
 	m.add_theme_constant_override("margin_right", 30)
 	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	m.theme = theme
 	toast_layer.add_child(m)
-	toast_box = UI.vbox(10)
+	toast_box = UI.vbox(8)
 	toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	m.add_child(toast_box)
 	var start := "title"
@@ -70,7 +70,7 @@ func _demo(d: String) -> void:
 	var arg := parts[1] if parts.size() > 1 else ""
 	match kind:
 		"hub", "codex", "settings", "challenge", "puzzles":
-			Game.goto(kind)
+			Game.goto(kind, {"tab": arg} if arg != "" else {})
 		"map":
 			Game.new_run("normal", "keeper", arg if arg != "" else "candle", 0)
 		"battle", "preview", "boss", "elite":
@@ -155,24 +155,37 @@ func _show(screen: String, p: Dictionary) -> void:
 
 func _toast(text: String, kind: String) -> void:
 	var col := UI.AMBER
+	var icon := "lantern"
 	match kind:
 		"bad":
 			col = UI.RED
+			icon = "close"
 		"set":
 			col = UI.VIOLET
-		"ach", "skin":
-			col = Color(1, 0.85, 0.4)
+			icon = "star"
+		"ach":
+			col = Color("ffd66a")
+			icon = "crown"
+		"skin":
+			col = Color("ffd66a")
+			icon = "flame"
 		"story":
 			col = UI.BLUE
-	var p := UI.panel(16, Color(0.08, 0.07, 0.1, 0.95), col)
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l := UI.label(text, 24, col, false, HORIZONTAL_ALIGNMENT_CENTER)
-	p.add_child(l)
+			icon = "book"
+		"char":
+			col = UI.GREEN
+			icon = "person"
+	var p := UI.chip(icon, text, col, 21)
+	var tsb := FancyBox.make(Color("26233f"), Color("1a1830"), Color(col, 0.6), 999, 14).with_shadow(Color(0, 0, 0, 0.55), 14, 5)
+	tsb.pad(20, 13)
+	p.add_theme_stylebox_override("panel", tsb)
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	(p.get_meta("label") as Label).autowrap_mode = TextServer.AUTOWRAP_OFF
 	toast_box.add_child(p)
 	p.modulate.a = 0
 	var tw := create_tween()
 	tw.tween_property(p, "modulate:a", 1.0, 0.2)
-	tw.tween_interval(2.6)
+	tw.tween_interval(2.4)
 	tw.tween_property(p, "modulate:a", 0.0, 0.4)
 	tw.tween_callback(p.queue_free)
 	if kind in ["ach", "skin", "story", "char"]:
