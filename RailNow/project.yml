@@ -8,7 +8,10 @@ targets:
   RailNow:
     type: application
     platform: iOS
-    sources: [RailNow]
+    sources: [RailNow, Shared]
+    dependencies:
+      - target: RailNowWidget
+    scheme: {}
     info:
       path: RailNow/Info.plist
       properties:
@@ -19,6 +22,10 @@ targets:
         ITSAppUsesNonExemptEncryption: false   # HTTPS 표준 암호화만 사용
         SeoulSubwayKey: $(SEOUL_SUBWAY_API_KEY)
         DataGoKrKey: $(DATA_GO_KR_KEY)
+        NSSupportsLiveActivities: true   # 탑승 안내를 잠금화면·다이내믹 아일랜드에 표시
+        NSLocationWhenInUseUsageDescription: 탑승 안내 중 지금 어느 역을 지나는지 알아내는 데 위치를 사용해요. 위치는 기기 안에서만 쓰고 저장하거나 보내지 않아요.
+        UIBackgroundModes:
+          - location   # 안내 중 화면을 꺼도 환승·도착 알림을 주기 위해
         NSAppTransportSecurity:
           NSExceptionDomains:
             swopenapi.seoul.go.kr:   # 서울시 실시간 지하철 API는 http만 제공
@@ -46,3 +53,25 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SEOUL_SUBWAY_API_KEY: ""   # 빌드 시 주입 (GitHub Secrets). 비어 있으면 미리보기 데이터로 동작
         DATA_GO_KR_KEY: ""         # 빌드 시 주입 (GitHub Secrets)
+        RAILNOW_APP_PROFILE: ""
+        PROVISIONING_PROFILE_SPECIFIER: $(RAILNOW_APP_PROFILE)       # CI에서 주입 (없으면 비어 있음)
+
+  # 탑승 안내 Live Activity (잠금화면·다이내믹 아일랜드)
+  RailNowWidget:
+    type: app-extension
+    platform: iOS
+    sources: [Widget, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon.railnowwidget
+        PRODUCT_NAME: RailNowWidget
+        MARKETING_VERSION: "4.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Widget/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: ITGO 잇고
+        SKIP_INSTALL: YES
+        RAILNOW_WIDGET_PROFILE: ""
+        PROVISIONING_PROFILE_SPECIFIER: $(RAILNOW_WIDGET_PROFILE)    # CI에서 주입

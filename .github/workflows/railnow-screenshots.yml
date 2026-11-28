@@ -72,6 +72,8 @@ jobs:
               shoot 6-route -screenshotTab subway -screenshotLine 2 -screenshotSheet route
               shoot 7-lines -screenshotTab subway -screenshotLine 2 -screenshotSheet lines
               shoot 8-settings -screenshotTab settings
+              shoot 9-guide -screenshotSheet guide
+              shoot 10-guidebar -screenshotTab subway -screenshotLine 2 -screenshotSheet guidebar
             fi
           done
           ls -la shots

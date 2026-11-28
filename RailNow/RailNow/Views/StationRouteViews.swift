@@ -219,6 +219,9 @@ struct StationSheet: View {
 // MARK: - 경로 찾기
 
 struct RouteSheet: View {
+    @EnvironmentObject private var store: TrainStore
+    @EnvironmentObject private var guide: RideGuide
+    @Environment(\.dismiss) private var dismiss
     @State var from: String
     @State var to: String
     @State private var picking: Slot?
@@ -401,6 +404,25 @@ struct RouteSheet: View {
                     .foregroundStyle(Palette.accent)
                     .monospacedDigit()
                     .padding(.top, 4)
+
+                Button {
+                    guide.start(plan)
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { store.showGuide = true }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "location.north.line.fill")
+                            .font(.system(size: 15, weight: .bold))
+                        Text("안내 시작")
+                            .font(.pre(16, .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 16)
 
                 // 구간 길이에 비례한 색 띠
                 GeometryReader { geo in

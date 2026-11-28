@@ -43,7 +43,7 @@ final class RouteFinder {
     /// 이름은 다르지만 갈아탈 수 있는 역
     private static let aliases: [(String, String, String, String)] = [("4", "총신대입구", "7", "이수")]
 
-    private static func hopMinutes(_ lineID: String) -> Double {
+    static func hopMinutes(_ lineID: String) -> Double {
         switch lineID {
         case "gtx-a": return 5
         case "arex": return 4

@@ -62,6 +62,8 @@ final class TrainStore: ObservableObject {
     @Published var tab: AppTab = .home
     @Published var selectedLineID: String = "2"
     @Published var focusedRailID: String?
+    /// 탑승 안내 화면을 띄울지
+    @Published var showGuide = false
 
     @Published private(set) var subway: [String: [SubwayTrain]] = [:]
     @Published private(set) var subwaySource: [String: DataSource] = [:]
