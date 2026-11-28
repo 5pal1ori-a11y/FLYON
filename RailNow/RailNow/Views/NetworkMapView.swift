@@ -1,37 +1,30 @@
+import MapKit
 import SwiftUI
 
-/// 전체 노선도에 그릴 선과 역. 역의 실제 좌표(OpenStreetMap)를 평면에 옮긴 것이라
-/// 손으로 그린 약도가 아니라 실제 지리 모양 그대로다.
+/// 전체 노선도에 그릴 선과 역. 역의 실제 좌표(OpenStreetMap)를 그대로 써서 지도 위에 얹는다.
 final class NetworkGeometry {
     static let shared = NetworkGeometry()
 
-    struct Track {
+    struct Track: Identifiable {
+        let id: String
         let line: SubwayLine
         let segment: Int
-        let points: [CGPoint]
-        let closed: Bool
+        let coordinates: [CLLocationCoordinate2D]
     }
 
-    struct Station {
+    struct Station: Identifiable {
+        let id: String
         let name: String
         let lineID: String
+        let color: String
         let segment: Int
         let index: Int
-        let point: CGPoint
+        let coordinate: CLLocationCoordinate2D
     }
 
     let tracks: [Track]
     let stations: [Station]
     private let trackByKey: [String: Track]
-
-    private static let originLat = 37.55
-    private static let originLon = 126.99
-
-    private static func project(_ c: [Double]) -> CGPoint {
-        let x = (c[1] - originLon) * cos(originLat * .pi / 180)
-        let y = -(c[0] - originLat)
-        return CGPoint(x: x, y: y)
-    }
 
     private init() {
         var tracks: [Track] = []
@@ -39,17 +32,25 @@ final class NetworkGeometry {
         var byKey: [String: Track] = [:]
         for line in SubwayCatalog.shared.lines {
             for (si, names) in line.segments.enumerated() {
-                var points: [CGPoint] = []
+                var points: [CLLocationCoordinate2D] = []
                 for name in names {
-                    if let c = line.coords[name], c.count == 2 { points.append(NetworkGeometry.project(c)) }
+                    if let c = line.coords[name], c.count == 2 {
+                        points.append(CLLocationCoordinate2D(latitude: c[0], longitude: c[1]))
+                    }
                 }
                 guard points.count == names.count, points.count >= 2 else { continue }
-                let track = Track(line: line, segment: si, points: points, closed: line.loop && si == 0)
-                tracks.append(track)
-                byKey["\(line.id)#\(si)"] = track
                 for (i, name) in names.enumerated() {
-                    stations.append(Station(name: name, lineID: line.id, segment: si, index: i, point: points[i]))
+                    stations.append(Station(
+                        id: "\(line.id)#\(si)#\(i)", name: name, lineID: line.id, color: line.color,
+                        segment: si, index: i, coordinate: points[i]
+                    ))
                 }
+                let key = "\(line.id)#\(si)"
+                // 순환선은 마지막 역에서 첫 역으로 선을 닫는다.
+                let drawn = line.loop && si == 0 ? points + [points[0]] : points
+                let track = Track(id: key, line: line, segment: si, coordinates: drawn)
+                tracks.append(track)
+                byKey[key] = track
             }
         }
         self.tracks = tracks
@@ -57,17 +58,20 @@ final class NetworkGeometry {
         trackByKey = byKey
     }
 
-    /// 노선도 위 열차 위치. `row`는 역 순서에 구간 내 위치를 더한 값이다.
-    func point(lineID: String, segment: Int, row: Double) -> CGPoint? {
+    /// 노선 위 열차 좌표. `row`는 역 순서에 구간 내 위치를 더한 값이다.
+    func coordinate(lineID: String, segment: Int, row: Double) -> CLLocationCoordinate2D? {
         guard let track = trackByKey["\(lineID)#\(segment)"] else { return nil }
-        let last = Double(track.points.count - 1)
+        let last = Double(track.coordinates.count - 1)
         let r = min(max(row, 0), last)
         let i = Int(r.rounded(.down))
-        let j = min(i + 1, track.points.count - 1)
-        let f = CGFloat(r - Double(i))
-        let a = track.points[i]
-        let b = track.points[j]
-        return CGPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f)
+        let j = min(i + 1, track.coordinates.count - 1)
+        let f = r - Double(i)
+        let a = track.coordinates[i]
+        let b = track.coordinates[j]
+        return CLLocationCoordinate2D(
+            latitude: a.latitude + (b.latitude - a.latitude) * f,
+            longitude: a.longitude + (b.longitude - a.longitude) * f
+        )
     }
 
     func station(named name: String) -> Station? {
@@ -89,59 +93,34 @@ private enum MapSheet: Identifiable {
     }
 }
 
-private struct TrainDot {
-    let point: CGPoint
+private struct TrainDot: Identifiable {
+    let id: String
+    let coordinate: CLLocationCoordinate2D
     let color: Color
 }
 
 struct NetworkMapView: View {
     @EnvironmentObject private var store: TrainStore
     @EnvironmentObject private var settings: AppSettings
-    @State private var zoom: CGFloat = 1.5
-    @State private var pan: CGSize = .zero
-    @GestureState private var pinch: CGFloat = 1
-    @GestureState private var drag: CGSize = .zero
+    @State private var camera: MapCameraPosition = .region(NetworkMapView.seoul)
+    @State private var region = NetworkMapView.seoul
     @State private var sheet: MapSheet?
 
     private let geometry = NetworkGeometry.shared
-    /// 확대 1배일 때 경위도 1도가 차지하는 화면 길이
-    private let unit: CGFloat = 1500
-    private let minZoom: CGFloat = 0.35
-    private let maxZoom: CGFloat = 16
+
+    private static let seoul = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 37.545, longitude: 126.99),
+        span: MKCoordinateSpan(latitudeDelta: 0.24, longitudeDelta: 0.24)
+    )
 
     private var liveKey: Bool { !settings.effectiveSeoulKey.isEmpty }
 
     var body: some View {
-        GeometryReader { geo in
-            let z = min(max(zoom * pinch, minZoom), maxZoom)
-            let factor = z / zoom
-            let offset = CGSize(width: pan.width * factor + drag.width, height: pan.height * factor + drag.height)
-
-            TimelineView(.periodic(from: .now, by: 10)) { context in
-                canvas(size: geo.size, z: z, offset: offset, dots: trainDots(at: context.date))
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 4)
-                    .updating($drag) { value, state, _ in state = value.translation }
-                    .onEnded { value in
-                        pan.width += value.translation.width
-                        pan.height += value.translation.height
-                    }
-            )
-            .simultaneousGesture(
-                MagnifyGesture()
-                    .updating($pinch) { value, state, _ in state = value.magnification }
-                    .onEnded { value in setZoom(zoom * value.magnification) }
-            )
-            .onTapGesture(coordinateSpace: .local) { location in
-                tap(location, size: geo.size, z: z, offset: offset)
-            }
-            .overlay(alignment: .top) { topBar }
-            .overlay(alignment: .bottomTrailing) { zoomButtons }
-            .overlay(alignment: .bottomLeading) { legend }
+        TimelineView(.periodic(from: .now, by: 10)) { context in
+            map(dots: trainDots(at: context.date))
         }
-        .background(Palette.background.ignoresSafeArea())
+        .overlay(alignment: .top) { topBar }
+        .overlay(alignment: .bottomLeading) { legend }
         .sheet(item: $sheet) { item in
             switch item {
             case .search:
@@ -164,71 +143,60 @@ struct NetworkMapView: View {
         }
     }
 
-    // MARK: 그리기
+    // MARK: 지도
 
-    private func place(_ p: CGPoint, size: CGSize, z: CGFloat, offset: CGSize) -> CGPoint {
-        CGPoint(
-            x: size.width / 2 + p.x * unit * z + offset.width,
-            y: size.height / 2 + p.y * unit * z + offset.height
-        )
+    private func inView(_ c: CLLocationCoordinate2D) -> Bool {
+        abs(c.latitude - region.center.latitude) <= region.span.latitudeDelta * 0.6
+            && abs(c.longitude - region.center.longitude) <= region.span.longitudeDelta * 0.6
     }
 
-    private func canvas(size: CGSize, z: CGFloat, offset: CGSize, dots: [TrainDot]) -> some View {
-        Canvas { context, canvasSize in
-            let width = min(7, 2.2 + z * 0.55)
-            for track in geometry.tracks {
-                var path = Path()
-                for (i, p) in track.points.enumerated() {
-                    let q = place(p, size: canvasSize, z: z, offset: offset)
-                    if i == 0 { path.move(to: q) } else { path.addLine(to: q) }
+    private func map(dots: [TrainDot]) -> some View {
+        // 역 표시는 충분히 확대했을 때 화면 안에 있는 것만 그린다.
+        let span = region.span.latitudeDelta
+        let showStations = span < 0.14
+        let showNames = span < 0.07
+        let stations = showStations ? geometry.stations.filter { inView($0.coordinate) } : []
+        let visibleDots = dots.filter { inView($0.coordinate) }
+        let width: CGFloat = span < 0.1 ? 6 : (span < 0.3 ? 4.5 : 3)
+
+        return MapReader { proxy in
+            Map(position: $camera) {
+                ForEach(geometry.tracks) { track in
+                    MapPolyline(coordinates: track.coordinates)
+                        .stroke(Color(hex: track.line.color), style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
                 }
-                if track.closed { path.closeSubpath() }
-                context.stroke(
-                    path,
-                    with: .color(Color(hex: track.line.color)),
-                    style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round)
-                )
-            }
-
-            let bounds = CGRect(origin: .zero, size: canvasSize).insetBy(dx: -30, dy: -30)
-            if z >= 1.8 {
-                let r = min(5.5, 1.6 + z * 0.45)
-                for station in geometry.stations {
-                    let q = place(station.point, size: canvasSize, z: z, offset: offset)
-                    guard bounds.contains(q) else { continue }
-                    let dot = Path(ellipseIn: CGRect(x: q.x - r, y: q.y - r, width: r * 2, height: r * 2))
-                    context.fill(dot, with: .color(.white))
-                    context.stroke(dot, with: .color(Color(hex: lineColor(station.lineID))), lineWidth: max(1.2, r * 0.45))
+                ForEach(stations) { station in
+                    Annotation(station.name, coordinate: station.coordinate, anchor: .center) {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 11, height: 11)
+                            .overlay(Circle().stroke(Color(hex: station.color), lineWidth: 3))
+                            .allowsHitTesting(false)
+                    }
+                    .annotationTitles(showNames ? .visible : .hidden)
+                }
+                ForEach(visibleDots) { dot in
+                    Annotation("", coordinate: dot.coordinate, anchor: .center) {
+                        Circle()
+                            .fill(dot.color)
+                            .frame(width: 13, height: 13)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                            .background(Circle().fill(dot.color.opacity(0.3)).frame(width: 25, height: 25))
+                            .allowsHitTesting(false)
+                    }
+                    .annotationTitles(.hidden)
                 }
             }
-
-            for dot in dots {
-                let q = place(dot.point, size: canvasSize, z: z, offset: offset)
-                guard bounds.contains(q) else { continue }
-                let r = min(7, 3 + z * 0.5)
-                let halo = Path(ellipseIn: CGRect(x: q.x - r * 1.9, y: q.y - r * 1.9, width: r * 3.8, height: r * 3.8))
-                context.fill(halo, with: .color(dot.color.opacity(0.28)))
-                let core = Path(ellipseIn: CGRect(x: q.x - r, y: q.y - r, width: r * 2, height: r * 2))
-                context.fill(core, with: .color(dot.color))
-                context.stroke(core, with: .color(.white), lineWidth: 1.6)
+            .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
+            .onMapCameraChange(frequency: .onEnd) { context in
+                region = context.region
             }
-
-            if z >= 4.2 {
-                var drawn = Set<String>()
-                for station in geometry.stations where drawn.insert(station.name).inserted {
-                    let q = place(station.point, size: canvasSize, z: z, offset: offset)
-                    guard bounds.contains(q) else { continue }
-                    context.draw(
-                        Text(station.name).font(.pre(11, .semibold)).foregroundColor(Palette.ink),
-                        at: CGPoint(x: q.x, y: q.y + 13)
-                    )
+            .onTapGesture { location in
+                if let coordinate = proxy.convert(location, from: .local) {
+                    tap(coordinate)
                 }
             }
         }
-    }
-
-    private func lineColor(_ id: String) -> String {
-        store.catalog.lines.first { $0.id == id }?.color ?? "#888888"
     }
 
     /// 지도에 찍을 열차. 인증키가 없으면 전 노선 미리보기, 있으면 이미 받아 둔 노선의 실제 위치만.
@@ -246,8 +214,8 @@ struct NetworkMapView: View {
             let color = Color(hex: line.color)
             for train in trains {
                 guard let placed = line.place(train),
-                      let p = geometry.point(lineID: line.id, segment: placed.segment, row: placed.row) else { continue }
-                out.append(TrainDot(point: p, color: color))
+                      let c = geometry.coordinate(lineID: line.id, segment: placed.segment, row: placed.row) else { continue }
+                out.append(TrainDot(id: "\(line.id)#\(train.id)", coordinate: c, color: color))
             }
         }
         return out
@@ -255,19 +223,16 @@ struct NetworkMapView: View {
 
     // MARK: 조작
 
-    private func setZoom(_ value: CGFloat) {
-        let next = min(max(value, minZoom), maxZoom)
-        let factor = next / zoom
-        pan = CGSize(width: pan.width * factor, height: pan.height * factor)
-        zoom = next
-    }
-
-    private func tap(_ location: CGPoint, size: CGSize, z: CGFloat, offset: CGSize) {
+    /// 누른 곳에서 가장 가까운 역을 연다. 화면에 보이는 범위의 4% 안쪽만 인정한다.
+    private func tap(_ c: CLLocationCoordinate2D) {
+        let limit = region.span.latitudeDelta * 0.04
+        let scale = cos(c.latitude * .pi / 180)
         var best: NetworkGeometry.Station?
-        var bestDistance: CGFloat = 26
+        var bestDistance = limit
         for station in geometry.stations {
-            let q = place(station.point, size: size, z: z, offset: offset)
-            let d = hypot(q.x - location.x, q.y - location.y)
+            let dx = (station.coordinate.longitude - c.longitude) * scale
+            let dy = station.coordinate.latitude - c.latitude
+            let d = (dx * dx + dy * dy).squareRoot()
             if d < bestDistance {
                 bestDistance = d
                 best = station
@@ -289,9 +254,12 @@ struct NetworkMapView: View {
             sheet = nil
             return
         }
-        let next = max(zoom, 6)
-        zoom = next
-        pan = CGSize(width: -station.point.x * unit * next, height: -station.point.y * unit * next)
+        let target = MKCoordinateRegion(
+            center: station.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.035, longitudeDelta: 0.035)
+        )
+        camera = .region(target)
+        region = target
         open(station)
     }
 
@@ -314,7 +282,7 @@ struct NetworkMapView: View {
                 .padding(.horizontal, 14)
                 .frame(height: 46)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
+                .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
             }
             .buttonStyle(.plain)
 
@@ -326,7 +294,7 @@ struct NetworkMapView: View {
                     .foregroundStyle(.white)
                     .frame(width: 46, height: 46)
                     .background(Palette.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
+                    .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("경로 찾기")
@@ -335,39 +303,15 @@ struct NetworkMapView: View {
         .padding(.top, 8)
     }
 
-    private var zoomButtons: some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) { setZoom(zoom * 1.6) }
-            } label: {
-                Image(systemName: "plus").frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("확대")
-            Rectangle().fill(Palette.hairline).frame(width: 28, height: 1)
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) { setZoom(zoom / 1.6) }
-            } label: {
-                Image(systemName: "minus").frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("축소")
-        }
-        .font(.system(size: 16, weight: .semibold))
-        .foregroundStyle(Palette.ink)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 3)
-        .padding(.trailing, 16)
-        .padding(.bottom, 16)
-    }
-
     private var legend: some View {
-        Text(liveKey ? "점은 실시간 열차 · 열어 본 노선만 표시" : "점은 미리보기 열차 · 실제 위치와 다름")
+        Text(liveKey ? "색 점은 실시간 열차 · 열어 본 노선만 표시" : "색 점은 미리보기 열차 · 실제 위치와 다름")
             .font(.pre(11.5, .medium))
             .foregroundStyle(Palette.sub)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(Palette.surface.opacity(0.94), in: Capsule())
             .padding(.leading, 16)
-            .padding(.bottom, 22)
+            .padding(.bottom, 40)
     }
 }
 
