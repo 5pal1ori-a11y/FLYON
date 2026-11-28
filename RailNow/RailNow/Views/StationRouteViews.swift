@@ -402,7 +402,7 @@ struct RouteSheet: View {
                                     Circle().fill(Palette.faint).frame(width: 3, height: 3)
                                 }
                             }
-                            .frame(width: 26)
+                            .frame(width: 40)
                             Text("환승 · 약 \(Int(RouteFinder.transferMinutes))분")
                                 .font(.pre(12.5, .medium))
                                 .foregroundStyle(Palette.sub)
@@ -431,13 +431,14 @@ private struct LegView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
                 LineBadge(line: leg.line, size: 26)
+                    .fixedSize()
                 Rectangle().fill(tint).frame(width: 4)
                 Circle()
                     .fill(Palette.background)
                     .frame(width: 12, height: 12)
                     .overlay(Circle().stroke(tint, lineWidth: 3.5))
             }
-            .frame(width: 26)
+            .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(leg.from)
