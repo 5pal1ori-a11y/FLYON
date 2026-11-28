@@ -1,13 +1,16 @@
 name: 듀오 던전 TestFlight
 
 # 듀오 던전(DuoDungeon) 게임 전용.
-# 실행: Actions 탭 > 듀오 던전 TestFlight > Run workflow, 또는 duodungeon-v* 태그를 푸시하면 자동 실행
+# 실행: Actions 탭 > 듀오 던전 TestFlight > Run workflow,
+#       또는 DuoDungeon/RELEASE 파일을 고쳐 main에 푸시하면 자동 실행 (duodungeon-v* 태그도 가능)
 # 기기(UDID) 등록 없이 서명하기 위해, 실행마다 임시 배포 인증서/프로파일을 API로 만들고
 # 업로드 후 삭제한다. (ci/apple_signing.py, FLYON과 같은 팀·시크릿 사용)
 on:
   workflow_dispatch: {}
   push:
     tags: ["duodungeon-v*"]
+    branches: [main]
+    paths: ["DuoDungeon/RELEASE"]
 
 permissions:
   contents: read

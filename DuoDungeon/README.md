@@ -45,7 +45,7 @@ DuoDungeon/
 ## 자동 빌드와 TestFlight
 
 - `.github/workflows/duodungeon-build-check.yml`: `DuoDungeon/` 아래 파일이 main에 푸시되면 시뮬레이터용으로 컴파일만 해 봅니다.
-- `.github/workflows/testflight-duodungeon.yml`: Actions 탭에서 **듀오 던전 TestFlight → Run workflow**를 누르거나, `duodungeon-v*` 태그를 푸시하면 실행됩니다.
+- `.github/workflows/testflight-duodungeon.yml`: Actions 탭에서 **듀오 던전 TestFlight → Run workflow**를 누르거나, `DuoDungeon/RELEASE` 파일을 고쳐 main에 푸시하면 실행됩니다 (`duodungeon-v*` 태그 푸시도 가능).
 - 버전은 **3.0**입니다. 빌드 번호는 **40000 + 실행 번호**로, 다른 앱의 빌드 번호(1만·2만·3만대)와 겹치지 않습니다.
 - 번들 ID는 다른 앱들처럼 `com.flight.flyon`을 같이 씁니다. 그래서 TestFlight에서 설치하면 폰에 있던 FLYON·구독온·TRADEX·한평상회 테스트 빌드를 덮어씁니다. 따로 두려면 App Store Connect에 새 앱(예: `com.flight.duodungeon`)을 만들고 워크플로와 project.yml의 번들 ID를 바꾸면 됩니다.
 
