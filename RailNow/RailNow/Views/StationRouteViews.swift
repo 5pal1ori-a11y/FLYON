@@ -351,6 +351,13 @@ struct RouteSheet: View {
         }
     }
 
+    private func barWidth(_ leg: RouteLeg, plan: RoutePlan, total: CGFloat) -> CGFloat {
+        let riding = plan.legs.reduce(0) { $0 + $1.minutes }
+        let usable = total - CGFloat(plan.legs.count - 1) * 3
+        let share = CGFloat(leg.minutes) / CGFloat(max(riding, 1))
+        return max(10, usable * share)
+    }
+
     private func hint(_ text: String) -> some View {
         Text(text)
             .font(.pre(14))
@@ -379,8 +386,7 @@ struct RouteSheet: View {
                         ForEach(plan.legs) { leg in
                             Capsule()
                                 .fill(Color(hex: leg.line.color))
-                                .frame(width: max(10, (geo.size.width - CGFloat(plan.legs.count - 1) * 3)
-                                                  * CGFloat(leg.minutes) / CGFloat(max(plan.legs.reduce(0) { $0 + $1.minutes }, 1))))
+                                .frame(width: barWidth(leg, plan: plan, total: geo.size.width))
                         }
                     }
                 }
