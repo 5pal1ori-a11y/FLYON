@@ -78,6 +78,21 @@ final class TrainStore: ObservableObject {
     init(settings: AppSettings) {
         self.settings = settings
         rail = RailCatalog.previewTrains(day: Date())
+        #if DEBUG
+        // 시뮬레이터 스크린샷용 실행 인자: -screenshotTab subway|rail|settings -screenshotLine 1 -screenshotSheet rail
+        let args = UserDefaults.standard
+        switch args.string(forKey: "screenshotTab") {
+        case "subway": tab = .subway
+        case "rail": tab = .rail
+        case "settings": tab = .settings
+        default: break
+        }
+        if let line = args.string(forKey: "screenshotLine") { selectedLineID = line }
+        if args.string(forKey: "screenshotSheet") == "rail" {
+            let now = Date()
+            focusedRailID = rail.first { $0.kind == .ktx && ($0.position(at: now)?.progress ?? 0) > 0.4 }?.id
+        }
+        #endif
     }
 
     func refreshSubway(_ line: SubwayLine) async {

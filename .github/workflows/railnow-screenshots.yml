@@ -1,0 +1,93 @@
+name: 레일나우 screenshots
+
+# 시뮬레이터에서 레일나우(디버그 빌드, 미리보기 데이터)를 띄워 주요 화면을 캡처한다.
+# 수동 실행: Actions 탭 > 레일나우 screenshots > Run workflow (railnow-shots-* 브랜치 푸시로도 실행)
+# 결과는 railnow-screenshots 브랜치와 artifacts
+on:
+  workflow_dispatch: {}
+  push:
+    branches: ["railnow-shots-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd RailNow && xcodegen generate
+
+      - name: Build for simulator (Debug, no signing)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project RailNow/RailNow.xcodeproj \
+            -scheme RailNow \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO | tail -5
+
+      - name: Boot simulator and capture
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          c = [x for k, v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone') and 'Pro' in x['name'] and 'Max' not in x['name']]
+          c = c or [x for k, v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
+          print(c[-1]['udid'])")
+          echo "Simulator: $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          APP=$(find build/Build/Products/Debug-iphonesimulator -maxdepth 1 -name 'RailNow.app' | head -1)
+          BID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p shots
+
+          shoot() {  # $1 이름, 나머지는 실행 인자
+            local name="$1"; shift
+            xcrun simctl terminate "$UDID" "$BID" || true
+            xcrun simctl launch "$UDID" "$BID" "$@"
+            sleep 12
+            xcrun simctl io "$UDID" screenshot "shots/${MODE}-${name}.png"
+          }
+
+          for MODE in light dark; do
+            xcrun simctl ui "$UDID" appearance "$MODE"
+            shoot 1-home
+            shoot 2-subway -screenshotTab subway -screenshotLine 2
+            shoot 3-rail -screenshotTab rail
+            if [ "$MODE" = light ]; then
+              shoot 4-subway-branch -screenshotTab subway -screenshotLine 1
+              shoot 5-rail-detail -screenshotTab rail -screenshotSheet rail
+              shoot 6-settings -screenshotTab settings
+            fi
+          done
+          ls -la shots
+
+      - name: Push screenshots to railnow-screenshots branch
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for f in shots/*.png; do sips -s format jpeg -s formatOptions 70 -Z 1400 "$f" --out "out/$(basename "${f%.png}").jpg" >/dev/null; done
+          cd out
+          git init -q -b railnow-screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -q -m "레일나우 screenshots (run ${{ github.run_id }})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" railnow-screenshots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: railnow-screenshots
+          path: shots/*.png
+          retention-days: 7
