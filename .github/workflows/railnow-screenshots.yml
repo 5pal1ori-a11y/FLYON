@@ -70,6 +70,8 @@ jobs:
               shoot 4-subway-branch -screenshotTab subway -screenshotLine 1
               shoot 5-rail-detail -screenshotTab rail -screenshotSheet rail
               shoot 6-settings -screenshotTab settings
+              shoot 7-station -screenshotTab subway -screenshotLine 2 -screenshotSheet station
+              shoot 8-route -screenshotTab subway -screenshotLine 2 -screenshotSheet route
             fi
           done
           ls -la shots

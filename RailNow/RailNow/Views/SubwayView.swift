@@ -4,7 +4,7 @@ struct SubwayView: View {
     @EnvironmentObject private var store: TrainStore
     @EnvironmentObject private var settings: AppSettings
     @State private var segment = 0
-    @State private var selected: SubwayTrain?
+    @State private var sheet: SubwaySheet?
 
     private var line: SubwayLine? { store.catalog.line(store.selectedLineID) }
 
@@ -33,13 +33,38 @@ struct SubwayView: View {
             }
         }
         .onChange(of: store.selectedLineID) { _, _ in segment = 0 }
-        .sheet(item: $selected) { train in
+        .sheet(item: $sheet) { item in
             if let line {
-                SubwayTrainSheet(line: line, train: train)
-                    .presentationDetents([.height(360)])
-                    .presentationDragIndicator(.visible)
+                switch item {
+                case .train(let train):
+                    SubwayTrainSheet(line: line, train: train)
+                        .presentationDetents([.height(360)])
+                        .presentationDragIndicator(.visible)
+                case .station(let si, let index):
+                    if si < line.segments.count, index < line.segments[si].count {
+                        StationSheet(line: line, segment: si, index: index) { name, asOrigin in
+                            sheet = asOrigin ? .route(from: name, to: "") : .route(from: "", to: name)
+                        }
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                    }
+                case .route(let from, let to):
+                    RouteSheet(from: from, to: to)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
             }
         }
+        #if DEBUG
+        .onAppear {
+            // 시뮬레이터 스크린샷용: -screenshotSheet station|route
+            switch UserDefaults.standard.string(forKey: "screenshotSheet") {
+            case "station": sheet = .station(segment: 0, index: 21)
+            case "route": sheet = .route(from: "서울", to: "판교")
+            default: break
+            }
+        }
+        #endif
     }
 
     private func header(_ line: SubwayLine) -> some View {
@@ -47,6 +72,17 @@ struct SubwayView: View {
         return ScreenHeader(title: "지하철") {
             HStack(spacing: 10) {
                 SourcePill(source: store.subwaySource[line.id] ?? .preview)
+                Button {
+                    sheet = .route(from: "", to: "")
+                } label: {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Palette.accent)
+                        .frame(width: 36, height: 36)
+                        .background(Palette.surface, in: Circle())
+                        .overlay(Circle().stroke(Palette.hairline, lineWidth: 1))
+                }
+                .accessibilityLabel("경로 찾기")
                 Button {
                     settings.toggleFavorite(line.id)
                 } label: {
@@ -133,7 +169,11 @@ struct SubwayView: View {
         return ScrollView {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 Section {
-                    LineDiagram(line: line, stations: stations, trains: trains) { selected = $0 }
+                    LineDiagram(
+                        line: line, stations: stations, trains: trains,
+                        onStation: { sheet = .station(segment: si, index: $0) },
+                        onSelect: { sheet = .train($0) }
+                    )
                         .padding(.top, 6)
                     footer(line)
                 } header: {
@@ -234,6 +274,7 @@ private struct LineDiagram: View {
     let line: SubwayLine
     let stations: [String]
     let trains: [PlacedTrain]
+    let onStation: (Int) -> Void
     let onSelect: (SubwayTrain) -> Void
 
     var body: some View {
@@ -241,12 +282,21 @@ private struct LineDiagram: View {
         VStack(spacing: 0) {
             ForEach(Array(stations.enumerated()), id: \.offset) { index, name in
                 HStack(spacing: 0) {
-                    Text(name)
-                        .font(.pre(15, .medium))
-                        .foregroundStyle(Palette.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Spacer(minLength: 8)
+                    Button {
+                        onStation(index)
+                    } label: {
+                        HStack(spacing: 0) {
+                            Text(name)
+                                .font(.pre(15, .medium))
+                                .foregroundStyle(Palette.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            Spacer(minLength: 8)
+                        }
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     TrackCell(tint: tint, first: index == 0, last: index == stations.count - 1)
                     TrackCell(tint: tint, first: index == 0, last: index == stations.count - 1)
                 }
