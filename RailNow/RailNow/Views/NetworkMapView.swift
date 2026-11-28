@@ -97,7 +97,7 @@ private struct TrainDot {
 struct NetworkMapView: View {
     @EnvironmentObject private var store: TrainStore
     @EnvironmentObject private var settings: AppSettings
-    @State private var zoom: CGFloat = 1
+    @State private var zoom: CGFloat = 1.5
     @State private var pan: CGSize = .zero
     @GestureState private var pinch: CGFloat = 1
     @GestureState private var drag: CGSize = .zero
