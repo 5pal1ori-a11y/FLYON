@@ -91,7 +91,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         note("지하철 위치는 서울시가 제공하는 실시간 정보이며, 수신 시점에 따라 실제와 조금 다를 수 있습니다. 인천 1·2호선, 김포골드라인, 용인·의정부경전철은 실시간 위치가 공개되지 않습니다.")
                         note("KTX·SRT·ITX-새마을·무궁화호는 열차 좌표를 주는 공개 API가 없어, 시간표로 계산한 추정 위치를 보여 줍니다. 지연은 반영되지 않습니다.")
-                        note("이 앱은 한국철도공사, 에스알, 서울교통공사 등 운영기관과 관계없는 비공식 앱입니다. 승차권과 정확한 운행 정보는 각 운영기관에서 확인하세요.")
+                        note("이 앱은 국토교통부(국가대중교통정보센터 TAGO), 한국철도공사, 에스알, 서울교통공사 등과 관계없는 비공식 앱입니다. 승차권과 정확한 운행 정보는 각 운영기관에서 확인하세요.")
                         note("이 앱은 개인정보를 수집하거나 서버로 보내지 않습니다.")
                     }
                 }
@@ -108,7 +108,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("레일나우 \(version)")
+                Text("TAGO 타고 \(version)")
                     .font(.pre(12.5))
                     .foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity)

@@ -52,7 +52,7 @@ struct SubwayView: View {
                 } label: {
                     Image(systemName: favorite ? "star.fill" : "star")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(favorite ? Palette.accent : Palette.sub)
+                        .foregroundStyle(favorite ? Palette.star : Palette.sub)
                         .frame(width: 36, height: 36)
                         .background(Palette.surface, in: Circle())
                         .overlay(Circle().stroke(Palette.hairline, lineWidth: 1))

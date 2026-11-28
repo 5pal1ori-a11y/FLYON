@@ -50,7 +50,7 @@ struct SourcePill: View {
         switch source {
         case .live: return Palette.live
         case .preview: return Palette.sub
-        case .failed: return Palette.accent
+        case .failed: return Palette.star
         }
     }
 

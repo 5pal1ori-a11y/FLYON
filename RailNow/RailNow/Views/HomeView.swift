@@ -35,16 +35,24 @@ struct HomeView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(KST.day(now))
-                        .font(.pre(14, .medium))
-                        .foregroundStyle(Palette.sub)
-                    Text("지금 열차는 어디쯤")
-                        .font(.pre(28, .bold))
+                HStack(spacing: 8) {
+                    Image("LogoMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 20)
+                    Text("타고")
+                        .font(.pre(21, .bold))
                         .foregroundStyle(Palette.ink)
+                    Spacer()
+                    Text(KST.day(now))
+                        .font(.pre(13, .medium))
+                        .foregroundStyle(Palette.sub)
                 }
-                .padding(.top, 14)
-                .padding(.bottom, 22)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+
+                hero(active: active)
+                    .padding(.bottom, 26)
 
                 if needsKey {
                     keyNotice
@@ -104,6 +112,56 @@ struct HomeView: View {
         }
     }
 
+    private func hero(active: [ActiveRail]) -> some View {
+        let subwayCount = favoriteLines.reduce(0) { $0 + (store.subway[$1.id]?.count ?? 0) }
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        return VStack(alignment: .leading, spacing: 20) {
+            Text("지금 열차는 어디쯤")
+                .font(.pre(23, .bold))
+                .foregroundStyle(.white)
+            HStack(spacing: 0) {
+                heroStat(value: subwayCount, label: "즐겨찾는 노선 지하철")
+                Rectangle()
+                    .fill(Color.white.opacity(0.28))
+                    .frame(width: 1, height: 38)
+                    .padding(.horizontal, 20)
+                heroStat(value: active.count, label: "달리는 기차")
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(colors: Palette.brand, startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .overlay(alignment: .topTrailing) {
+            Image("LogoMark")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 170)
+                .foregroundStyle(Color.white.opacity(0.13))
+                .offset(x: 46, y: 10)
+        }
+        .clipShape(shape)
+    }
+
+    private func heroStat(value: Int, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(value)")
+                    .font(.pre(30, .bold))
+                    .monospacedDigit()
+                Text("대")
+                    .font(.pre(15, .semibold))
+            }
+            .foregroundStyle(.white)
+            Text(label)
+                .font(.pre(12.5, .medium))
+                .foregroundStyle(Color.white.opacity(0.8))
+        }
+    }
+
     private var keyNotice: some View {
         Button {
             store.tab = .settings
@@ -128,7 +186,7 @@ struct HomeView: View {
                     .foregroundStyle(Palette.faint)
             }
             .padding(14)
-            .background(Palette.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Palette.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
     }

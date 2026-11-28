@@ -12,7 +12,7 @@ targets:
     info:
       path: RailNow/Info.plist
       properties:
-        CFBundleDisplayName: 레일나우
+        CFBundleDisplayName: TAGO 타고
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.navigation
@@ -38,7 +38,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon
         PRODUCT_NAME: RailNow
-        MARKETING_VERSION: "4.0"   # 같은 FLYON 앱 자리를 쓰는 다른 앱(최대 3.0)보다 높게 → TestFlight 기본 빌드가 레일나우
+        MARKETING_VERSION: "4.0"   # 같은 FLYON 앱 자리를 쓰는 다른 앱(최대 3.0)보다 높게 → TestFlight 기본 빌드가 TAGO 타고
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
