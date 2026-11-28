@@ -1,0 +1,46 @@
+name: DuoDungeon
+options:
+  bundleIdPrefix: com.flight
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: ko
+targets:
+  DuoDungeon:
+    type: application
+    platform: iOS
+    sources: [DuoDungeon]
+    entitlements:
+      path: DuoDungeon/DuoDungeon.entitlements
+      properties:
+        com.apple.developer.game-center: true
+    info:
+      path: DuoDungeon/Info.plist
+      properties:
+        CFBundleDisplayName: 듀오 던전
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.action-games
+        ITSAppUsesNonExemptEncryption: false   # HTTPS·기본 암호화만 사용
+        NSLocalNetworkUsageDescription: 근처에 있는 친구와 같은 와이파이로 함께 플레이하려면 로컬 네트워크 접근이 필요해요.
+        NSBonjourServices:
+          - _duodgn._tcp
+          - _duodgn._udp
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon
+        PRODUCT_NAME: DuoDungeon
+        MARKETING_VERSION: "3.0"   # 같은 FLYON 앱 자리를 쓰는 다른 앱(최대 2.0)보다 높게 → TestFlight 기본 빌드가 듀오 던전
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

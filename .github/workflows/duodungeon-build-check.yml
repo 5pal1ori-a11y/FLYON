@@ -1,0 +1,44 @@
+name: 듀오 던전 build check
+
+# 서명 없이 시뮬레이터용으로 컴파일만 해 본다. (비밀값 불필요)
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "DuoDungeon/**"
+      - ".github/workflows/duodungeon-build-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: cd DuoDungeon && xcodegen generate
+
+      - name: Build (simulator, no signing)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project DuoDungeon/DuoDungeon.xcodeproj \
+            -scheme DuoDungeon \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO 2>&1 | tee build.log
+
+      - name: Report compile errors
+        if: failure()
+        run: |
+          grep -E "error:" build.log | sort -u | head -10 | while IFS= read -r l; do echo "::error::$l"; done || true
