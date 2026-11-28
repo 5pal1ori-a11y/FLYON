@@ -179,9 +179,9 @@ struct NetworkMapView: View {
                     Annotation("", coordinate: dot.coordinate, anchor: .center) {
                         Circle()
                             .fill(dot.color)
-                            .frame(width: 13, height: 13)
-                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            .background(Circle().fill(dot.color.opacity(0.3)).frame(width: 25, height: 25))
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 1.8))
+                            .background(Circle().fill(dot.color.opacity(0.28)).frame(width: 18, height: 18))
                             .allowsHitTesting(false)
                     }
                     .annotationTitles(.hidden)
