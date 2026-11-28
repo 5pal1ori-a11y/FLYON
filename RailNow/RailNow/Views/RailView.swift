@@ -69,7 +69,7 @@ struct RailView: View {
         Map(position: $camera) {
             ForEach(routes) { route in
                 MapPolyline(coordinates: route.coordinates)
-                    .stroke(route.kind.color.opacity(0.5), lineWidth: 2.5)
+                    .stroke(route.kind.color.opacity(0.75), lineWidth: 3)
             }
             ForEach(active) { item in
                 Annotation(item.train.title, coordinate: item.position.coordinate, anchor: .center) {
@@ -78,9 +78,9 @@ struct RailView: View {
                     } label: {
                         Circle()
                             .fill(item.train.kind.color)
-                            .frame(width: 13, height: 13)
+                            .frame(width: 12, height: 12)
                             .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                            .shadow(color: item.train.kind.color, radius: 5)
                             .padding(8)
                             .contentShape(Rectangle())
                     }
@@ -90,22 +90,22 @@ struct RailView: View {
             }
         }
         .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
-        .frame(height: 300)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Palette.hairline, lineWidth: 1)
-        )
+        .frame(height: 330)
+        .overlay(alignment: .bottom) {
+            LinearGradient(colors: [Palette.background.opacity(0), Palette.background], startPoint: .top, endPoint: .bottom)
+                .frame(height: 46)
+                .allowsHitTesting(false)
+        }
         .overlay(alignment: .bottomLeading) {
             Text("위치는 시간표로 계산한 추정값")
                 .font(.pre(11, .medium))
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Palette.surface.opacity(0.9), in: Capsule())
-                .padding(10)
+                .background(Palette.raised.opacity(0.92), in: Capsule())
+                .padding(.leading, 16)
+                .padding(.bottom, 14)
         }
-        .padding(.horizontal, 16)
     }
 
     private var filterBar: some View {
@@ -143,12 +143,10 @@ struct RailView: View {
 
     private func list(active: [ActiveRail], now: Date) -> some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                HStack {
-                    SectionTitle(title: "지금 달리는 열차", trailing: "\(active.count)대")
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 6)
+            LazyVStack(spacing: 8) {
+                SectionTitle(title: "지금 달리는 열차", trailing: "\(active.count)대")
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 2)
 
                 if active.isEmpty {
                     Text("지금은 운행 중인 열차가 없어요")
@@ -164,53 +162,60 @@ struct RailView: View {
                         RailRow(item: item, now: now)
                     }
                     .buttonStyle(.plain)
-                    Rectangle().fill(Palette.hairline).frame(height: 1).padding(.leading, 20)
                 }
             }
+            .padding(.horizontal, 16)
             .padding(.bottom, 24)
         }
     }
 }
 
+/// 전광판 한 줄: 왼쪽 색 막대, 구간, 오른쪽에 다음 역까지 남은 시간.
 struct RailRow: View {
     let item: ActiveRail
     let now: Date
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(item.train.kind.color)
+                .frame(width: 5)
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 7) {
-                    KindBadge(kind: item.train.kind, text: item.train.kindName)
-                    if !item.train.number.isEmpty {
-                        Text(item.train.number)
-                            .font(.pre(14, .semibold))
-                            .foregroundStyle(Palette.ink)
-                            .monospacedDigit()
-                    }
-                    Text("\(item.train.origin) → \(item.train.destination)")
-                        .font(.pre(14, .medium))
-                        .foregroundStyle(Palette.ink)
+                    Text(item.train.title)
+                        .font(.pre(12.5, .bold))
+                        .foregroundStyle(Palette.sub)
+                        .monospacedDigit()
+                    Circle().fill(Palette.faint).frame(width: 3, height: 3)
+                    Text("\(item.position.previous) – \(item.position.next)")
+                        .font(.pre(12.5, .medium))
+                        .foregroundStyle(Palette.sub)
                         .lineLimit(1)
                 }
-                ProgressBar(value: item.position.progress, tint: item.train.kind.color)
-                Text("\(item.position.previous) – \(item.position.next) 구간")
-                    .font(.pre(12.5))
-                    .foregroundStyle(Palette.sub)
-            }
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(item.position.next)
-                    .font(.pre(13, .semibold))
+                Text("\(item.train.origin) → \(item.train.destination)")
+                    .font(.pre(18, .bold))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
-                Text(minutesText(item.position.nextTime.timeIntervalSince(now)))
-                    .font(.pre(16, .bold))
-                    .foregroundStyle(Palette.accent)
-                    .monospacedDigit()
+                ProgressBar(value: item.position.progress, tint: item.train.kind.color)
             }
-            .frame(minWidth: 62, alignment: .trailing)
+            .padding(.leading, 14)
+            .padding(.vertical, 14)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(minutesText(item.position.nextTime.timeIntervalSince(now)))
+                    .font(.pre(22, .bold))
+                    .foregroundStyle(Palette.ink)
+                    .monospacedDigit()
+                Text("\(item.position.next) 도착")
+                    .font(.pre(12, .medium))
+                    .foregroundStyle(Palette.sub)
+                    .lineLimit(1)
+            }
+            .frame(minWidth: 84, alignment: .trailing)
+            .padding(.horizontal, 14)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
+        .background(Palette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .contentShape(Rectangle())
     }
 }

@@ -12,7 +12,6 @@ struct SubwayView: View {
         VStack(spacing: 0) {
             if let line {
                 header(line)
-                linePicker(line)
                 if line.segments.count > 1 { segmentPicker(line) }
                 diagram(line)
             } else {
@@ -36,6 +35,13 @@ struct SubwayView: View {
         .sheet(item: $sheet) { item in
             if let line {
                 switch item {
+                case .lines:
+                    LinePickerSheet { id in
+                        store.selectedLineID = id
+                        sheet = nil
+                    }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
                 case .train(let train):
                     SubwayTrainSheet(line: line, train: train)
                         .presentationDetents([.height(360)])
@@ -57,83 +63,66 @@ struct SubwayView: View {
         }
         #if DEBUG
         .onAppear {
-            // 시뮬레이터 스크린샷용: -screenshotSheet station|route
+            // 시뮬레이터 스크린샷용: -screenshotSheet station|route|lines
             switch UserDefaults.standard.string(forKey: "screenshotSheet") {
             case "station": sheet = .station(segment: 0, index: 21)
             case "route": sheet = .route(from: "서울", to: "판교")
+            case "lines": sheet = .lines
             default: break
             }
         }
         #endif
     }
 
+    /// 노선 이름을 크게 두고, 누르면 전체 노선 목록이 열린다.
     private func header(_ line: SubwayLine) -> some View {
         let favorite = settings.favorites.contains(line.id)
-        return ScreenHeader(title: "지하철") {
-            HStack(spacing: 10) {
-                SourcePill(source: store.subwaySource[line.id] ?? .preview)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 Button {
-                    sheet = .route(from: "", to: "")
+                    sheet = .lines
                 } label: {
-                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Palette.accent)
-                        .frame(width: 36, height: 36)
-                        .background(Palette.surface, in: Circle())
-                        .overlay(Circle().stroke(Palette.hairline, lineWidth: 1))
-                }
-                .accessibilityLabel("경로 찾기")
-                Button {
-                    settings.toggleFavorite(line.id)
-                } label: {
-                    Image(systemName: favorite ? "star.fill" : "star")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(favorite ? Palette.star : Palette.sub)
-                        .frame(width: 36, height: 36)
-                        .background(Palette.surface, in: Circle())
-                        .overlay(Circle().stroke(Palette.hairline, lineWidth: 1))
-                }
-                .accessibilityLabel(favorite ? "즐겨찾기 해제" : "즐겨찾기 추가")
-            }
-        }
-    }
-
-    private func linePicker(_ current: SubwayLine) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(store.catalog.lines) { item in
-                        let on = item.id == current.id
-                        Button {
-                            store.selectedLineID = item.id
-                        } label: {
-                            HStack(spacing: 7) {
-                                LineBadge(line: item, size: 24)
-                                if on {
-                                    Text(item.name)
-                                        .font(.pre(14, .semibold))
-                                        .foregroundStyle(Palette.ink)
-                                }
-                            }
-                            .padding(.leading, 6)
-                            .padding(.trailing, on ? 12 : 6)
-                            .padding(.vertical, 6)
-                            .background(on ? Palette.surface : Color.clear, in: Capsule())
-                            .overlay(Capsule().stroke(on ? Palette.hairline : Color.clear, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .id(item.id)
-                        .accessibilityLabel(item.name)
+                    HStack(spacing: 10) {
+                        LineBadge(line: line, size: 36)
+                        Text(line.name)
+                            .font(.pre(28, .bold))
+                            .foregroundStyle(Palette.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Palette.sub)
                     }
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 14)
+                .buttonStyle(.plain)
+                .accessibilityLabel("노선 바꾸기, 지금 \(line.name)")
+
+                Spacer(minLength: 4)
+                CircleButton(icon: "arrow.triangle.turn.up.right.diamond.fill", tint: Palette.accent, label: "경로 찾기") {
+                    sheet = .route(from: "", to: "")
+                }
+                CircleButton(
+                    icon: favorite ? "star.fill" : "star",
+                    tint: favorite ? Palette.star : Palette.sub,
+                    label: favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"
+                ) {
+                    settings.toggleFavorite(line.id)
+                }
             }
-            .onAppear { proxy.scrollTo(current.id, anchor: .center) }
-            .onChange(of: current.id) { _, id in
-                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(id, anchor: .center) }
+            HStack(spacing: 8) {
+                SourcePill(source: store.subwaySource[line.id] ?? .preview)
+                if let updated = store.subwayUpdated[line.id] {
+                    Text("\(KST.hms(updated)) 기준 · 운행 중 \(store.subway[line.id]?.count ?? 0)대")
+                        .font(.pre(12.5, .medium))
+                        .foregroundStyle(Palette.sub)
+                        .monospacedDigit()
+                }
             }
         }
-        .padding(.bottom, 10)
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
     }
 
     private func segmentPicker(_ line: SubwayLine) -> some View {
@@ -145,18 +134,18 @@ struct SubwayView: View {
                         segment = i
                     } label: {
                         Text(line.segmentTitle(i))
-                            .font(.pre(13, on ? .semibold : .medium))
-                            .foregroundStyle(on ? Palette.background : Palette.sub)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(on ? Palette.ink : Palette.raised, in: Capsule())
+                            .font(.pre(13, on ? .bold : .medium))
+                            .foregroundStyle(on ? Color.onColor(hex: line.color) : Palette.sub)
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 8)
+                            .background(on ? Color(hex: line.color) : Palette.surface, in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 20)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 12)
     }
 
     private func diagram(_ line: SubwayLine) -> some View {
@@ -174,15 +163,14 @@ struct SubwayView: View {
                         onStation: { sheet = .station(segment: si, index: $0) },
                         onSelect: { sheet = .train($0) }
                     )
-                        .padding(.top, 6)
+                    .padding(.top, 8)
                     footer(line)
                 } header: {
                     DiagramHeader(
                         upTitle: loopMain ? "외선순환" : "\(stations.first ?? "") 방면",
                         downTitle: loopMain ? "내선순환" : "\(stations.last ?? "") 방면",
                         upCount: up,
-                        downCount: trains.count - up,
-                        updated: store.subwayUpdated[line.id]
+                        downCount: trains.count - up
                     )
                 }
             }
@@ -215,34 +203,25 @@ struct SubwayView: View {
     }
 }
 
-private let trackColumn: CGFloat = 86
-private let rowHeight: CGFloat = 46
+// 노선도 치수: 왼쪽은 위로 가는 열차, 가운데 굵은 선로, 그 옆에 역 이름, 오른쪽 끝은 아래로 가는 열차
+private let sideColumn: CGFloat = 96
+private let trackWidth: CGFloat = 30
+private let sidePadding: CGFloat = 12
+private let rowHeight: CGFloat = 52
 
 private struct DiagramHeader: View {
     let upTitle: String
     let downTitle: String
     let upCount: Int
     let downCount: Int
-    let updated: Date?
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("운행 중 \(upCount + downCount)대")
-                    .font(.pre(14, .semibold))
-                    .foregroundStyle(Palette.ink)
-                if let updated {
-                    Text("\(KST.hms(updated)) 기준")
-                        .font(.pre(11.5))
-                        .foregroundStyle(Palette.sub)
-                        .monospacedDigit()
-                }
-            }
+            side(icon: "arrow.up", title: upTitle, count: upCount)
             Spacer(minLength: 8)
-            column(icon: "arrow.up", title: upTitle, count: upCount)
-            column(icon: "arrow.down", title: downTitle, count: downCount)
+            side(icon: "arrow.down", title: downTitle, count: downCount)
         }
-        .padding(.leading, 20)
+        .padding(.horizontal, sidePadding)
         .padding(.vertical, 9)
         .background(Palette.background)
         .overlay(alignment: .bottom) {
@@ -250,26 +229,22 @@ private struct DiagramHeader: View {
         }
     }
 
-    private func column(icon: String, title: String, count: Int) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 9, weight: .bold))
-                Text(title)
-                    .font(.pre(11.5, .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .foregroundStyle(Palette.ink)
-            Text("\(count)대")
-                .font(.pre(11))
+    private func side(icon: String, title: String, count: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10, weight: .heavy))
+            Text(title)
+                .font(.pre(12.5, .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text("\(count)")
+                .font(.pre(12.5, .bold))
                 .foregroundStyle(Palette.sub)
                 .monospacedDigit()
         }
-        .frame(width: trackColumn)
+        .foregroundStyle(Palette.ink)
     }
 }
 
-/// 역을 위에서 아래로 늘어놓고, 오른쪽 두 줄의 선로 위에 열차를 올린다.
 private struct LineDiagram: View {
     let line: SubwayLine
     let stations: [String]
@@ -281,29 +256,27 @@ private struct LineDiagram: View {
         let tint = Color(hex: line.color)
         VStack(spacing: 0) {
             ForEach(Array(stations.enumerated()), id: \.offset) { index, name in
-                HStack(spacing: 0) {
-                    Button {
-                        onStation(index)
-                    } label: {
-                        HStack(spacing: 0) {
-                            Text(name)
-                                .font(.pre(15, .medium))
-                                .foregroundStyle(Palette.ink)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            Spacer(minLength: 8)
-                        }
-                        .frame(maxHeight: .infinity)
-                        .contentShape(Rectangle())
+                Button {
+                    onStation(index)
+                } label: {
+                    HStack(spacing: 0) {
+                        Color.clear.frame(width: sideColumn)
+                        TrackCell(tint: tint, first: index == 0, last: index == stations.count - 1)
+                        Text(name)
+                            .font(.pre(16, .semibold))
+                            .foregroundStyle(Palette.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .padding(.leading, 12)
+                        Spacer(minLength: sideColumn)
                     }
-                    .buttonStyle(.plain)
-                    TrackCell(tint: tint, first: index == 0, last: index == stations.count - 1)
-                    TrackCell(tint: tint, first: index == 0, last: index == stations.count - 1)
+                    .frame(height: rowHeight)
+                    .contentShape(Rectangle())
                 }
-                .frame(height: rowHeight)
-                .padding(.leading, 20)
+                .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, sidePadding)
         .overlay {
             GeometryReader { geo in
                 ForEach(trains) { placed in
@@ -314,7 +287,9 @@ private struct LineDiagram: View {
                     }
                     .buttonStyle(.plain)
                     .position(
-                        x: geo.size.width - trackColumn * (placed.towardStart ? 1.5 : 0.5),
+                        x: placed.towardStart
+                            ? sidePadding + sideColumn / 2
+                            : geo.size.width - sidePadding - sideColumn / 2,
                         y: (CGFloat(placed.row) + 0.5) * rowHeight
                     )
                     .animation(.easeInOut(duration: 0.6), value: placed.row)
@@ -324,6 +299,7 @@ private struct LineDiagram: View {
     }
 }
 
+/// 굵은 선로 한 칸과 역 표시.
 private struct TrackCell: View {
     let tint: Color
     let first: Bool
@@ -332,15 +308,15 @@ private struct TrackCell: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                Rectangle().fill(first ? Color.clear : tint.opacity(0.4)).frame(width: 3)
-                Rectangle().fill(last ? Color.clear : tint.opacity(0.4)).frame(width: 3)
+                Rectangle().fill(first ? Color.clear : tint).frame(width: 7)
+                Rectangle().fill(last ? Color.clear : tint).frame(width: 7)
             }
             Circle()
-                .fill(Palette.background)
-                .frame(width: 9, height: 9)
-                .overlay(Circle().stroke(tint, lineWidth: 2.5))
+                .fill(Color.white)
+                .frame(width: 13, height: 13)
+                .overlay(Circle().stroke(tint, lineWidth: 3))
         }
-        .frame(width: trackColumn)
+        .frame(width: trackWidth)
     }
 }
 
@@ -356,31 +332,89 @@ private struct TrainChip: View {
 
     var body: some View {
         let ink = Color.onColor(hex: line.color)
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Image(systemName: placed.towardStart ? "arrow.up" : "arrow.down")
-                .font(.system(size: 8.5, weight: .heavy))
+                .font(.system(size: 9.5, weight: .heavy))
             Text(label)
-                .font(.pre(11, .bold))
+                .font(.pre(12, .bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             if placed.train.express {
                 Text("급")
-                    .font(.pre(9.5, .bold))
+                    .font(.pre(10, .bold))
                     .foregroundStyle(Color(hex: line.color))
                     .padding(.horizontal, 3)
                     .background(ink, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
         }
         .foregroundStyle(ink)
-        .padding(.horizontal, 7)
-        .frame(height: 22)
-        .frame(maxWidth: trackColumn - 8)
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .frame(maxWidth: sideColumn - 6)
         .fixedSize(horizontal: true, vertical: false)
-        .background(Color(hex: line.color), in: Capsule())
-        .overlay(Capsule().stroke(Palette.background, lineWidth: 1.5))
-        .opacity(placed.train.estimated ? 0.82 : 1)
+        .background(Color(hex: line.color), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .shadow(color: Color(hex: line.color).opacity(placed.train.estimated ? 0 : 0.55), radius: 6)
+        .opacity(placed.train.estimated ? 0.9 : 1)
         .contentShape(Rectangle())
         .accessibilityLabel("\(label) 열차, \(placed.train.statusText)")
+    }
+}
+
+/// 전체 노선 목록. 두 줄 격자로 보여 준다.
+struct LinePickerSheet: View {
+    @EnvironmentObject private var store: TrainStore
+    @EnvironmentObject private var settings: AppSettings
+    let onPick: (String) -> Void
+
+    var body: some View {
+        let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("노선 선택")
+                    .font(.pre(22, .bold))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.top, 26)
+                    .padding(.bottom, 16)
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(store.catalog.lines) { line in
+                        let on = line.id == store.selectedLineID
+                        Button {
+                            onPick(line.id)
+                        } label: {
+                            HStack(spacing: 9) {
+                                LineBadge(line: line, size: 28)
+                                Text(line.name)
+                                    .font(.pre(15, .semibold))
+                                    .foregroundStyle(Palette.ink)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                Spacer(minLength: 0)
+                                if settings.favorites.contains(line.id) {
+                                    Image(systemName: "star.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Palette.star)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 54)
+                            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                    .stroke(on ? Color(hex: line.color) : Color.clear, lineWidth: 2)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Text("인천 1·2호선, 김포골드라인, 용인·의정부경전철은 실시간 위치가 공개되지 않아 미리보기로만 나옵니다.")
+                    .font(.pre(12.5))
+                    .foregroundStyle(Palette.sub)
+                    .padding(.top, 18)
+                    .padding(.bottom, 30)
+            }
+            .padding(.horizontal, 20)
+        }
+        .background(Palette.background.ignoresSafeArea())
     }
 }
 

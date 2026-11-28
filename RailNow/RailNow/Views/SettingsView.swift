@@ -160,11 +160,7 @@ struct SettingsView: View {
                 .focused($focused)
                 .padding(.horizontal, 13)
                 .frame(height: 46)
-                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Palette.hairline, lineWidth: 1)
-                )
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 

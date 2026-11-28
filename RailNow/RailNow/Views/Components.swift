@@ -67,6 +67,7 @@ struct SourcePill: View {
     }
 }
 
+/// 구역 이름. 작고 흐리게 써서 내용의 숫자와 노선색이 먼저 보이게 한다.
 struct SectionTitle: View {
     let title: String
     var trailing: String? = nil
@@ -74,13 +75,13 @@ struct SectionTitle: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(.pre(18, .bold))
-                .foregroundStyle(Palette.ink)
+                .font(.pre(13.5, .semibold))
+                .foregroundStyle(Palette.sub)
             Spacer()
             if let trailing {
                 Text(trailing)
-                    .font(.pre(13, .medium))
-                    .foregroundStyle(Palette.sub)
+                    .font(.pre(13.5, .semibold))
+                    .foregroundStyle(Palette.ink)
                     .monospacedDigit()
             }
         }
@@ -95,11 +96,7 @@ struct Card<Content: View>: View {
         content()
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Palette.hairline, lineWidth: 1)
-            )
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -111,14 +108,34 @@ struct ScreenHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center) {
             Text(title)
-                .font(.pre(26, .bold))
+                .font(.pre(30, .bold))
                 .foregroundStyle(Palette.ink)
             Spacer()
             trailing()
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
-        .padding(.bottom, 12)
+        .padding(.bottom, 14)
+    }
+}
+
+/// 동그란 아이콘 버튼.
+struct CircleButton: View {
+    let icon: String
+    var tint: Color = Palette.ink
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 40, height: 40)
+                .background(Palette.raised, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 

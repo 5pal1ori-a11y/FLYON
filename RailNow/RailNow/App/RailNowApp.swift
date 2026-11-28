@@ -18,6 +18,7 @@ struct RailNowApp: App {
                 .environmentObject(settings)
                 .environmentObject(store)
                 .tint(Palette.accent)
+                .preferredColorScheme(.dark)
         }
     }
 }

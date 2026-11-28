@@ -2,12 +2,14 @@ import SwiftUI
 
 /// 지하철 화면에서 띄우는 시트 종류.
 enum SubwaySheet: Identifiable {
+    case lines
     case train(SubwayTrain)
     case station(segment: Int, index: Int)
     case route(from: String, to: String)
 
     var id: String {
         switch self {
+        case .lines: return "lines"
         case .train(let train): return "train-\(train.id)"
         case .station(let segment, let index): return "station-\(segment)-\(index)"
         case .route(let from, let to): return "route-\(from)-\(to)"
@@ -268,8 +270,7 @@ struct RouteSheet: View {
                 Rectangle().fill(Palette.hairline).frame(height: 1).padding(.leading, 44)
                 field(label: "도착", value: to, tint: Palette.accent, active: picking == .to) { pick(.to) }
             }
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Palette.hairline, lineWidth: 1))
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
             Button {
                 let old = from
