@@ -18,7 +18,6 @@ struct RailNowApp: App {
                 .environmentObject(settings)
                 .environmentObject(store)
                 .tint(Palette.accent)
-                .preferredColorScheme(.dark)
         }
     }
 }
@@ -31,8 +30,11 @@ struct RootView: View {
             HomeView()
                 .tabItem { Label("홈", systemImage: "square.grid.2x2.fill") }
                 .tag(AppTab.home)
+            NetworkMapView()
+                .tabItem { Label("노선도", systemImage: "map.fill") }
+                .tag(AppTab.map)
             SubwayView()
-                .tabItem { Label("지하철", systemImage: "tram.fill") }
+                .tabItem { Label("실시간", systemImage: "tram.fill") }
                 .tag(AppTab.subway)
             RailView()
                 .tabItem { Label("기차", systemImage: "train.side.front.car") }

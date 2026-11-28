@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// 색과 글꼴. 검정 바탕에 로고의 파랑을 강조색으로 쓰고, 그 밖의 채도 높은 색은 노선색과 열차 종류색뿐이다.
+// 색과 글꼴. 로고의 파랑을 강조색으로 쓰고, 그 밖의 채도 높은 색은 노선색과 열차 종류색뿐이다.
 
 extension Color {
     init(hex: String) {
@@ -39,18 +39,18 @@ extension Color {
 }
 
 enum Palette {
-    // 밝은 모드 없이 어두운 화면 하나만 쓴다. 검정 바탕에서 노선색이 가장 잘 보인다.
-    static let background = Color(hex: "#0A0B0E")
-    static let surface = Color(hex: "#15171C")
-    static let raised = Color(hex: "#20232B")
-    static let hairline = Color(hex: "#272B34")
-    static let ink = Color(hex: "#F4F5F7")
-    static let sub = Color(hex: "#8D929C")
-    static let faint = Color(hex: "#555A66")
-    static let accent = Color(hex: "#3D8BFF")
-    static let star = Color(hex: "#FFC043")
+    // 밝은 화면은 흰 바탕에 파랑, 어두운 화면은 검정 바탕. 기기 설정을 따른다.
+    static let background = Color(light: "#F5F6F8", dark: "#0A0B0E")
+    static let surface = Color(light: "#FFFFFF", dark: "#15171C")
+    static let raised = Color(light: "#E9ECF1", dark: "#20232B")
+    static let hairline = Color(light: "#E1E5EB", dark: "#272B34")
+    static let ink = Color(light: "#111318", dark: "#F4F5F7")
+    static let sub = Color(light: "#6B7079", dark: "#8D929C")
+    static let faint = Color(light: "#A7ACB5", dark: "#555A66")
+    static let accent = Color(light: "#1A6DFF", dark: "#3D8BFF")
+    static let star = Color(light: "#F5A623", dark: "#FFC043")
     static let brand = [Color(hex: "#0A3BE0"), Color(hex: "#0A6CF5"), Color(hex: "#2FA8FF")]
-    static let live = Color(hex: "#2EDB8A")
+    static let live = Color(light: "#12A150", dark: "#2EDB8A")
 }
 
 enum PreWeight: String {

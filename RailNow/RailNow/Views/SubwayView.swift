@@ -35,6 +35,10 @@ struct SubwayView: View {
         .sheet(item: $sheet) { item in
             if let line {
                 switch item {
+                case .search:
+                    StationSearchSheet { name in openStation(name, current: line) }
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
                 case .lines:
                     LinePickerSheet { id in
                         store.selectedLineID = id
@@ -74,6 +78,23 @@ struct SubwayView: View {
         #endif
     }
 
+    /// 검색한 역이 지금 노선에 있으면 그 노선에서, 없으면 그 역을 지나는 첫 노선에서 역 안내를 연다.
+    private func openStation(_ name: String, current: SubwayLine) {
+        let passing = RouteFinder.shared.stationLines[name] ?? []
+        guard let target = passing.first(where: { $0.id == current.id }) ?? passing.first else {
+            sheet = nil
+            return
+        }
+        for (si, stations) in target.segments.enumerated() {
+            if let index = stations.firstIndex(of: name) {
+                store.selectedLineID = target.id
+                sheet = .station(segment: si, index: index)
+                return
+            }
+        }
+        sheet = nil
+    }
+
     /// 노선 이름을 크게 두고, 누르면 전체 노선 목록이 열린다.
     private func header(_ line: SubwayLine) -> some View {
         let favorite = settings.favorites.contains(line.id)
@@ -99,6 +120,9 @@ struct SubwayView: View {
                 .accessibilityLabel("노선 바꾸기, 지금 \(line.name)")
 
                 Spacer(minLength: 4)
+                CircleButton(icon: "magnifyingglass", label: "역 검색") {
+                    sheet = .search
+                }
                 CircleButton(icon: "arrow.triangle.turn.up.right.diamond.fill", tint: Palette.accent, label: "경로 찾기") {
                     sheet = .route(from: "", to: "")
                 }

@@ -142,10 +142,22 @@ def main(src, dst):
                 if done:
                     break
             assert done, (l["id"], a, x, b)
+        # 노선도 지도에 쓰는 역 좌표 (위도, 경도)
+        coords = {}
+        for st in d["stations"]:
+            if l["id"] in st["lines"]:
+                coords[st["ko"]] = [round(st["lat"], 5), round(st["lon"], 5)]
+        # 손으로 끼워 넣은 역은 같은 이름의 다른 노선 역 좌표를 쓴다.
+        for st in d["stations"]:
+            if any(st["ko"] in sg for sg in segs) and st["ko"] not in coords:
+                coords[st["ko"]] = [round(st["lat"], 5), round(st["lon"], 5)]
+        missing = [n for sg in segs for n in sg if n not in coords]
+        assert not missing, (l["id"], missing)
         lines.append({
             "id": l["id"], "name": l["ko"].replace("·", ""), "short": SHORT[l["id"]],
             "color": COLOUR_FIX.get(l["id"], l["colour"]), "live": LIVE.get(l["id"]), "loop": loop,
             "segments": segs,
+            "coords": coords,
         })
     out = {
         "attribution": "역·노선 자료 © OpenStreetMap contributors (ODbL 1.0), korea-mcp 가공본 기반",

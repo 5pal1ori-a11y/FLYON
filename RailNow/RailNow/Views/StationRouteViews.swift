@@ -3,6 +3,7 @@ import SwiftUI
 /// 지하철 화면에서 띄우는 시트 종류.
 enum SubwaySheet: Identifiable {
     case lines
+    case search
     case train(SubwayTrain)
     case station(segment: Int, index: Int)
     case route(from: String, to: String)
@@ -10,6 +11,7 @@ enum SubwaySheet: Identifiable {
     var id: String {
         switch self {
         case .lines: return "lines"
+        case .search: return "search"
         case .train(let train): return "train-\(train.id)"
         case .station(let segment, let index): return "station-\(segment)-\(index)"
         case .route(let from, let to): return "route-\(from)-\(to)"
@@ -367,8 +369,22 @@ struct RouteSheet: View {
             .padding(.top, 60)
     }
 
+    /// 지금 출발한다고 볼 때 구간마다 타는 시각과 내리는 시각(추정).
+    private func legTimes(_ plan: RoutePlan, start: Date) -> [(Date, Date)] {
+        var out: [(Date, Date)] = []
+        var clock = start
+        for leg in plan.legs {
+            let arrive = clock.addingTimeInterval(Double(leg.minutes) * 60)
+            out.append((clock, arrive))
+            clock = arrive.addingTimeInterval(RouteFinder.transferMinutes * 60)
+        }
+        return out
+    }
+
     private func result(_ plan: RoutePlan) -> some View {
-        ScrollView {
+        let now = Date()
+        let times = legTimes(plan, start: now)
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("약 \(plan.totalMinutes)분")
@@ -380,6 +396,11 @@ struct RouteSheet: View {
                         .foregroundStyle(Palette.sub)
                 }
                 .padding(.top, 22)
+                Text("지금 출발하면 \(KST.hm(now.addingTimeInterval(Double(plan.totalMinutes) * 60))) 도착")
+                    .font(.pre(14, .semibold))
+                    .foregroundStyle(Palette.accent)
+                    .monospacedDigit()
+                    .padding(.top, 4)
 
                 // 구간 길이에 비례한 색 띠
                 GeometryReader { geo in
@@ -410,7 +431,7 @@ struct RouteSheet: View {
                         }
                         .frame(height: 34)
                     }
-                    LegView(leg: leg)
+                    LegView(leg: leg, depart: times[leg.id].0, arrive: times[leg.id].1)
                 }
 
                 Text("소요 시간은 노선별 평균 역 간 시간과 환승 4분으로 계산한 추정값이에요. 실제 시간표, 급행 여부, 환승 거리에 따라 달라집니다.")
@@ -425,6 +446,8 @@ struct RouteSheet: View {
 
 private struct LegView: View {
     let leg: RouteLeg
+    let depart: Date
+    let arrive: Date
     @State private var expanded = false
 
     var body: some View {
@@ -442,10 +465,17 @@ private struct LegView: View {
             .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(leg.from)
-                    .font(.pre(17, .bold))
-                    .foregroundStyle(Palette.ink)
-                    .frame(height: 26)
+                HStack {
+                    Text(leg.from)
+                        .font(.pre(17, .bold))
+                        .foregroundStyle(Palette.ink)
+                    Spacer()
+                    Text(KST.hm(depart))
+                        .font(.pre(14, .semibold))
+                        .foregroundStyle(Palette.sub)
+                        .monospacedDigit()
+                }
+                .frame(height: 26)
                 Text("\(leg.line.name) · \(leg.heading)")
                     .font(.pre(13))
                     .foregroundStyle(Palette.sub)
@@ -482,12 +512,18 @@ private struct LegView: View {
                     .padding(.top, 10)
                 }
 
-                Text(leg.to)
-                    .font(.pre(17, .bold))
-                    .foregroundStyle(Palette.ink)
-                    .padding(.top, 14)
+                HStack {
+                    Text(leg.to)
+                        .font(.pre(17, .bold))
+                        .foregroundStyle(Palette.ink)
+                    Spacer()
+                    Text(KST.hm(arrive))
+                        .font(.pre(14, .semibold))
+                        .foregroundStyle(Palette.sub)
+                        .monospacedDigit()
+                }
+                .padding(.top, 14)
             }
-            Spacer(minLength: 0)
         }
     }
 }

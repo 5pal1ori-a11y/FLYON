@@ -10,6 +10,8 @@ struct SubwayLine: Identifiable, Decodable, Hashable {
     let live: String?
     let loop: Bool
     let segments: [[String]]
+    /// 역 이름 → [위도, 경도]. 노선도 지도에 쓴다.
+    let coords: [String: [Double]]
 
     func segmentTitle(_ index: Int) -> String {
         let s = segments[index]

@@ -61,17 +61,19 @@ jobs:
             xcrun simctl io "$UDID" screenshot "shots/${MODE}-${name}.png"
           }
 
-          MODE=dark
-          xcrun simctl ui "$UDID" appearance dark
-          shoot 1-home
-          shoot 2-subway -screenshotTab subway -screenshotLine 2
-          shoot 3-rail -screenshotTab rail
-          shoot 4-subway-branch -screenshotTab subway -screenshotLine 1
-          shoot 5-rail-detail -screenshotTab rail -screenshotSheet rail
-          shoot 6-settings -screenshotTab settings
-          shoot 7-station -screenshotTab subway -screenshotLine 2 -screenshotSheet station
-          shoot 8-route -screenshotTab subway -screenshotLine 2 -screenshotSheet route
-          shoot 9-lines -screenshotTab subway -screenshotLine 2 -screenshotSheet lines
+          for MODE in light dark; do
+            xcrun simctl ui "$UDID" appearance "$MODE"
+            shoot 1-home
+            shoot 2-map -screenshotTab map
+            shoot 3-subway -screenshotTab subway -screenshotLine 2
+            shoot 4-rail -screenshotTab rail
+            if [ "$MODE" = light ]; then
+              shoot 5-station -screenshotTab subway -screenshotLine 2 -screenshotSheet station
+              shoot 6-route -screenshotTab subway -screenshotLine 2 -screenshotSheet route
+              shoot 7-lines -screenshotTab subway -screenshotLine 2 -screenshotSheet lines
+              shoot 8-settings -screenshotTab settings
+            fi
+          done
           ls -la shots
 
       - name: Push screenshots to railnow-screenshots branch

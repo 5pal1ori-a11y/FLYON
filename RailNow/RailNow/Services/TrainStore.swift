@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 enum AppTab: Hashable {
-    case home, subway, rail, settings
+    case home, map, subway, rail, settings
 }
 
 enum DataSource: Equatable {
@@ -83,6 +83,7 @@ final class TrainStore: ObservableObject {
         let args = UserDefaults.standard
         switch args.string(forKey: "screenshotTab") {
         case "subway": tab = .subway
+        case "map": tab = .map
         case "rail": tab = .rail
         case "settings": tab = .settings
         default: break
