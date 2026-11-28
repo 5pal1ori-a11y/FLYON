@@ -1,6 +1,6 @@
 name: RailNow
 options:
-  bundleIdPrefix: com.flight
+  bundleIdPrefix: com.metro
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: ko
@@ -43,9 +43,9 @@ targets:
           UIApplicationSupportsMultipleScenes: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon
+        PRODUCT_BUNDLE_IDENTIFIER: com.metro.itgo   # ITGO 잇고 전용 앱 레코드
         PRODUCT_NAME: RailNow
-        MARKETING_VERSION: "4.0"   # 같은 FLYON 앱 자리를 쓰는 다른 앱(최대 3.0)보다 높게 → TestFlight 기본 빌드가 ITGO 잇고
+        MARKETING_VERSION: "4.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
@@ -63,7 +63,7 @@ targets:
     sources: [Widget, Shared]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.flight.flyon.railnowwidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.metro.itgo.widget
         PRODUCT_NAME: RailNowWidget
         MARKETING_VERSION: "4.0"
         CURRENT_PROJECT_VERSION: "1"

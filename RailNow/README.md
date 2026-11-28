@@ -80,7 +80,7 @@ scripts/build_subway.py   OpenStreetMap 기반 자료에서 subway.json을 다�
 - `.github/workflows/railnow-build-check.yml`: `RailNow/` 아래 파일이 main(또는 `railnow-*` 브랜치)에 푸시되면 시뮬레이터용으로 컴파일만 해 봅니다.
 - `.github/workflows/testflight-railnow.yml`: Actions 탭에서 **ITGO 잇고 TestFlight → Run workflow**를 누르거나, `RailNow/RELEASE` 파일을 고쳐 main에 푸시하면 실행됩니다 (`railnow-v*` 태그 푸시도 가능).
 - 버전은 **4.0**입니다. 빌드 번호는 **50000 + 실행 번호**로, 다른 앱의 빌드 번호(1만~4만대)와 겹치지 않습니다.
-- 번들 ID는 다른 앱들처럼 `com.flight.flyon`을 같이 씁니다. 그래서 TestFlight에서 설치하면 폰에 있던 FLYON·구독온·TRADEX·한평상회·듀오 던전 테스트 빌드를 덮어씁니다. 따로 두려면 App Store Connect에 새 앱(예: `com.flight.railnow`)을 만들고 워크플로와 project.yml의 번들 ID를 바꾸면 됩니다.
+- 번들 ID는 전용인 `com.metro.itgo`(위젯은 `com.metro.itgo.widget`)입니다. 다른 앱의 테스트 빌드를 덮어쓰지 않습니다. 위젯용 ID는 배포 스크립트가 자동으로 등록합니다.
 
 ## 출시 전 확인할 것 (법적 체크리스트)
 

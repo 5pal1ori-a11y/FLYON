@@ -17,8 +17,8 @@ permissions:
 
 env:
   TEAM_ID: F5XL8B63NU
-  BUNDLE_ID: com.flight.flyon
-  WIDGET_BUNDLE_ID: com.flight.flyon.railnowwidget   # 탑승 안내 Live Activity
+  BUNDLE_ID: com.metro.itgo
+  WIDGET_BUNDLE_ID: com.metro.itgo.widget   # 탑승 안내 Live Activity
   CAPABILITIES: ""   # 추가 기능 없음
 
 jobs:
