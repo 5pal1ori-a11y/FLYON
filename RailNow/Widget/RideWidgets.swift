@@ -9,7 +9,7 @@ struct RailNowWidgetBundle: WidgetBundle {
     }
 }
 
-private func tint(_ hex: String) -> Color {
+private func hexColor(_ hex: String) -> Color {
     var s = hex
     if s.hasPrefix("#") { s.removeFirst() }
     var v: UInt64 = 0
@@ -30,7 +30,7 @@ private struct CountRing: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(tint(state.colorHex), lineWidth: size * 0.14)
+            Circle().stroke(hexColor(state.colorHex), lineWidth: size * 0.14)
             Text("\(state.remaining)")
                 .font(.system(size: size * 0.5, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
@@ -49,7 +49,7 @@ private struct LineTag: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 7)
             .frame(minWidth: 22, minHeight: 22)
-            .background(tint(state.colorHex), in: Capsule())
+            .background(hexColor(state.colorHex), in: Capsule())
     }
 }
 
@@ -125,7 +125,7 @@ struct RideLiveActivity: Widget {
             } minimal: {
                 CountRing(state: context.state, size: 22)
             }
-            .keylineTint(tint(context.state.colorHex))
+            .keylineTint(hexColor(context.state.colorHex))
         }
     }
 }
