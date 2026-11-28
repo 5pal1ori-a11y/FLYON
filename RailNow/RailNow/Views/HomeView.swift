@@ -40,7 +40,7 @@ struct HomeView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(height: 20)
-                    Text("타고")
+                    Text("잇고")
                         .font(.pre(21, .bold))
                         .foregroundStyle(Palette.ink)
                     Spacer()

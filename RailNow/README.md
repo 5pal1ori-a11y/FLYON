@@ -1,4 +1,4 @@
-# TAGO 타고
+# ITGO 잇고
 
 (폴더와 Xcode 타깃 이름은 처음 이름인 RailNow를 그대로 씁니다.)
 
@@ -72,7 +72,7 @@ scripts/build_subway.py   OpenStreetMap 기반 자료에서 subway.json을 다�
 ## 자동 빌드와 TestFlight
 
 - `.github/workflows/railnow-build-check.yml`: `RailNow/` 아래 파일이 main(또는 `railnow-*` 브랜치)에 푸시되면 시뮬레이터용으로 컴파일만 해 봅니다.
-- `.github/workflows/testflight-railnow.yml`: Actions 탭에서 **TAGO 타고 TestFlight → Run workflow**를 누르거나, `RailNow/RELEASE` 파일을 고쳐 main에 푸시하면 실행됩니다 (`railnow-v*` 태그 푸시도 가능).
+- `.github/workflows/testflight-railnow.yml`: Actions 탭에서 **ITGO 잇고 TestFlight → Run workflow**를 누르거나, `RailNow/RELEASE` 파일을 고쳐 main에 푸시하면 실행됩니다 (`railnow-v*` 태그 푸시도 가능).
 - 버전은 **4.0**입니다. 빌드 번호는 **50000 + 실행 번호**로, 다른 앱의 빌드 번호(1만~4만대)와 겹치지 않습니다.
 - 번들 ID는 다른 앱들처럼 `com.flight.flyon`을 같이 씁니다. 그래서 TestFlight에서 설치하면 폰에 있던 FLYON·구독온·TRADEX·한평상회·듀오 던전 테스트 빌드를 덮어씁니다. 따로 두려면 App Store Connect에 새 앱(예: `com.flight.railnow`)을 만들고 워크플로와 project.yml의 번들 ID를 바꾸면 됩니다.
 
@@ -83,6 +83,6 @@ scripts/build_subway.py   OpenStreetMap 기반 자료에서 subway.json을 다�
 - **상표와 로고**: "KTX", "SRT", "ITX-새마을"은 한국철도공사와 에스알의 등록상표입니다. 앱 안에서 열차 종류를 가리키는 말로만 쓰고, 앱 이름·아이콘·스토어 스크린샷 문구에 내세우지 않으며, 공식 로고나 CI를 넣지 않습니다. 설정 화면에 운영기관과 무관한 비공식 앱임을 밝혀 두었습니다.
 - **"실시간" 표현**: 기차 위치는 추정값이므로 스토어 설명에 "KTX 실시간 위치"처럼 쓰면 소비자를 오인하게 하는 표시가 될 수 있습니다(표시광고법). "시간표 기반 추정 위치"로 씁니다. 지하철만 "실시간"이라고 쓸 수 있습니다.
 - **OpenStreetMap 자료**: `subway.json`은 ODbL 1.0 자료에서 만든 것이라 출처 표시가 필요하고, 고친 자료를 배포할 때도 ODbL을 따라야 합니다. 이 저장소에 생성 스크립트와 결과물이 공개되어 있습니다.
-- **이름 "TAGO"**: TAGO는 국토교통부 국가대중교통정보센터의 서비스 이름이고, 이 앱이 쓰는 시간표 API의 이름이기도 합니다. 같은 이름을 앱 이름에 쓰면 정부 공식 앱으로 오인될 수 있고, 등록된 표장이 있으면 상표법·부정경쟁방지법 문제가 됩니다. **App Store에 정식 출시하기 전에** KIPRIS(키프리스)에서 "TAGO", "타고"를 제9류·제39류·제42류로 검색하고, 겹치면 "타고"만 쓰거나 다른 이름으로 바꿉니다. TestFlight 내부 시험 단계에서는 설정 화면에 비공식 앱임을 밝혀 두었습니다.
+- **이름 상표**: KIPRIS(키프리스)에서 "ITGO", "잇고"를 제9류·제39류·제42류로 검색해 같거나 비슷한 상표가 있는지 확인합니다. (처음 후보였던 "TAGO"는 국토교통부 국가대중교통정보센터의 서비스 이름이라 쓰지 않습니다. 앱 안에서는 시간표 API의 출처를 밝히는 말로만 나옵니다.)
 - **개인정보**: 서버로 보내거나 수집하는 정보가 없고 위치 권한도 쓰지 않습니다. App Store 개인정보 라벨은 "데이터를 수집하지 않음"으로 작성할 수 있습니다. 내 위치 기반 기능, 광고, 분석 SDK를 넣으면 위치정보법 신고 여부와 개인정보처리방침을 다시 검토해야 합니다.
 - **글꼴**: Pretendard는 SIL Open Font License 1.1이며 라이선스 파일을 함께 넣었습니다.

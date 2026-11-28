@@ -108,7 +108,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("TAGO 타고 \(version)")
+                Text("ITGO 잇고 \(version)")
                     .font(.pre(12.5))
                     .foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity)

@@ -1,4 +1,4 @@
-name: TAGO 타고 build check
+name: ITGO 잇고 build check
 
 # 서명 없이 시뮬레이터용으로 컴파일만 해 본다. (비밀값 불필요)
 on:
